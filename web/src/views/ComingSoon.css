@@ -1,0 +1,27 @@
+.eko-soon {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  padding-bottom: calc(var(--space-8) + var(--sab));
+  background: linear-gradient(180deg, var(--lagoon-100), var(--bg));
+}
+
+.eko-soon__actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.eko-soon__link {
+  background: none;
+  border: 0;
+  color: var(--primary-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-top: var(--space-4);
+  min-height: 44px;
+}

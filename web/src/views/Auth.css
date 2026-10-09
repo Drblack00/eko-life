@@ -1,0 +1,185 @@
+.eko-auth {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--lagoon-100), var(--bg));
+}
+
+.eko-auth__top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: calc(var(--space-3) + var(--sat)) var(--space-4) var(--space-3);
+  padding-left: calc(var(--space-4) + var(--sal));
+  padding-right: calc(var(--space-4) + var(--sar));
+}
+
+.eko-auth__back {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  font-size: 1.3rem;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.eko-auth__wordmark {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: var(--lagoon-700);
+}
+
+.eko-auth__main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: var(--space-4);
+  padding-bottom: calc(var(--space-8) + var(--sab));
+}
+
+.eko-auth__card {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.eko-auth__tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--surface-2);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+}
+
+.eko-auth__tab {
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  min-height: 44px;
+  padding: var(--space-2);
+}
+
+.eko-auth__tab--active {
+  background: var(--surface);
+  color: var(--primary-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.eko-auth__card form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.eko-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.eko-field__label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.eko-field__error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.eko-input {
+  width: 100%;
+  min-height: 48px;
+  border: 2px solid var(--neutral-200);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  font-size: 1rem;
+}
+
+.eko-input:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(14 165 233 / 0.2);
+}
+
+.eko-input__wrap {
+  position: relative;
+}
+
+.eko-input__wrap .eko-input {
+  padding-right: 76px;
+}
+
+.eko-input__toggle {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  bottom: 4px;
+  min-height: 40px;
+  min-width: 64px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--primary-strong);
+}
+
+.eko-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 0.95rem;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.eko-check input {
+  width: 24px;
+  height: 24px;
+  accent-color: var(--primary);
+  flex: none;
+}
+
+.eko-auth__submit {
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.eko-auth__fineprint {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.eko-auth__form-error {
+  background: rgb(220 38 38 / 0.08);
+  border: 1px solid rgb(220 38 38 / 0.3);
+  color: var(--danger);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.eko-auth__guest-blurb {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 0.95rem;
+}

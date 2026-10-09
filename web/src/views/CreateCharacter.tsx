@@ -1,0 +1,332 @@
+import { useEffect, useState, type FormEvent } from "react";
+import { api, ApiError, asList, type ClassInfo } from "../lib/api";
+import { Button, Card, Skeleton, useToast } from "../components";
+import "./CreateCharacter.css";
+
+/**
+ * M2 character creation. Effects are shown BEFORE choosing (audit improvement).
+ * POST /api/characters {name, class, avatar, color} — once per character.
+ * Avatar/color options are a subset of the server allowlists (server/src/game/data.js),
+ * so they always pass server validation.
+ */
+const AVATARS = ["🧑", "👩", "👨", "🧔", "👩‍🦱", "🧕", "🤠", "😎"];
+const COLORS = [
+  "#22d3ee",
+  "#f472b6",
+  "#a3e635",
+  "#fbbf24",
+  "#c084fc",
+  "#fb7185",
+  "#34d399",
+  "#60a5fa",
+];
+
+function classOrder(classes: Record<string, ClassInfo>): ClassInfo[] {
+  const list = asList(classes);
+  const rank = (id: string) =>
+    id === "silver_spoon" ? 0 : id === "street_smart" ? 1 : 2;
+  return list.slice().sort((a, b) => rank(a.id) - rank(b.id));
+}
+
+export function CreateCharacter({
+  token,
+  username,
+  onDone,
+  onSignOut,
+}: {
+  token: string;
+  username: string;
+  onDone: () => void;
+  onSignOut: () => void;
+}) {
+  const { toast } = useToast();
+  const [classes, setClasses] = useState<ClassInfo[] | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [name, setName] = useState(username);
+  const [classId, setClassId] = useState("street_smart");
+  const [avatar, setAvatar] = useState(AVATARS[0]);
+  const [color, setColor] = useState(COLORS[0]);
+  const [avatarOpts, setAvatarOpts] = useState<string[]>(AVATARS);
+  const [colorOpts, setColorOpts] = useState<string[]>(COLORS);
+  const [busy, setBusy] = useState(false);
+  const [nameError, setNameError] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [endpointMissing, setEndpointMissing] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .config()
+      .then((cfg) => {
+        if (cancelled) return;
+        const list = classOrder(cfg.classes ?? {});
+        if (list.length === 0) {
+          setLoadError("The city didn't send any character classes.");
+        } else {
+          setClasses(list);
+          if (!list.some((c) => c.id === classId)) setClassId(list[0].id);
+        }
+        // Prefer server allowlists for avatar/color (fall back to local subsets).
+        if (Array.isArray(cfg.avatars) && cfg.avatars.length > 0) {
+          setAvatarOpts(cfg.avatars);
+          if (!cfg.avatars.includes(avatar)) setAvatar(cfg.avatars[0]);
+        }
+        if (Array.isArray(cfg.colors) && cfg.colors.length > 0) {
+          setColorOpts(cfg.colors);
+          if (!cfg.colors.includes(color)) setColor(cfg.colors[0]);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setLoadError(
+          err instanceof ApiError
+            ? err.message
+            : "Couldn't reach the city. Check your connection."
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setSubmitError("");
+    setEndpointMissing(false);
+    const clean = name.trim();
+    // Must match the server's USER_RE (server/src/auth.js): no spaces.
+    if (!/^[a-zA-Z0-9_]{3,16}$/.test(clean)) {
+      setNameError("3–16 letters, numbers or underscores.");
+      return;
+    }
+    setNameError("");
+    setBusy(true);
+    try {
+      await api.createCharacter(token, {
+        name: clean,
+        class: classId,
+        avatar,
+        color,
+      });
+      try {
+        localStorage.setItem(`eko_char_done:${username}`, "1");
+      } catch {
+        /* private mode: creation just re-asks next session */
+      }
+      toast(`Your Lagos story begins, ${clean}!`, "success");
+      onDone();
+    } catch (err) {
+      setBusy(false);
+      if (
+        err instanceof ApiError &&
+        (err.status === 409 ||
+          (err.status === 400 && /already created/i.test(err.message)))
+      ) {
+        // Already created (one-time endpoint) — proceed into the game.
+        try {
+          localStorage.setItem(`eko_char_done:${username}`, "1");
+        } catch {
+          /* ignore */
+        }
+        onDone();
+        return;
+      }
+      if (err instanceof ApiError && err.status === 404) {
+        // M2 server not deployed yet — offer a way forward.
+        setEndpointMissing(true);
+        return;
+      }
+      setSubmitError(
+        err instanceof ApiError
+          ? err.message
+          : "Couldn't create your character. Check your connection and try again."
+      );
+    }
+  };
+
+  const selectedClass = classes?.find((c) => c.id === classId);
+
+  return (
+    <div className="eko-create">
+      <header className="eko-create__top">
+        <span className="eko-create__wordmark">Èkó Life</span>
+        <button
+          type="button"
+          className="eko-create__signout"
+          onClick={onSignOut}
+        >
+          Sign out
+        </button>
+      </header>
+
+      <main className="eko-create__main">
+        <h1 className="eko-create__title">Who are you in this city?</h1>
+        <p className="eko-create__sub">
+          Pick a name, a background and a look. Your choices shape your
+          starting money, your home and how the hustle pays you.
+        </p>
+
+        {loadError ? (
+          <Card>
+            <p className="eko-create__error" role="alert">
+              {loadError}
+            </p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </Card>
+        ) : !classes ? (
+          <div className="eko-create__loading" aria-label="Loading character options">
+            <Skeleton height={120} />
+            <Skeleton height={120} />
+            <Skeleton height={56} />
+          </div>
+        ) : (
+          <form onSubmit={submit} noValidate>
+            <section aria-labelledby="cc-name">
+              <h2 id="cc-name" className="eko-create__h2">
+                Your name
+              </h2>
+              <input
+                className="eko-input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={16}
+                placeholder="e.g. Adaeze"
+                aria-invalid={!!nameError}
+                aria-describedby={nameError ? "cc-name-error" : undefined}
+              />
+              {nameError && (
+                <p id="cc-name-error" className="eko-field__error" role="alert">
+                  {nameError}
+                </p>
+              )}
+            </section>
+
+            <section aria-labelledby="cc-class">
+              <h2 id="cc-class" className="eko-create__h2">
+                Your background
+              </h2>
+              <div className="eko-create__classes" role="radiogroup" aria-label="Character class">
+                {classes.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={classId === c.id}
+                    className={`eko-create__class ${classId === c.id ? "eko-create__class--active" : ""}`}
+                    onClick={() => setClassId(c.id)}
+                  >
+                    <span className="eko-create__class-icon" aria-hidden="true">
+                      {c.icon}
+                    </span>
+                    <span className="eko-create__class-body">
+                      <span className="eko-create__class-name">{c.name}</span>
+                      <span className="eko-create__class-tagline">{c.tagline}</span>
+                      <ul className="eko-create__perks">
+                        {c.perks.map((p) => (
+                          <li key={p}>{p}</li>
+                        ))}
+                      </ul>
+                    </span>
+                    <span
+                      className="eko-create__class-check"
+                      aria-hidden="true"
+                    >
+                      {classId === c.id ? "●" : "○"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section aria-labelledby="cc-look">
+              <h2 id="cc-look" className="eko-create__h2">
+                Your look
+              </h2>
+              <div className="eko-create__preview">
+                <span
+                  className="eko-create__preview-dot"
+                  style={{ backgroundColor: color }}
+                  aria-hidden="true"
+                >
+                  <span className="eko-create__preview-emoji">{avatar}</span>
+                </span>
+                <span className="eko-create__preview-name">
+                  {name.trim() || "Your name"}
+                  {selectedClass ? ` · ${selectedClass.name}` : ""}
+                </span>
+              </div>
+              <div
+                className="eko-create__avatars"
+                role="radiogroup"
+                aria-label="Avatar"
+              >
+                {avatarOpts.map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    role="radio"
+                    aria-checked={avatar === a}
+                    aria-label={`Avatar ${a}`}
+                    className={`eko-create__avatar ${avatar === a ? "eko-create__avatar--active" : ""}`}
+                    onClick={() => setAvatar(a)}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
+              <div
+                className="eko-create__colors"
+                role="radiogroup"
+                aria-label="Colour"
+              >
+                {colorOpts.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    role="radio"
+                    aria-checked={color === c}
+                    aria-label={`Colour ${c}`}
+                    className={`eko-create__color ${color === c ? "eko-create__color--active" : ""}`}
+                    style={{ backgroundColor: c }}
+                    onClick={() => setColor(c)}
+                  />
+                ))}
+              </div>
+            </section>
+
+            {submitError && (
+              <p className="eko-create__error" role="alert">
+                {submitError}
+              </p>
+            )}
+
+            {endpointMissing && (
+              <Card className="eko-create__fallback">
+                <p>
+                  Character creation isn't live on this server yet — your
+                  default character is ready instead.
+                </p>
+                <Button type="button" onClick={onDone}>
+                  Enter the city with my default character
+                </Button>
+              </Card>
+            )}
+
+            <Button
+              type="submit"
+              size="lg"
+              loading={busy}
+              className="eko-create__submit"
+            >
+              Start my Lagos story
+            </Button>
+            <p className="eko-create__fineprint">
+              One character per account. Choose wisely — Lagos remembers.
+            </p>
+          </form>
+        )}
+      </main>
+    </div>
+  );
+}

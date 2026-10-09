@@ -1,0 +1,588 @@
+/* Game — mobile-first main game shell */
+
+.eko-game {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--bg);
+}
+
+/* ---- HUD ---- */
+.eko-hud {
+  padding: var(--space-3) var(--space-4);
+  padding-top: calc(var(--space-3) + var(--sat));
+  background: var(--surface);
+  border-bottom: 1px solid var(--surface-2);
+  box-shadow: var(--shadow-sm);
+  z-index: 10;
+}
+
+.eko-hud__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.eko-hud__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.eko-hud__identity {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.eko-hud__name {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eko-hud__money {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  color: var(--palm-700);
+  font-size: 1.1rem;
+}
+
+.eko-hud__day {
+  font-family: var(--font-display);
+  font-weight: 800;
+  background: var(--lagoon-100);
+  color: var(--lagoon-700);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-3);
+  white-space: nowrap;
+}
+
+.eko-hud__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-3);
+}
+
+.eko-offline {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--danfo-400);
+  color: var(--neutral-900);
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.eko-offline--failed {
+  background: var(--danger);
+  color: #fff;
+}
+
+.eko-offline__retry {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: #fff;
+  color: var(--neutral-900);
+  font-weight: 800;
+}
+
+/* ---- Day banner ---- */
+.eko-daybanner {
+  position: fixed;
+  top: calc(var(--space-4) + var(--sat));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  background: var(--neutral-900);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-lg);
+  white-space: nowrap;
+}
+
+/* ---- Hint bar ---- */
+.eko-hint {
+  margin: var(--space-3) var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  min-height: 44px;
+  border: 1px solid var(--danfo-500);
+  border-radius: var(--radius-md);
+  background: #fffbeb;
+  color: var(--neutral-900);
+  font-weight: 600;
+  text-align: left;
+  width: calc(100% - var(--space-8));
+}
+
+[data-theme="night"] .eko-hint {
+  background: #2a2113;
+  color: #fde68a;
+}
+
+/* ---- Main content ---- */
+.eko-main {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.eko-tabpad {
+  padding: var(--space-4);
+  padding-bottom: calc(var(--space-8) + var(--sab));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.eko-tabh {
+  font-size: 1.15rem;
+  margin-top: var(--space-2);
+}
+
+/* ---- City tab ---- */
+.eko-city {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  padding-bottom: calc(var(--space-8) + var(--sab));
+  height: 100%;
+}
+
+.eko-city__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.eko-city__here {
+  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+
+.eko-city__spawns {
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: var(--danfo-400);
+  color: var(--neutral-900);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+  white-space: nowrap;
+}
+
+.eko-city__mapwrap {
+  position: relative;
+  height: min(58dvh, 520px);
+  min-height: 320px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.eko-city__tip {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* ---- Work / Eat cards ---- */
+.eko-job,
+.eko-food {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.eko-job__head,
+.eko-food__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.eko-job__icon,
+.eko-food__icon {
+  font-size: 1.75rem;
+  flex: none;
+}
+
+.eko-job__meta,
+.eko-food__meta {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.eko-job__name {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+
+.eko-job__loc,
+.eko-food__fx {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.eko-job__pay,
+.eko-food__cost {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--palm-700);
+  white-space: nowrap;
+}
+
+.eko-job__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.eko-job__foot .eko-btn,
+.eko-food .eko-btn {
+  min-height: 44px;
+}
+
+.eko-job__cost {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.eko-work__note {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* ---- Me tab ---- */
+.eko-me__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.eko-me__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.eko-me__avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.25rem;
+  flex: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.eko-me__name {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+}
+
+.eko-me__sub {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.eko-me__rows {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.eko-me__rows > div {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+}
+
+.eko-me__rows dt {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.eko-me__rows dd {
+  margin: 0;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.eko-me__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.eko-me__btn {
+  min-height: 56px;
+}
+
+.eko-me__tip {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.eko-howto {
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+
+.eko-howto summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+  font-family: var(--font-display);
+  cursor: pointer;
+}
+
+.eko-howto ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: 0.92rem;
+}
+
+.eko-me__signout {
+  align-self: center;
+}
+
+/* ---- Location pin sheet ---- */
+.eko-pin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.eko-pin__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.eko-pin__emoji {
+  font-size: 2.5rem;
+}
+
+.eko-pin__name {
+  font-size: 1.3rem;
+}
+
+.eko-pin__blurb {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.eko-pin__go {
+  margin-top: var(--space-2);
+}
+
+/* ---- Bottom tabs ---- */
+.eko-tabs {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  background: var(--surface);
+  border-top: 1px solid var(--surface-2);
+  padding-bottom: var(--sab);
+  z-index: 10;
+}
+
+.eko-tabs__btn {
+  min-height: 60px;
+  border: none;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--text-muted);
+}
+
+.eko-tabs__btn--active {
+  color: var(--primary);
+}
+
+.eko-tabs__icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.eko-tabs__label {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* ---- Work tab: path groups ---- */
+
+/* ---- Leaderboard (Me tab) ---- */
+.eko-leaders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-leaders__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--surface-2);
+}
+
+.eko-leaders__row:last-child {
+  border-bottom: none;
+}
+
+.eko-leaders__row--me {
+  background: var(--lagoon-100);
+  border-radius: var(--radius-sm);
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+}
+
+.eko-leaders__rank {
+  min-width: 32px;
+  text-align: center;
+  font-weight: 800;
+}
+
+.eko-leaders__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eko-leaders__money {
+  font-weight: 800;
+  color: var(--success);
+}
+.eko-work__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.eko-work__path {
+  font-size: 1rem;
+  font-family: var(--font-display);
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.eko-job__study {
+  width: 100%;
+  min-height: 44px;
+}
+
+/* ---- Eat tab: study card ---- */
+.eko-eat__study {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border: 2px solid var(--lagoon-500);
+}
+
+.eko-eat__study .eko-btn {
+  min-height: 44px;
+}
+
+/* ---- Location pin sheet: tag actions ---- */
+.eko-pin__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-pin__btnrow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.eko-pin__btnrow .eko-btn {
+  min-height: 48px;
+}
+
+.eko-pin__full {
+  width: 100%;
+  min-height: 48px;
+}
+
+/* ---- Me tab ---- */
+.eko-me__ledger {
+  width: 100%;
+  min-height: 48px;
+}
+
+/* ---- Boot / loading ---- */
+.eko-game__boot {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.eko-game__boot-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 320px;
+}
+
+@media (min-width: 720px) {
+  .eko-hud__stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
