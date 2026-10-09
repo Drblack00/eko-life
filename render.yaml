@@ -1,5 +1,9 @@
 # Render Blueprint — Èkó Life
-# Web service (Node server + serves built client) + free Postgres.
+# Web service (Node server + serves built client). The database is an external
+# Supabase Postgres (free tier): Render allows only one free managed Postgres
+# per workspace and that slot is taken by benin-life-db, so DATABASE_URL is set
+# manually in the Render dashboard (sync:false keeps the Blueprint from
+# overwriting it).
 
 services:
   - type: web
@@ -12,13 +16,5 @@ services:
       - key: SESSION_SECRET
         generateValue: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: eko-life-db
-          property: connectionString
+        sync: false
     healthCheckPath: /api/health
-
-databases:
-  - name: eko-life-db
-    plan: free
-    databaseName: ekolife
-    user: ekolife
