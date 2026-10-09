@@ -1,0 +1,96 @@
+/* Èkó Life design tokens — day theme + night theme (data-theme="night") */
+
+:root,
+[data-theme="day"] {
+  --font-display: "Baloo 2", "Comic Sans MS", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Palette */
+  --lagoon-50: #f0f9ff;
+  --lagoon-100: #e0f2fe;
+  --lagoon-500: #0ea5e9;
+  --lagoon-600: #0284c7;
+  --lagoon-700: #0369a1;
+  --lagoon-900: #0c4a6e;
+
+  --palm-400: #4ade80;
+  --palm-500: #22c55e;
+  --palm-600: #16a34a;
+  --palm-700: #15803d;
+
+  --danfo-400: #fbbf24;
+  --danfo-500: #f59e0b;
+  --danfo-600: #d97706;
+
+  --neutral-0: #ffffff;
+  --neutral-50: #faf7f0;
+  --neutral-100: #f4efe4;
+  --neutral-200: #e7dfcc;
+  --neutral-600: #5b5344;
+  --neutral-800: #2b2620;
+  --neutral-900: #1c1814;
+
+  /* Semantic */
+  --bg: var(--neutral-50);
+  --surface: var(--neutral-0);
+  --surface-2: var(--neutral-100);
+  --text: var(--neutral-900);
+  --text-muted: var(--neutral-600);
+  --primary: var(--lagoon-600);
+  --primary-strong: var(--lagoon-700);
+  --accent: var(--danfo-500);
+  --success: var(--palm-600);
+  --danger: #dc2626;
+  --ring: var(--lagoon-500);
+
+  /* Shape */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgb(28 24 20 / 0.08);
+  --shadow-md: 0 6px 20px rgb(28 24 20 / 0.12);
+  --shadow-lg: 0 16px 48px rgb(28 24 20 / 0.18);
+
+  /* Safe areas */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+[data-theme="night"] {
+  --bg: #0b1b2a;
+  --surface: #12293d;
+  --surface-2: #0e2233;
+  --text: #f2f7fb;
+  --text-muted: #a9c0d4;
+  --primary: var(--lagoon-500);
+  --primary-strong: var(--lagoon-100);
+  --accent: var(--danfo-400);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 6px 20px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 16px 48px rgb(0 0 0 / 0.5);
+}
+
+/* Reduced motion: kill decorative animation everywhere */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
