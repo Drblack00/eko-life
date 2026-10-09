@@ -1,0 +1,79 @@
+.eko-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-weight: 700;
+  cursor: pointer;
+  padding: var(--space-3) var(--space-5);
+  min-height: 44px;
+  min-width: 44px;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+  text-decoration: none;
+  user-select: none;
+}
+
+.eko-btn--md {
+  font-size: 1rem;
+}
+
+.eko-btn--lg {
+  font-size: 1.15rem;
+  padding: var(--space-4) var(--space-6);
+  min-height: 52px;
+}
+
+.eko-btn--primary {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: var(--shadow-md);
+}
+
+.eko-btn--accent {
+  background: var(--accent);
+  color: var(--neutral-900);
+  box-shadow: var(--shadow-md);
+}
+
+.eko-btn--ghost {
+  background: transparent;
+  color: var(--primary-strong);
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+
+.eko-btn--danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.eko-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.eko-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.99);
+}
+
+.eko-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.eko-btn__spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid rgb(255 255 255 / 0.4);
+  border-top-color: currentColor;
+  animation: eko-spin 0.7s linear infinite;
+  flex: none;
+}
+
+@keyframes eko-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

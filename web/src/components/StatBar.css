@@ -1,0 +1,55 @@
+.eko-statbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.eko-statbar__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.8rem;
+}
+
+.eko-statbar__label {
+  font-weight: 600;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.eko-statbar__icon {
+  font-size: 1rem;
+}
+
+.eko-statbar__value {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.eko-statbar__track {
+  height: 10px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.eko-statbar__fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+.eko-statbar__fill--good {
+  background: var(--palm-500);
+}
+
+.eko-statbar__fill--warn {
+  background: var(--accent);
+}
+
+.eko-statbar__fill--bad {
+  background: var(--danger);
+}
