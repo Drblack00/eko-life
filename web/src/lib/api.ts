@@ -1,0 +1,562 @@
+import type {
+  LeaderEntry,
+  NewsItem,
+  PresenceEntry,
+} from "../game/types";
+
+/** Thin fetch wrapper against the same-origin Èkó Life API (see docs/API_SPEC.md). */
+
+export interface ApiLocation {
+  id: string;
+  name: string;
+  zone?: string;
+  region?: string;
+  emoji?: string;
+  icon?: string;
+  blurb?: string;
+  desc?: string;
+  /** M3: gameplay tags, e.g. "market", "campus", "bank", "housing_office", "beach", "club". */
+  tags?: string[];
+  /** M3: travel fare in naira (optional). */
+  fare?: number;
+  lat?: number;
+  lng?: number;
+  x?: number;
+  y?: number;
+  z?: number;
+}
+
+export interface ClassInfo {
+  id: string;
+  name: string;
+  icon: string;
+  tagline: string;
+  startMoney: number;
+  housing: string;
+  happinessBonus: number;
+  payMult: number;
+  starterLoan: number;
+  perks: string[];
+}
+
+export interface JobInfo {
+  id: string;
+  name: string;
+  locationId: string;
+  /** M3 career path group: "Market" | "Transport" | "Campus" | "Corporate" (server-defined). */
+  path?: string;
+  pay: number;
+  energyCost: number;
+  cooldownSec: number;
+  certRequired?: boolean;
+  icon: string;
+}
+
+export interface FoodInfo {
+  id: string;
+  name: string;
+  cost: number;
+  hunger: number;
+  energy: number;
+  happy: number;
+  icon: string;
+}
+
+export interface FunInfo {
+  id: string;
+  name: string;
+  cost: number;
+  happy: number;
+  energyDelta: number;
+  locationId: string;
+  icon: string;
+}
+
+export interface HousingInfo {
+  id: string;
+  name: string;
+  rent: number;
+  icon: string;
+}
+
+/** M3 catalog entries — all prices/names come from /api/config (or WS init).
+ *  Field names tolerate both the task-brief shapes (price/speedMult) and the
+ *  live server shapes (cost/mult); use priceOf()/speedOf() below. */
+export interface PropertyInfo {
+  id: string;
+  name: string;
+  price: number;
+  /** Daily income the property pays (0 = none). */
+  incomeDaily?: number;
+  income?: number;
+  /** Happiness bonus from owning (server PROPERTIES shape). */
+  happy?: number;
+  icon?: string;
+  desc?: string;
+}
+
+export interface BusinessInfo {
+  id: string;
+  name: string;
+  price?: number;
+  /** Server BIZ shape uses `cost`. */
+  cost?: number;
+  /** Daily income the business pays. */
+  dailyIncome?: number;
+  income?: number;
+  icon?: string;
+  desc?: string;
+}
+
+export interface VehicleInfo {
+  id: string;
+  name: string;
+  price?: number;
+  /** Server VEHICLES shape uses `cost`. */
+  cost?: number;
+  /** Travel speed multiplier (1 = normal). */
+  speedMult?: number;
+  speed?: number;
+  /** Server VEHICLES shape uses `mult`. */
+  mult?: number;
+  icon?: string;
+  desc?: string;
+}
+
+export interface FurnitureInfo {
+  id: string;
+  name: string;
+  price: number;
+  /** Server effect code (e.g. "sleep_health"); `desc` is the human text. */
+  effect?: string;
+  desc?: string;
+  icon?: string;
+}
+
+/** Price for any catalog entry (price | cost). */
+export function priceOf(e: { price?: number; cost?: number }): number {
+  const p = typeof e.price === "number" ? e.price : e.cost;
+  return Math.max(0, Math.round(p ?? 0));
+}
+
+/** Travel speed multiplier for a vehicle entry (speedMult | speed | mult). */
+export function speedOf(v: { speedMult?: number; speed?: number; mult?: number }): number {
+  const s =
+    typeof v.speedMult === "number"
+      ? v.speedMult
+      : typeof v.speed === "number"
+        ? v.speed
+        : v.mult;
+  return Number.isFinite(s) && (s as number) > 0 ? (s as number) : 1;
+}
+
+export interface BankInfo {
+  savingsRate?: number;
+  loanRate?: number;
+  loanMax?: number;
+}
+
+export interface TravelFares {
+  sameRegion?: number;
+  crossRegion?: number;
+  boat?: number;
+}
+
+/**
+ * Display-only mirror of the server's travelFare(): same region → sameRegion,
+ * any lagoon leg → boat, otherwise crossRegion. Server re-validates on travel.
+ */
+export function travelFare(
+  from: ApiLocation | null | undefined,
+  to: ApiLocation | null | undefined,
+  fares?: TravelFares
+): number {
+  const same = fares?.sameRegion ?? 0;
+  const cross = fares?.crossRegion ?? 200;
+  const boat = fares?.boat ?? 500;
+  if (!from || !to) return cross;
+  if (from.id === to.id) return 0;
+  if (from.region === to.region) return same;
+  if (from.region === "lagoon" || to.region === "lagoon") return boat;
+  return cross;
+}
+
+/** One row of the money ledger (GET /api/transactions). */
+export interface TransactionInfo {
+  id: number;
+  kind: string;
+  amount: number;
+  /** Balance right after this transaction. */
+  balance_after?: number;
+  balanceAfter?: number;
+  /** ms epoch (server may send `created_at` instead). */
+  created_at?: number;
+  ts?: number;
+  meta?: unknown;
+}
+
+export interface GameConfig {
+  classes: Record<string, ClassInfo>;
+  locations: ApiLocation[];
+  jobs: JobInfo[];
+  food: FoodInfo[];
+  fun: FunInfo[];
+  housing: Record<string, HousingInfo>;
+  /** M3 catalogs (optional until the M3 server lands). */
+  properties?: PropertyInfo[];
+  businesses?: BusinessInfo[];
+  vehicles?: VehicleInfo[];
+  furniture?: FurnitureInfo[];
+  /** M3 economy knobs (WS init carries these; REST may not). */
+  homeSlots?: number;
+  bank?: BankInfo;
+  travelFares?: TravelFares;
+  studyCost?: number;
+  spawn: string;
+  bounds: { xMin: number; xMax: number; yMin: number; yMax: number };
+  avatars?: string[];
+  colors?: string[];
+}
+
+/**
+ * Normalize raw config (from WS `init` or GET /api/config) into GameConfig,
+ * defensively: every catalog tolerates arrays or keyed objects and may be absent.
+ */
+export function normalizeConfig(raw: Record<string, unknown> | undefined): GameConfig | null {
+  if (!raw) return null;
+  const r = raw;
+  const classes =
+    r.classes && typeof r.classes === "object"
+      ? (r.classes as GameConfig["classes"])
+      : {};
+  const housing =
+    r.housing && typeof r.housing === "object"
+      ? (r.housing as GameConfig["housing"])
+      : {};
+  const bounds =
+    r.bounds && typeof r.bounds === "object"
+      ? (r.bounds as GameConfig["bounds"])
+      : { xMin: 0, xMax: 100, yMin: 0, yMax: 100 };
+  // Catalog key aliases: the live server sends `biz`/`furn`; the contract
+  // brief said `businesses`/`furniture`. Accept both.
+  const bank =
+    r.bank && typeof r.bank === "object" ? (r.bank as GameConfig["bank"]) : undefined;
+  const travelFares =
+    r.travelFares && typeof r.travelFares === "object"
+      ? (r.travelFares as GameConfig["travelFares"])
+      : undefined;
+  return {
+    classes,
+    locations: asList(r.locations as GameConfig["locations"]),
+    jobs: asList(r.jobs as GameConfig["jobs"]),
+    food: asList(r.food as GameConfig["food"]),
+    fun: asList(r.fun as GameConfig["fun"]),
+    housing,
+    properties: asList(r.properties as GameConfig["properties"]),
+    businesses:
+      asList(r.businesses as GameConfig["businesses"]).length > 0
+        ? asList(r.businesses as GameConfig["businesses"])
+        : asList(r.biz as GameConfig["businesses"]),
+    vehicles: asList(r.vehicles as GameConfig["vehicles"]),
+    furniture:
+      asList(r.furniture as GameConfig["furniture"]).length > 0
+        ? asList(r.furniture as GameConfig["furniture"])
+        : asList(r.furn as GameConfig["furniture"]),
+    homeSlots: typeof r.homeSlots === "number" ? r.homeSlots : 6,
+    bank,
+    travelFares,
+    studyCost: typeof r.studyCost === "number" ? r.studyCost : 5000,
+    spawn: typeof r.spawn === "string" ? r.spawn : "ojuelegba",
+    bounds,
+  };
+}
+
+/** Defensive: the wire may carry an array or a keyed object. */
+export function asList<T>(v: T[] | Record<string, T> | undefined | null): T[] {
+  if (!v) return [];
+  return Array.isArray(v) ? v : Object.values(v);
+}
+
+/** Authoritative character state (GET /api/me). */
+export interface Me {
+  id: number;
+  username: string;
+  name: string;
+  class: string | null;
+  avatar: string;
+  color: string;
+  money: number;
+  energy: number;
+  health: number;
+  happiness: number;
+  hunger: number;
+  housing: string;
+  property: string | { id?: string; name?: string } | null;
+  vehicle: string | { id?: string; name?: string } | null;
+  /** M3: owned business id/ref. */
+  biz?: string | { id?: string; name?: string } | null;
+  savings: number;
+  loan: number;
+  cert: number;
+  /** M3: owned furniture instances. */
+  furniture?: Array<{
+    id?: string;
+    item?: string;
+    itemId?: string;
+    name?: string;
+    icon?: string;
+    effect?: string;
+    placed?: boolean;
+  }> | null;
+  starter_loan_available?: boolean;
+  locationId: string;
+  day: number;
+  is_admin: boolean;
+  guest: boolean;
+  customized?: boolean;
+}
+
+export interface PublicStats {
+  online: number;
+  visits: number;
+  governor: string | null;
+  homes: number;
+  homesOnline: number;
+}
+
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...init,
+  });
+  let body: unknown = null;
+  try {
+    body = await res.json();
+  } catch {
+    body = null;
+  }
+  if (!res.ok) {
+    const msg =
+      body && typeof body === "object" && "error" in body
+        ? String((body as { error: unknown }).error)
+        : `Request failed (${res.status})`;
+    throw new ApiError(res.status, msg);
+  }
+  return body as T;
+}
+
+/**
+ * One row of the admin roster (GET /api/admin/players). Field names are
+ * defensive — the server may use `banned`/`is_banned` and `online` flags.
+ */
+export interface AdminPlayer {
+  id: number;
+  username: string;
+  money: number;
+  energy: number;
+  housing: string | null;
+  online?: boolean;
+  banned?: boolean;
+  is_admin?: boolean;
+  last_seen?: number;
+}
+
+/** Bearer-auth GET helper. */
+async function authGet<T>(path: string, token: string): Promise<T> {
+  return request<T>(path, {
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+/** Bearer-auth POST-with-JSON helper. */
+async function authPost<T>(path: string, token: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * M4 admin endpoints — require is_admin; the server answers 403 otherwise.
+ * Contract: docs/API_SPEC.md ("Admin (Bearer, is_admin only) — M4").
+ */
+export const adminApi = {
+  players: (token: string) =>
+    authGet<{ players: Array<AdminPlayer & { stats?: Record<string, number> }> }>(
+      "/api/admin/players",
+      token
+    ).then((body) => {
+      const rows = Array.isArray(body?.players) ? body.players : [];
+      // Server nests stats as {energy,health,...}; flatten defensively.
+      return rows.map((p) => ({
+        ...p,
+        energy: p.energy ?? p.stats?.energy ?? 0,
+      }));
+    }),
+  broadcast: (token: string, text: string) =>
+    authPost<{ ok?: boolean }>("/api/admin/broadcast", token, { text }),
+  ban: (token: string, username: string, banned: boolean) =>
+    authPost<{ ok?: boolean; banned?: boolean }>("/api/admin/ban", token, {
+      username,
+      banned,
+    }),
+  makeAdmin: (token: string, username: string) =>
+    authPost<{ ok?: boolean; is_admin?: boolean }>(
+      "/api/admin/make-admin",
+      token,
+      { username }
+    ),
+  election: (token: string) =>
+    authGet<unknown>("/api/admin/election", token),
+};
+
+/** Defensive M5 payload pickers — tolerate server shape drift. */
+function pickLeaders(body: unknown): LeaderEntry[] | null {
+  if (!body || typeof body !== "object") return null;
+  const b = body as Record<string, unknown>;
+  const list = asList(b.leaders as LeaderEntry[] | Record<string, LeaderEntry> | undefined);
+  if (list.length === 0) return null;
+  return list
+    .filter((l) => l && typeof (l as LeaderEntry).username === "string")
+    .slice(0, 10)
+    .map((l) => ({
+      id: typeof l.id === "number" ? l.id : undefined,
+      username: l.username,
+      money: Math.max(0, Math.round(Number(l.money) || 0)),
+    }));
+}
+
+function pickNews(body: unknown): NewsItem[] | null {
+  if (!body || typeof body !== "object") return null;
+  const b = body as Record<string, unknown>;
+  const list = asList(b.news as NewsItem[] | Record<string, NewsItem> | undefined);
+  if (list.length === 0) return null;
+  return list
+    .filter((n) => n && typeof (n as NewsItem).text === "string")
+    .map((n) => ({ id: n.id, text: String(n.text).slice(0, 220), ts: typeof n.ts === "number" ? n.ts : undefined }))
+    .slice(0, 20);
+}
+
+function pickPresence(body: unknown): PresenceEntry[] | null {
+  if (!body || typeof body !== "object") return null;
+  const b = body as Record<string, unknown>;
+  const list = asList(b.presence as PresenceEntry[] | Record<string, PresenceEntry> | undefined);
+  if (list.length === 0) return null;
+  return list
+    .filter((p) => p && typeof p.id === "number" && typeof p.username === "string")
+    .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
+    .map((p) => ({
+      id: p.id,
+      username: p.username,
+      x: Math.max(0, Math.min(100, p.x)),
+      y: Math.max(0, Math.min(100, p.y)),
+      avatar: typeof p.avatar === "string" ? p.avatar : undefined,
+      color: typeof p.color === "string" ? p.color : undefined,
+    }))
+    .slice(0, 200);
+}
+
+export const api = {
+  health: () => request<{ ok: boolean; online: number; day: number; db: string; version: string }>("/api/health"),
+  stats: () => request<PublicStats>("/api/stats"),
+  config: () => request<GameConfig>("/api/config"),
+  guest: (ageConfirm: boolean) =>
+    request<{ token: string; username: string }>("/api/auth/guest", {
+      method: "POST",
+      body: JSON.stringify({ ageConfirm }),
+    }),
+  register: (body: {
+    username: string;
+    email?: string;
+    password: string;
+    dob: string;
+    guestToken?: string;
+  }) =>
+    request<{ token: string; username: string; is_admin?: boolean }>("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  login: (body: { username: string; password: string }) =>
+    request<{ token: string; username: string; is_admin?: boolean }>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  me: (token: string) =>
+    request<Me>("/api/me", {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    }),
+  /** M2 character creation — once per character. Server validates & applies class stats. */
+  createCharacter: (
+    token: string,
+    body: { name: string; class: string; avatar: string; color: string }
+  ) =>
+    request<{ ok: boolean; character?: Me }>("/api/characters", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    }),
+  /** M3 money ledger — newest first. The server wraps rows in `{transactions}`. */
+  transactions: (token: string, limit = 50) =>
+    request<{ transactions: TransactionInfo[] }>(
+      `/api/transactions?limit=${limit}`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    ).then((body) =>
+      Array.isArray(body?.transactions) ? body.transactions : []
+    ),
+  /**
+   * M5 leaderboard — top players by money. The server may return
+   * `{leaders:[...]}` or `stats.leaders`; null when the endpoint isn't live.
+   */
+  leaderboard: (token: string, limit = 10): Promise<LeaderEntry[] | null> =>
+    authGet<unknown>(`/api/leaderboard?limit=${limit}`, token)
+      .then((body) => pickLeaders(body))
+      .catch(() =>
+        // Auth-less servers may serve it publicly.
+        request<unknown>("/api/leaderboard")
+          .then((body) => pickLeaders(body))
+          .catch(() => null)
+      ),
+  /**
+   * M5 public news ticker. `{news:[{id?,text,ts?}]}`; null when not live.
+   */
+  news: (): Promise<NewsItem[] | null> =>
+    request<unknown>("/api/news")
+      .then((body) => pickNews(body))
+      .catch(() => null),
+  /**
+   * M5 public presence — capped player dots for the landing map.
+   * `{presence:[{id,username,x,y,avatar?,color?}]}` (x/y are 0..100 map
+   * coords). Null when the server team hasn't built the endpoint —
+   * the landing simply renders no presence dots.
+   */
+  presence: (): Promise<PresenceEntry[] | null> =>
+    request<unknown>("/api/presence")
+      .then((body) => pickPresence(body))
+      .catch(() => null),
+};
