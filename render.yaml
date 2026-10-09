@@ -1,0 +1,24 @@
+# Render Blueprint — Èkó Life
+# Web service (Node server + serves built client) + free Postgres.
+
+services:
+  - type: web
+    name: eko-life
+    runtime: node
+    plan: free
+    buildCommand: npm run install:all && npm run build:web
+    startCommand: npm start
+    envVars:
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: eko-life-db
+          property: connectionString
+    healthCheckPath: /api/health
+
+databases:
+  - name: eko-life-db
+    plan: free
+    databaseName: ekolife
+    user: ekolife
