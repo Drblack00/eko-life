@@ -1,0 +1,275 @@
+/* Home tab — housing, bank, vehicles, business, furniture + ledger */
+
+.eko-home {
+  gap: var(--space-6);
+}
+
+.eko-home__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  scroll-margin-top: var(--space-4);
+}
+
+.eko-home__h {
+  font-size: 1.15rem;
+  margin: 0;
+  font-family: var(--font-display);
+}
+
+.eko-home__subh {
+  font-size: 0.95rem;
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-display);
+  color: var(--text-muted);
+}
+
+.eko-home__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.eko-home__card--own {
+  border: 2px solid var(--palm-500);
+}
+
+.eko-home__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.eko-home__meta {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.eko-home__meta--right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.eko-home__sub {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.eko-home__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.eko-home__label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.eko-home__input {
+  min-height: 48px;
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  padding: var(--space-2) var(--space-3);
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.eko-home__chips {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.eko-home__chip {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.eko-home__btnrow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.eko-home__btnrow .eko-btn {
+  min-height: 48px;
+}
+
+.eko-home__full {
+  width: 100%;
+  min-height: 48px;
+}
+
+.eko-home__sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ---- Confirm dialog ---- */
+.eko-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.eko-confirm__body {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.eko-confirm__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.eko-confirm__actions .eko-btn {
+  min-height: 48px;
+}
+
+/* ---- Furniture grid ---- */
+.eko-furn__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.eko-furn__item {
+  min-height: 88px;
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--space-2);
+}
+
+.eko-furn__item--placed {
+  border: 2px solid var(--palm-500);
+  background: var(--lagoon-100);
+}
+
+[data-theme="night"] .eko-furn__item--placed {
+  background: #14304a;
+}
+
+.eko-furn__item:disabled {
+  opacity: 0.55;
+}
+
+.eko-furn__icon {
+  font-size: 1.75rem;
+}
+
+.eko-furn__name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.eko-furn__state {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* ---- Ledger ---- */
+.eko-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.eko-ledger__error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.eko-ledger__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.eko-ledger__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--surface-2);
+}
+
+.eko-ledger__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.eko-ledger__kind {
+  font-size: 0.95rem;
+}
+
+.eko-ledger__time {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.eko-ledger__nums {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: none;
+}
+
+.eko-ledger__amt {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.eko-ledger__amt--in {
+  color: var(--palm-700);
+}
+
+.eko-ledger__amt--out {
+  color: var(--danger);
+}
+
+.eko-ledger__bal {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 720px) {
+  .eko-furn__grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
