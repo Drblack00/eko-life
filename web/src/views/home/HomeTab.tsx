@@ -6,17 +6,15 @@ import {
   type GameConfig,
 } from "../../lib/api";
 import {
-  furnitureItemId,
-  furnitureKey,
   naira,
   refId,
   refName,
   type ActName,
-  type FurnitureEntry,
   type You,
 } from "../../game/types";
 import { Button, Card, Dialog, Sheet } from "../../components";
 import "./Home.css";
+import { HomeRoomSection } from "./HomeRoom";
 
 export type HomeFocus = "housing" | "bank" | null;
 
@@ -657,104 +655,6 @@ function BusinessSection({
   );
 }
 
-/* ---------------- Furniture ---------------- */
-
-function FurnitureSection({
-  you,
-  config,
-  sendAct,
-}: {
-  you: You;
-  config: GameConfig;
-  sendAct: (a: ActName, params?: Record<string, unknown>) => void;
-}) {
-  const owned: FurnitureEntry[] = Array.isArray(you.furniture) ? you.furniture : [];
-  const catalog = config.furniture ?? [];
-  const maxPlaced = typeof config.homeSlots === "number" ? config.homeSlots : 6;
-  const placedCount = owned.filter((f) => f.placed).length;
-  const full = placedCount >= maxPlaced;
-
-  const catalogById = (id: string) => catalog.find((c) => c.id === id);
-
-  return (
-    <Section id="furniture" emoji="🛋️" title="Furniture">
-      <p className="eko-home__note">
-        Placed furniture boosts your daily vibes. {placedCount}/{maxPlaced}{" "}
-        slots used — tap an item to place or remove it.
-      </p>
-      {owned.length === 0 ? (
-        <p className="eko-home__note">
-          Your place is empty — buy something from the catalog below.
-        </p>
-      ) : (
-        <div className="eko-furn__grid">
-          {owned.map((f) => {
-            const c = catalogById(furnitureItemId(f));
-            return (
-              <button
-                key={furnitureKey(f)}
-                type="button"
-                className={`eko-furn__item ${f.placed ? "eko-furn__item--placed" : ""}`}
-                onClick={() =>
-                  sendAct("place_furniture", {
-                    id: furnitureKey(f),
-                    placed: !f.placed,
-                  })
-                }
-                aria-label={`${c?.name ?? f.name ?? "Furniture"}: ${f.placed ? "placed, tap to remove" : full ? "no free slots" : "tap to place"}`}
-                disabled={!f.placed && full}
-              >
-                <span className="eko-furn__icon" aria-hidden="true">
-                  {c?.icon ?? f.icon ?? "🪑"}
-                </span>
-                <span className="eko-furn__name">
-                  {c?.name ?? f.name ?? "Furniture"}
-                </span>
-                <span className="eko-furn__state">
-                  {f.placed ? "Placed ✓" : "Tap to place"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      <h3 className="eko-home__subh">Catalog</h3>
-      {catalog.map((f) => {
-        const ownedCount = owned.filter(
-          (o) => furnitureItemId(o) === f.id
-        ).length;
-        return (
-          <Card key={f.id} className="eko-home__card">
-            <div className="eko-home__row">
-              <div className="eko-home__meta">
-                <strong>
-                  {f.icon ? `${f.icon} ` : ""}{f.name}
-                  {ownedCount > 0 && ` ×${ownedCount}`}
-                </strong>
-                <span className="eko-home__sub">
-                  {f.desc ?? f.effect ?? "Makes the place feel like home."}
-                </span>
-              </div>
-              <BuyButton
-                price={f.price}
-                you={you}
-                label="Buy"
-                onBuy={() => sendAct("buy_furniture", { item: f.id })}
-              />
-            </div>
-          </Card>
-        );
-      })}
-      {catalog.length === 0 && (
-        <p className="eko-home__note">
-          The furniture catalog hasn't arrived yet.
-        </p>
-      )}
-    </Section>
-  );
-}
-
 /* ---------------- Home tab ---------------- */
 
 export function HomeTab({
@@ -789,7 +689,7 @@ export function HomeTab({
       <BankSection you={you} config={config} sendAct={sendAct} />
       <VehicleSection you={you} config={config} sendAct={sendAct} />
       <BusinessSection you={you} config={config} sendAct={sendAct} />
-      <FurnitureSection you={you} config={config} sendAct={sendAct} />
+      <HomeRoomSection you={you} config={config} sendAct={sendAct} />
     </div>
   );
 }

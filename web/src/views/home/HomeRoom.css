@@ -1,0 +1,254 @@
+/* M14 Home Room — 3D room + buy-mode catalogue */
+
+.eko-room__wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.eko-room__toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.eko-room__hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.eko-room__stage {
+  position: relative;
+}
+
+.eko-room__canvas {
+  height: 340px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  touch-action: none;
+  background: #f7f1e3;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.eko-room__nogl {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.eko-room__nogl button {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: var(--palm-500);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-4);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Floating placing toolbar + item popup over the canvas. */
+
+.eko-room__placing,
+.eko-room__popup {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-3);
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: 0.9rem;
+}
+
+.eko-room__placing-btns,
+.eko-room__popup-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.eko-room__btn {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-3);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.eko-room__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.eko-room__btn--primary {
+  background: var(--palm-500);
+  border-color: var(--palm-600);
+  color: #fff;
+}
+
+.eko-room__btn--danger {
+  background: #dc2626;
+  border-color: #991b1b;
+  color: #fff;
+}
+
+.eko-room__warn {
+  font-size: 0.8rem;
+  color: #b45309;
+}
+
+.eko-room__popup-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.eko-room__popup-head strong {
+  flex: 1;
+  min-width: 0;
+}
+
+.eko-room__popup-desc {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.eko-room__x {
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: var(--space-1);
+  line-height: 1;
+}
+
+/* Storage strip. */
+
+.eko-room__inventory {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+}
+
+.eko-room__inv-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.eko-room__inv-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.eko-room__inv-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Buy-mode catalogue. */
+
+.eko-room__tabs {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+}
+
+.eko-room__tab {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-3);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.eko-room__tab--active {
+  background: var(--palm-500);
+  border-color: var(--palm-600);
+  color: #fff;
+}
+
+.eko-room__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.eko-room__card {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.eko-room__card-top {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.eko-room__card-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.eko-room__card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
+.eko-room__card-sub {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.eko-room__buy {
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-3);
+  font-weight: 800;
+  font-size: 0.88rem;
+  cursor: pointer;
+  background: var(--palm-500);
+  color: #fff;
+}
+
+.eko-room__buy:disabled {
+  background: rgba(0, 0, 0, 0.12);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
