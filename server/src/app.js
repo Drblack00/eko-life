@@ -13,6 +13,15 @@ import { initDb, dbMode } from './db.js';
 import { createApiRouter } from './routes/api.js';
 import { createHub } from './ws/hub.js';
 import { DAY_MS } from './game/data.js';
+// V2 milestones: real-time clock + shifts (M7), city events (M8), daily
+// hunt rotation (M9). ensureSchema for every v2 module at boot.
+import { ensureSchema as m7Schema, onTickMinute as m7Tick, lagosNow as m7LagosNow } from './game/v2/m7.js';
+import { ensureSchema as m8Schema, onTickMinute as m8Tick, triggerMoodlet as m8TriggerMoodlet } from './game/v2/m8.js';
+import { ensureSchema as m9Schema, onTickMinute as m9Tick, bootM9 } from './game/v2/m9.js';
+import { ensureSchema as m10Schema } from './game/v2/m10.js';
+import { ensureSchema as m11Schema } from './game/v2/m11.js';
+import { ensureSchema as m12Schema } from './game/v2/m12.js';
+import { ensureSchema as m13Schema } from './game/v2/m13.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -47,6 +56,16 @@ export async function createApp() {
   // M5: seed rooms, ensure an election cycle, restore the governor —
   // before any WS client connects.
   await hub.bootGame();
+
+  // V2: module schemas (own tables), then M9 boot (hunt round safety net).
+  await m7Schema();
+  await m8Schema();
+  await m9Schema();
+  await m10Schema();
+  await m11Schema();
+  await m12Schema();
+  await m13Schema();
+  await bootM9({ broadcast: (m) => hub.broadcast(m) });
 
   // ---- API ----
   app.use('/api', createApiRouter({ hub, getDay }));
@@ -96,6 +115,33 @@ export async function createApp() {
   }, 60000);
   if (decay.unref) decay.unref();
 
+  // ---- V2: real-time Lagos clock broadcast (M7) — every 30s ----
+  const clock = setInterval(() => {
+    try { hub.broadcast({ t: 'clock', ...m7LagosNow() }); } catch (e) { console.error('[clock]', e.message); }
+  }, 30000);
+  if (clock.unref) clock.unref();
+
+  // ---- V2: per-minute ticks (M7 shifts, M8 city events, M9 hunt rotation) ----
+  const v2tick = setInterval(async () => {
+    try { await m8Tick({ broadcast: (m) => hub.broadcast(m), pushNews: hub.pushNews }); }
+    catch (e) { console.error('[m8]', e.message); }
+    try { await m9Tick({ broadcast: (m) => hub.broadcast(m), pushNews: hub.pushNews }); }
+    catch (e) { console.error('[m9]', e.message); }
+    try {
+      const done = await m7Tick({
+        broadcast: (m) => hub.broadcast(m),
+        sendTo: (uid, msg) => hub.sendTo(uid, msg),
+        getDay, now: Date.now(),
+        refreshYou: (uid) => hub.pushYou(uid),
+      });
+      // M8: payday groove moodlet for completed shifts.
+      for (const d of done || []) {
+        try { await m8TriggerMoodlet(d.userId, 'payday_groove'); } catch (e) { console.error('[m8] payday:', e.message); }
+      }
+    } catch (e) { console.error('[m7]', e.message); }
+  }, 60000);
+  if (v2tick.unref) v2tick.unref();
+
   // ---- street-find spawn ticker (M3): every 15s, prune + spawn near players ----
   const spawns = setInterval(() => {
     try { hub.spawnTick(); } catch (e) { console.error('[spawn]', e.message); }
@@ -113,6 +159,8 @@ export async function createApp() {
     clearInterval(tick);
     clearInterval(decay);
     clearInterval(spawns);
+    clearInterval(clock);
+    clearInterval(v2tick);
     await new Promise((resolve) => server.close(resolve));
   }
 

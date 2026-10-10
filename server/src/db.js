@@ -323,8 +323,24 @@ async function getAll(sqliteSql, pgSql, params) {
   return sdb.prepare(sqliteSql).all(...params);
 }
 
+// V2: generic exported query helpers for milestone modules.
+// Each v2 game module (server/src/game/v2/*.js) owns its own tables and
+// implements its storage against these — no db.js edits needed per milestone.
+// Dialect rule: pass BOTH variants; SQLite uses `?` placeholders,
+// Postgres uses `$1, $2, ...`. Tests run on SQLite (:memory:).
+export async function dbRun(sqliteSql, pgSql, params = []) {
+  return runQ(sqliteSql, pgSql, params);
+}
+export async function dbGet(sqliteSql, pgSql, params = []) {
+  return getOne(sqliteSql, pgSql, params);
+}
+export async function dbAll(sqliteSql, pgSql, params = []) {
+  return getAll(sqliteSql, pgSql, params);
+}
+
 // Add a column if missing (for upgrading existing databases)
-async function ensureColumn(table, col, sqliteDef, pgDef) {
+// V2: exported so tests can add/verify coordinator-owned columns idempotently.
+export async function ensureColumn(table, col, sqliteDef, pgDef) {
   try {
     await runQ(
       `ALTER TABLE ${table} ADD COLUMN ${col} ${sqliteDef}`,
@@ -361,6 +377,19 @@ export async function initDb() {
     await ensureColumn('characters', 'biz', 'TEXT', 'TEXT');
     // M4 economy columns
     await ensureColumn('characters', 'loan_free', 'INTEGER NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0');
+    // V2 columns (M7 shifts, M8 needs, M9 perks, M10 rent-to-own, M12 skills)
+    await ensureColumn('characters', 'shift_job', 'TEXT', 'TEXT');
+    await ensureColumn('characters', 'shift_started_at', 'INTEGER', 'BIGINT');
+    await ensureColumn('characters', 'shift_ends_at', 'INTEGER', 'BIGINT');
+    await ensureColumn('characters', 'fun', 'INTEGER NOT NULL DEFAULT 100', 'INTEGER NOT NULL DEFAULT 100');
+    await ensureColumn('characters', 'social', 'INTEGER NOT NULL DEFAULT 100', 'INTEGER NOT NULL DEFAULT 100');
+    await ensureColumn('characters', 'hygiene', 'INTEGER NOT NULL DEFAULT 100', 'INTEGER NOT NULL DEFAULT 100');
+    await ensureColumn('characters', 'bladder', 'INTEGER NOT NULL DEFAULT 100', 'INTEGER NOT NULL DEFAULT 100');
+    await ensureColumn('characters', 'perk_stars', 'INTEGER NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0');
+    await ensureColumn('characters', 'perks', "TEXT NOT NULL DEFAULT '[]'", "TEXT NOT NULL DEFAULT '[]'");
+    await ensureColumn('characters', 'housing_owned', 'INTEGER NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0');
+    await ensureColumn('characters', 'skills', 'TEXT', 'TEXT');
+    await ensureColumn('characters', 'skills_used', 'TEXT', 'TEXT');
     console.log('[db] PostgreSQL connected');
   } else {
     const dbPath = process.env.EKO_DB_PATH || path.join(__dirname, 'eko-life.db');
@@ -379,6 +408,19 @@ export async function initDb() {
     await ensureColumn('characters', 'biz', 'TEXT', '');
     // M4 economy columns
     await ensureColumn('characters', 'loan_free', 'INTEGER NOT NULL DEFAULT 0', '');
+    // V2 columns (M7 shifts, M8 needs, M9 perks, M10 rent-to-own, M12 skills)
+    await ensureColumn('characters', 'shift_job', 'TEXT', '');
+    await ensureColumn('characters', 'shift_started_at', 'INTEGER', '');
+    await ensureColumn('characters', 'shift_ends_at', 'INTEGER', '');
+    await ensureColumn('characters', 'fun', 'INTEGER NOT NULL DEFAULT 100', '');
+    await ensureColumn('characters', 'social', 'INTEGER NOT NULL DEFAULT 100', '');
+    await ensureColumn('characters', 'hygiene', 'INTEGER NOT NULL DEFAULT 100', '');
+    await ensureColumn('characters', 'bladder', 'INTEGER NOT NULL DEFAULT 100', '');
+    await ensureColumn('characters', 'perk_stars', 'INTEGER NOT NULL DEFAULT 0', '');
+    await ensureColumn('characters', 'perks', "TEXT NOT NULL DEFAULT '[]'", '');
+    await ensureColumn('characters', 'housing_owned', 'INTEGER NOT NULL DEFAULT 0', '');
+    await ensureColumn('characters', 'skills', 'TEXT', '');
+    await ensureColumn('characters', 'skills_used', 'TEXT', '');
     console.log(`[db] SQLite connected (${dbPath === ':memory:' ? 'in-memory' : 'local file'})`);
   }
 }
@@ -423,19 +465,31 @@ export async function createUser(opts) {
 }
 
 async function insertCharacter(userId, c, now) {
+  const perksJson = typeof c.perks === 'string' ? c.perks : JSON.stringify(c.perks || []);
+  const skillsJson = typeof c.skills === 'string' ? c.skills : (c.skills == null ? null : JSON.stringify(c.skills));
+  const skillsUsedJson = typeof c.skills_used === 'string' ? c.skills_used : (c.skills_used == null ? null : JSON.stringify(c.skills_used));
   const params = [userId, c.name, c.class, c.avatar, c.color, c.money, c.energy, c.health,
     c.happiness, c.hunger, c.housing, c.property, c.vehicle, c.biz ?? null, c.savings, c.loan, c.cert,
     c.location_id, c.x ?? null, c.y ?? null, c.rent_misses || 0, c.customized || 0,
-    c.starter_loan_available || 0, c.loan_free || 0, now || Date.now()];
+    c.starter_loan_available || 0, c.loan_free || 0,
+    c.shift_job ?? null, c.shift_started_at ?? null, c.shift_ends_at ?? null,
+    c.fun ?? 100, c.social ?? 100, c.hygiene ?? 100, c.bladder ?? 100,
+    Math.max(0, Math.floor(Number(c.perk_stars) || 0)), perksJson,
+    Number(c.housing_owned) ? 1 : 0, skillsJson, skillsUsedJson,
+    now || Date.now()];
   await runQ(
     `INSERT INTO characters (user_id, name, class, avatar, color, money, energy, health, happiness,
       hunger, housing, property, vehicle, biz, savings, loan, cert, location_id,
-      x, y, rent_misses, customized, starter_loan_available, loan_free, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      x, y, rent_misses, customized, starter_loan_available, loan_free,
+      shift_job, shift_started_at, shift_ends_at, fun, social, hygiene, bladder,
+      perk_stars, perks, housing_owned, skills, skills_used, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     `INSERT INTO characters (user_id, name, class, avatar, color, money, energy, health, happiness,
       hunger, housing, property, vehicle, biz, savings, loan, cert, location_id,
-      x, y, rent_misses, customized, starter_loan_available, loan_free, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
+      x, y, rent_misses, customized, starter_loan_available, loan_free,
+      shift_job, shift_started_at, shift_ends_at, fun, social, hygiene, bladder,
+      perk_stars, perks, housing_owned, skills, skills_used, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37)`,
     params);
 }
 
@@ -513,19 +567,32 @@ export async function ensureCharacter(userId, displayName) {
 // Gameplay save: never touches users (is_admin/banned live there), so a stale
 // session can never clobber admin flags or bans.
 export async function saveCharacter(c) {
+  // V2: normalize JSON-ish columns (modules may keep them as objects in memory).
+  const perksJson = typeof c.perks === 'string' ? c.perks : JSON.stringify(c.perks || []);
+  const skillsJson = typeof c.skills === 'string' ? c.skills : (c.skills == null ? null : JSON.stringify(c.skills));
+  const skillsUsedJson = typeof c.skills_used === 'string' ? c.skills_used : (c.skills_used == null ? null : JSON.stringify(c.skills_used));
   const params = [c.name, c.class, c.avatar, c.color, c.money, c.energy, c.health,
     c.happiness, c.hunger, c.housing, c.property, c.vehicle, c.biz ?? null, c.savings, c.loan,
     c.cert, c.location_id, c.x ?? null, c.y ?? null, c.rent_misses || 0,
-    c.customized || 0, c.starter_loan_available || 0, c.loan_free || 0, Date.now(), c.user_id];
+    c.customized || 0, c.starter_loan_available || 0, c.loan_free || 0,
+    c.shift_job ?? null, c.shift_started_at ?? null, c.shift_ends_at ?? null,
+    c.fun ?? 100, c.social ?? 100, c.hygiene ?? 100, c.bladder ?? 100,
+    Math.max(0, Math.floor(Number(c.perk_stars) || 0)), perksJson,
+    Number(c.housing_owned) ? 1 : 0, skillsJson, skillsUsedJson,
+    Date.now(), c.user_id];
   await runQ(
     `UPDATE characters SET name=?, class=?, avatar=?, color=?, money=?, energy=?, health=?,
       happiness=?, hunger=?, housing=?, property=?, vehicle=?, biz=?, savings=?, loan=?,
       cert=?, location_id=?, x=?, y=?, rent_misses=?, customized=?, starter_loan_available=?,
-      loan_free=?, updated_at=? WHERE user_id=?`,
+      loan_free=?, shift_job=?, shift_started_at=?, shift_ends_at=?,
+      fun=?, social=?, hygiene=?, bladder=?, perk_stars=?, perks=?,
+      housing_owned=?, skills=?, skills_used=?, updated_at=? WHERE user_id=?`,
     `UPDATE characters SET name=$1, class=$2, avatar=$3, color=$4, money=$5, energy=$6, health=$7,
       happiness=$8, hunger=$9, housing=$10, property=$11, vehicle=$12, biz=$13, savings=$14, loan=$15,
       cert=$16, location_id=$17, x=$18, y=$19, rent_misses=$20, customized=$21,
-      starter_loan_available=$22, loan_free=$23, updated_at=$24 WHERE user_id=$25`,
+      starter_loan_available=$22, loan_free=$23, shift_job=$24, shift_started_at=$25, shift_ends_at=$26,
+      fun=$27, social=$28, hygiene=$29, bladder=$30, perk_stars=$31, perks=$32,
+      housing_owned=$33, skills=$34, skills_used=$35, updated_at=$36 WHERE user_id=$37`,
     params);
 }
 
