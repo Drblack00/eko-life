@@ -32,8 +32,10 @@ export const TABS: Array<{ id: Tab; label: string; icon: string }> = [
 /**
  * Bottom tab bar: floating frosted dock with a liquid active-tab indicator.
  *
- * The indicator is a single pill that FLIP-slides between tab buttons with
- * a liquid mid-flight stretch (iOS Liquid Glass feel). The animation runs on
+ * Icon-only buttons (labels live on as aria-labels) — the dock reads as a
+ * single clean icon row, iPhone-home-screen style. The indicator is a single
+ * pill that hugs the active *icon* and FLIP-slides between tabs with a
+ * liquid mid-flight stretch (iOS Liquid Glass feel). The animation runs on
  * the Web Animations API and is transform-only — no layout thrash, 60fps on
  * iPhone. `will-change` is set on the pill only while it is animating.
  * Under prefers-reduced-motion the pill jumps instantly instead of sliding.
@@ -58,16 +60,20 @@ export function TabBar({
     []
   );
 
-  /** Seat the pill exactly behind the active button — no animation. */
+  /** Seat the pill exactly behind the active icon — no animation. */
   const placeInstant = useCallback((active: Tab) => {
     const nav = navRef.current;
     const pill = pillRef.current;
     const btn = btnRefs.current[active];
     if (!nav || !pill || !btn) return;
     const navBox = nav.getBoundingClientRect();
-    const btnBox = btn.getBoundingClientRect();
-    const x = btnBox.left - navBox.left;
-    const w = btnBox.width;
+    // Hug the icon, not the full button cell — the dock is icon-only.
+    const iconBox =
+      btn.querySelector(".eko-tabs__icon")?.getBoundingClientRect() ??
+      btn.getBoundingClientRect();
+    const pad = 9; // breathing room around the glyph
+    const x = iconBox.left - navBox.left - pad;
+    const w = iconBox.width + pad * 2;
     geomRef.current = { x, w };
     animRef.current?.cancel();
     animRef.current = null;
@@ -82,9 +88,13 @@ export function TabBar({
     const btn = btnRefs.current[tab];
     if (!nav || !pill || !btn) return;
     const navBox = nav.getBoundingClientRect();
-    const btnBox = btn.getBoundingClientRect();
-    const x = btnBox.left - navBox.left;
-    const w = btnBox.width;
+    // Hug the icon, not the full button cell — the dock is icon-only.
+    const iconBox =
+      btn.querySelector(".eko-tabs__icon")?.getBoundingClientRect() ??
+      btn.getBoundingClientRect();
+    const pad = 9; // breathing room around the glyph
+    const x = iconBox.left - navBox.left - pad;
+    const w = iconBox.width + pad * 2;
     const prev = geomRef.current;
     geomRef.current = { x, w };
     animRef.current?.cancel();
@@ -161,12 +171,12 @@ export function TabBar({
             tab === t.id ? "eko-tabs__btn--active" : ""
           }`}
           aria-current={tab === t.id ? "page" : undefined}
+          aria-label={t.label}
           onClick={() => onTab(t.id)}
         >
           <span className="eko-tabs__icon" aria-hidden="true">
             {t.icon}
           </span>
-          <span className="eko-tabs__label">{t.label}</span>
         </button>
       ))}
     </nav>

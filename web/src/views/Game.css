@@ -505,15 +505,15 @@
   margin-top: var(--space-2);
 }
 
-/* ---- Bottom tabs ---- */
-/* ---- Bottom tab bar: floating pill dock, icon-over-label buttons ---- */
+/* ---- Bottom tab bar: floating icon-only dock ---- */
 .eko-tabs {
   display: grid;
-  /* W3: 9 tabs (incl. Friends) in one row — compact buttons, same 52px
-     touch target. The liquid pill (eko-tabs__pill) sizes itself from the
-     active button's box, so it adapts automatically. */
+  /* 9 icon-only tabs in one row — the liquid pill (eko-tabs__pill) hugs the
+     active icon, so it adapts automatically. */
   grid-template-columns: repeat(9, 1fr);
-  margin: 0 var(--space-2) calc(var(--space-2) + var(--sab));
+  /* Sit low: just the iOS safe-area inset plus a whisper of margin, so the
+     dock never collides with the home indicator. */
+  margin: 0 var(--space-2) calc(var(--sab) + 2px);
   padding: var(--space-1);
   border-radius: var(--radius-pill);
   background: var(--surface);
@@ -547,13 +547,11 @@
   border: none;
   border-radius: var(--radius-pill);
   background: none;
+  /* Icon-only: single centered glyph per button. */
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  /* W3: tighter padding for 9 tabs in one row. */
-  padding: 5px 1px;
+  padding: 6px 2px;
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -574,16 +572,9 @@
 }
 
 .eko-tabs__icon {
-  /* W3: slightly smaller so 9 tabs fit one row. */
-  font-size: 1.15rem;
+  /* Larger now that labels are gone — the glyphs carry the dock. */
+  font-size: 1.5rem;
   line-height: 1;
-}
-
-.eko-tabs__label {
-  font-size: 0.58rem;
-  font-weight: 700;
-  line-height: 1.2;
-  white-space: nowrap;
 }
 
 /* Short viewports (e.g. landscape phones): slim the bar but keep >=44px targets. */
@@ -593,10 +584,7 @@
     padding: 4px 1px;
   }
   .eko-tabs__icon {
-    font-size: 1.05rem;
-  }
-  .eko-tabs__label {
-    font-size: 0.55rem;
+    font-size: 1.3rem;
   }
 }
 

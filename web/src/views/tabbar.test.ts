@@ -102,9 +102,11 @@ describe("tab bar styling (Game.css)", () => {
     expect(active).not.toMatch(/min-height/);
   });
 
-  it("respects the bottom safe-area inset", () => {
+  it("respects the bottom safe-area inset and sits low", () => {
     const block = ruleBlock(gameCss, ".eko-tabs");
     expect(block).toMatch(/var\(--sab\)/);
+    // Lowered dock: no extra floating gap beyond the safe-area inset.
+    expect(block).not.toMatch(/calc\(\s*var\(--space-2\)\s*\+\s*var\(--sab\)\s*\)/);
   });
 
   it("provides at least 44px touch targets", () => {
@@ -114,8 +116,25 @@ describe("tab bar styling (Game.css)", () => {
     expect(Number(m![1])).toBeGreaterThanOrEqual(44);
   });
 
-  it("keeps tab labels on one line (icon-over-label buttons)", () => {
-    expect(ruleBlock(gameCss, ".eko-tabs__label")).toMatch(/white-space:\s*nowrap/);
-    expect(ruleBlock(gameCss, ".eko-tabs__btn")).toMatch(/flex-direction:\s*column/);
+  it("renders icon-only buttons: no visible labels, labels exposed via aria-label", () => {
+    const nav = gameTsx.match(/<nav className="eko-tabs"[\s\S]*?<\/nav>/);
+    expect(nav).not.toBeNull();
+    // No visible label elements in the dock.
+    expect(nav![0]).not.toMatch(/eko-tabs__label/);
+    // Every button announces its label to assistive tech.
+    expect(nav![0]).toMatch(/aria-label=\{t\.label\}/);
+  });
+
+  it("sizes the liquid pill from the icon, not the full button cell", () => {
+    // The dock is icon-only, so the pill hugs the glyph.
+    expect(gameTsx).toMatch(/querySelector\("\.eko-tabs__icon"\)/);
+  });
+
+  it("uses larger icons now that labels are gone", () => {
+    const m = ruleBlock(gameCss, ".eko-tabs__icon").match(
+      /font-size:\s*([\d.]+)rem/
+    );
+    expect(m).not.toBeNull();
+    expect(Number(m![1])).toBeGreaterThanOrEqual(1.4);
   });
 });
