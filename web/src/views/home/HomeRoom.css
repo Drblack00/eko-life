@@ -60,14 +60,19 @@
   left: var(--space-3);
   right: var(--space-3);
   bottom: var(--space-3);
-  background: rgba(255, 255, 255, 0.96);
-  border-radius: var(--radius-md);
+  /* Frosted material comes from .glass (src/styles/glass.css) — layout only. */
   padding: var(--space-3);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   font-size: 0.9rem;
+}
+
+/* Light frost for the popup over the 3D room; the placing toolbar's dark
+   variant is set below. */
+.eko-room__popup.glass {
+  --glass-tint: rgb(255 255 255 / 0.74);
+  --glass-radius: var(--radius-md);
 }
 
 .eko-room__popup-btns {
@@ -152,14 +157,18 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: #fff;
-  border-radius: var(--radius-pill);
+  /* Frosted pill from .glass (no blur — small repeating control). */
   padding: var(--space-1) var(--space-3);
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.eko-room__inv-item.glass {
+  --glass-tint: color-mix(in srgb, var(--surface) 70%, transparent);
+  --glass-radius: var(--radius-pill);
+  --glass-blur: 0px;
 }
 
 .eko-room__inv-item:disabled {
@@ -181,14 +190,19 @@
 }
 
 .eko-room__tab {
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: #fff;
-  border-radius: var(--radius-pill);
+  /* Frosted pill from .glass (no blur — small repeating control). */
   padding: var(--space-2) var(--space-3);
   font-weight: 700;
   font-size: 0.85rem;
   cursor: pointer;
   white-space: nowrap;
+  color: var(--text);
+}
+
+.eko-room__tab.glass {
+  --glass-tint: rgb(255 255 255 / 0.65);
+  --glass-radius: var(--radius-pill);
+  --glass-blur: 0px;
 }
 
 .eko-room__tab--active {
@@ -204,13 +218,17 @@
 }
 
 .eko-room__card {
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: var(--radius-md);
+  /* Frosted tile from .glass (no blur — the sheet behind is the backdrop). */
   padding: var(--space-3);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  background: rgba(255, 255, 255, 0.6);
+}
+
+.eko-room__card.glass {
+  --glass-tint: rgb(255 255 255 / 0.55);
+  --glass-radius: var(--radius-md);
+  --glass-blur: 0px;
 }
 
 .eko-room__card-top {
@@ -258,6 +276,9 @@
 
 .eko-room__card--poor {
   opacity: 0.85;
+}
+
+.eko-room__card--poor.glass {
   border-style: dashed;
 }
 
@@ -297,9 +318,7 @@
 }
 
 .eko-room__swatch {
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: #fff;
-  border-radius: var(--radius-md);
+  /* Frosted tile from .glass (no blur — small repeating control). */
   padding: var(--space-2);
   display: flex;
   flex-direction: column;
@@ -309,17 +328,22 @@
   min-height: 44px;
 }
 
+.eko-room__swatch.glass {
+  --glass-tint: rgb(255 255 255 / 0.55);
+  --glass-radius: var(--radius-md);
+  --glass-blur: 0px;
+}
+
 .eko-room__swatch:disabled {
   cursor: default;
 }
 
-.eko-room__swatch--current {
+.eko-room__swatch--current.glass {
   border: 2px solid var(--palm-500);
 }
 
-.eko-room__swatch--preview {
+.eko-room__swatch--preview.glass {
   border: 2px dashed var(--palm-500);
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
 }
 
 .eko-room__swatch-color {
@@ -350,13 +374,15 @@
   z-index: 5;
   display: flex;
   flex-direction: column;
-  background: rgba(13, 20, 38, 0.97);
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  box-shadow: 0 -10px 32px rgba(0, 0, 0, 0.5);
+  /* Dark frosted material from .glass — the 3D room glows through. */
   overflow: hidden;
   color: #eef3fa;
   transition: height 0.22s ease;
+}
+
+.eko-room__sheet.glass {
+  --glass-tint: rgb(13 20 38 / 0.66);
+  --glass-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .eko-room__sheet--dragging {
@@ -412,15 +438,19 @@
 }
 
 .eko-room__sheet-hide {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
+  /* Frosted mini-pill from .glass (no blur — it sits on the sheet). */
   color: #eef3fa;
-  border-radius: var(--radius-pill);
   padding: var(--space-1) var(--space-3);
   font-weight: 700;
   font-size: 0.8rem;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.eko-room__sheet-hide.glass {
+  --glass-tint: rgb(255 255 255 / 0.10);
+  --glass-radius: var(--radius-pill);
+  --glass-blur: 0px;
 }
 
 .eko-room__sheet-body {
@@ -435,12 +465,15 @@
   gap: var(--space-2);
 }
 
-/* Buy sheet content on the dark theme. */
+/* Buy sheet content on the dark theme — frosted tints, no blur on the
+   small repeating controls (the sheet itself carries the blur). */
 
 .eko-room__sheet .eko-room__tab {
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.07);
   color: #e8edf7;
+}
+
+.eko-room__sheet .eko-room__tab.glass {
+  --glass-tint: rgb(255 255 255 / 0.10);
 }
 
 .eko-room__sheet .eko-room__tab--active {
@@ -450,9 +483,11 @@
 }
 
 .eko-room__sheet .eko-room__card {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
   color: #eef3fa;
+}
+
+.eko-room__sheet .eko-room__card.glass {
+  --glass-tint: rgb(255 255 255 / 0.07);
 }
 
 .eko-room__sheet .eko-room__card-sub,
@@ -461,22 +496,23 @@
 }
 
 .eko-room__sheet .eko-room__swatch {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.07);
   color: #eef3fa;
+}
+
+.eko-room__sheet .eko-room__swatch.glass {
+  --glass-tint: rgb(255 255 255 / 0.08);
 }
 
 .eko-room__sheet .eko-room__swatch-sub {
   color: rgba(232, 237, 247, 0.65);
 }
 
-.eko-room__sheet .eko-room__swatch--current {
+.eko-room__sheet .eko-room__swatch--current.glass {
   border: 2px solid var(--palm-400);
 }
 
-.eko-room__sheet .eko-room__swatch--preview {
+.eko-room__sheet .eko-room__swatch--preview.glass {
   border: 2px dashed var(--palm-400);
-  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18);
 }
 
 .eko-room__sheet .eko-room__buy:disabled {
@@ -496,18 +532,20 @@
   transform: translateX(-50%);
   bottom: var(--space-3);
   z-index: 5;
-  background: rgba(13, 20, 38, 0.94);
+  /* Dark frosted pill from .glass. */
   color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: var(--radius-pill);
   padding: var(--space-2) var(--space-4);
   font-weight: 800;
   font-size: 0.9rem;
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
-/* ---- M16: compact placing toolbar (≤64px, translucent, bottom-docked) ---- */
+.eko-room__sheet-fab.glass {
+  --glass-tint: rgb(13 20 38 / 0.66);
+  --glass-radius: var(--radius-pill);
+}
+
+/* ---- M16: compact placing toolbar (≤64px, dark frosted, bottom-docked) ---- */
 
 .eko-room__placing--compact {
   left: var(--space-2);
@@ -516,14 +554,14 @@
   z-index: 6;
   max-height: 64px;
   justify-content: center;
-  background: rgba(13, 20, 38, 0.9);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: var(--radius-pill);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  /* Material from .glass — the dark tint keeps the 3D room readable behind. */
   color: #eef3fa;
   padding: var(--space-1) var(--space-2);
+}
+
+.eko-room__placing--compact.glass {
+  --glass-tint: rgb(13 20 38 / 0.60);
+  --glass-radius: var(--radius-pill);
 }
 
 .eko-room__placing-bar {
@@ -551,15 +589,18 @@
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(13, 20, 38, 0.94);
-  border: 1px solid rgba(251, 191, 36, 0.55);
+  /* Amber edge kept as the warning signal; frost from .glass. */
   color: #fbbf24;
   font-size: 0.75rem;
   font-weight: 700;
   padding: 4px 12px;
-  border-radius: var(--radius-pill);
   white-space: nowrap;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.eko-room__placing-warn.glass {
+  --glass-tint: rgb(13 20 38 / 0.70);
+  --glass-radius: var(--radius-pill);
+  border: 1px solid rgb(251 191 36 / 0.55);
 }
 
 /* Tapped-item popup floats above the sheet. */
@@ -577,14 +618,9 @@
   right: auto;
   transform: translateX(-50%);
   max-width: calc(100% - var(--space-3));
-  background: rgba(13, 20, 38, 0.92);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  /* Frosted material from .glass; the dashed palm edge marks preview mode. */
   color: #eef3fa;
-  border: 1px dashed var(--palm-400);
-  border-radius: var(--radius-pill);
   padding: var(--space-1) var(--space-2);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -592,6 +628,12 @@
   font-size: 0.78rem;
   white-space: nowrap;
   z-index: 7;
+}
+
+.eko-room__trybar.glass {
+  --glass-tint: rgb(13 20 38 / 0.62);
+  --glass-radius: var(--radius-pill);
+  border: 1px dashed var(--palm-400);
 }
 
 .eko-room__trybar-text {
@@ -656,11 +698,12 @@
   right: 0;
   top: 0;
   bottom: 0;
-  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
-  border-top: none;
-  border-left: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: -10px 0 32px rgba(0, 0, 0, 0.5);
+  /* Material from .glass; left edge rounds toward the room. */
   transition: width 0.22s ease;
+}
+
+.eko-room__sheet--side.glass {
+  --glass-radius: var(--radius-lg) 0 0 var(--radius-lg);
 }
 
 /* The handle spans the panel's top edge; drags run horizontally. */
@@ -748,6 +791,35 @@
   }
   100% {
     background-position: -80% 0;
+  }
+}
+
+/* Reduced transparency: opaque dark fallbacks for the room's dark frosted
+   surfaces — the .glass default would turn them light, breaking the light
+   text drawn on them. */
+@media (prefers-reduced-transparency: reduce) {
+  .eko-room__sheet.glass {
+    background: rgb(13 20 38 / 0.97);
+  }
+  .eko-room__placing--compact.glass {
+    background: rgb(13 20 38 / 0.92);
+  }
+  .eko-room__trybar.glass {
+    background: rgb(13 20 38 / 0.94);
+  }
+  .eko-room__placing-warn.glass {
+    background: rgb(13 20 38 / 0.95);
+  }
+  .eko-room__sheet-fab.glass {
+    background: rgb(13 20 38 / 0.95);
+  }
+  .eko-room__sheet-hide.glass {
+    background: rgb(38 52 80);
+  }
+  .eko-room__sheet .eko-room__tab.glass,
+  .eko-room__sheet .eko-room__card.glass,
+  .eko-room__sheet .eko-room__swatch.glass {
+    background: rgb(30 42 68);
   }
 }
 

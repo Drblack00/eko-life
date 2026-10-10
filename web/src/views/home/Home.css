@@ -30,7 +30,7 @@
   gap: var(--space-3);
 }
 
-.eko-home__card--own {
+.eko-home__card--own.glass {
   border: 2px solid var(--palm-500);
 }
 

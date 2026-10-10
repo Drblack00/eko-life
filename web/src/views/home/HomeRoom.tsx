@@ -1240,7 +1240,7 @@ function StyleSwatch({
   return (
     <button
       type="button"
-      className={`eko-room__swatch${
+      className={`eko-room__swatch glass${
         isCurrent ? " eko-room__swatch--current" : ""
       }${previewing ? " eko-room__swatch--preview" : ""}`}
       onClick={onTap}
@@ -1857,7 +1857,7 @@ export function HomeRoomSection({
             apiRef={apiRef}
           />
           {preview && previewStyle && (
-            <div className="eko-room__trybar" role="status">
+            <div className="eko-room__trybar glass" role="status">
               <span className="eko-room__trybar-text">
                 Trying on <strong>{previewStyle.name}</strong> — nothing paid
                 yet
@@ -1880,11 +1880,11 @@ export function HomeRoomSection({
           )}
           {placing && (
             <div
-              className="eko-room__placing eko-room__placing--compact"
+              className="eko-room__placing eko-room__placing--compact glass"
               role="status"
             >
               {(full || (ghostCell && !ghostValid)) && (
-                <span className="eko-room__placing-warn">
+                <span className="eko-room__placing-warn glass">
                   {full
                     ? "Room is full — store something first."
                     : "Won't fit there — try another tile."}
@@ -1926,7 +1926,7 @@ export function HomeRoomSection({
           )}
           {selected && (
             <div
-              className="eko-room__popup"
+              className="eko-room__popup glass glass--strong"
               role="dialog"
               aria-label={`${selectedName} options`}
             >
@@ -2007,7 +2007,7 @@ export function HomeRoomSection({
             <div
               className={`eko-room__sheet eko-room__sheet--${sheetSnap}${
                 landscape ? " eko-room__sheet--side" : ""
-              }${(landscape ? dragW : dragH) != null ? " eko-room__sheet--dragging" : ""}`}
+              }${(landscape ? dragW : dragH) != null ? " eko-room__sheet--dragging" : ""} glass`}
               style={
                 landscape
                   ? { width: dragW ?? sheetWidths(stageW())[sheetSnap] }
@@ -2040,7 +2040,7 @@ export function HomeRoomSection({
                 {sheetSnap !== "collapsed" && (
                   <button
                     type="button"
-                    className="eko-room__sheet-hide"
+                    className="eko-room__sheet-hide glass"
                     onClick={(e) => {
                       e.stopPropagation();
                       setSheetHidden(true);
@@ -2088,7 +2088,7 @@ export function HomeRoomSection({
                       type="button"
                       role="tab"
                       aria-selected={activeTab === t.id}
-                      className={`eko-room__tab ${
+                      className={`eko-room__tab glass ${
                         activeTab === t.id ? "eko-room__tab--active" : ""
                       }`}
                       onClick={() => setTab(t.id)}
@@ -2155,7 +2155,7 @@ export function HomeRoomSection({
                         return (
                           <div
                             key={c.id}
-                            className={`eko-room__card${
+                            className={`eko-room__card glass${
                               ok ? "" : " eko-room__card--poor"
                             }`}
                           >
@@ -2215,7 +2215,7 @@ export function HomeRoomSection({
           {!placing && sheetHidden && (
             <button
               type="button"
-              className="eko-room__sheet-fab"
+              className="eko-room__sheet-fab glass"
               onClick={() => setSheetHidden(false)}
               aria-label="Show the buy sheet"
             >
@@ -2234,7 +2234,7 @@ export function HomeRoomSection({
                 <button
                   key={furnitureKey(f)}
                   type="button"
-                  className="eko-room__inv-item"
+                  className="eko-room__inv-item glass"
                   onClick={() => enterPlacing(f)}
                   disabled={full}
                   aria-label={`Place ${c?.name ?? f.name ?? "furniture"}`}
