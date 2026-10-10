@@ -26,6 +26,14 @@ import {
   currentGovernorId, currentGovernorName,
 } from '../game/elections.js';
 import { createSocial } from './social.js';
+// V2 milestones: needs/moodlets (M8), daily perks (M9), economy (M10),
+// governance (M11), skills (M12) — snapshots, decay, day ticks.
+import { activeShiftOf } from '../game/v2/m7.js';
+import { listActiveMoodlets } from '../game/v2/m8.js';
+import { activePerkEffects } from '../game/v2/m9.js';
+import * as m10 from '../game/v2/m10.js';
+import { isCommissioner } from '../game/v2/m11.js';
+import { m12YouSnapshot } from '../game/v2/m12.js';
 
 const CHAT_COOLDOWN_MS = 1200;
 const CHAT_HISTORY = 40;
@@ -124,6 +132,15 @@ export function createHub({ getDay }) {
       health: Number(c.health),
       happiness: Number(c.happiness),
       hunger: Number(c.hunger),
+      // V2: six needs (M8), shifts (M7), perks (M9), rent-to-own (M10)
+      fun: Number(c.fun),
+      social: Number(c.social),
+      hygiene: Number(c.hygiene),
+      bladder: Number(c.bladder),
+      perk_stars: Math.max(0, Math.floor(Number(c.perk_stars) || 0)),
+      perks: (() => { try { return JSON.parse(c.perks || '[]'); } catch { return []; } })(),
+      housing_owned: !!Number(c.housing_owned),
+      shift: activeShiftOf(c),
       housing: c.housing,
       property: c.property,
       biz: c.biz || null,
@@ -298,7 +315,12 @@ export function createHub({ getDay }) {
         conn.lastChat = now;
         const text = cleanText(m.text, 200);
         if (!text) return;
-        const entry = { id, name: conn.user.username, text, ts: now, gov: id === governorId };
+        // M11: commissioners get the 👑 badge too (async per-message is fine).
+        let isGov = id === governorId;
+        if (!isGov) {
+          try { isGov = await isCommissioner(id); } catch { /* no badge */ }
+        }
+        const entry = { id, name: conn.user.username, text, ts: now, gov: isGov };
         chatMemory.push(entry);
         if (chatMemory.length > CHAT_HISTORY) chatMemory.splice(0, chatMemory.length - CHAT_HISTORY);
         await social.broadcastCityChat(entry); // hidden from players who blocked the sender
@@ -344,6 +366,7 @@ export function createHub({ getDay }) {
           getGovernorId: () => governorId,
           pushNews: (type, text) => social.pushNews(type, text),
           pushElectionAll,
+          pushYou, // V2: re-read + push one player's `you`
           social,
         };
         handleAct(ctx, m).catch(e => {
@@ -415,6 +438,7 @@ export function createHub({ getDay }) {
       getGovernorId: () => governorId,
       pushNews: (type, text) => social.pushNews(type, text),
       pushElectionAll,
+      pushYou, // V2: M10 owner refreshes
       social };
     for (const conn of online.values()) {
       ctx.conn = conn;
@@ -424,8 +448,12 @@ export function createHub({ getDay }) {
       try {
         await settleDayEconomy(ctx, conn);
       } catch (e) { console.error('[economy]', e.message); }
+      // M10: LAPO auto-debits + weekly tax for online players.
+      try { await m10.settleOnlinePlayer(ctx, conn); } catch (e) { console.error('[m10]', e.message); }
     }
     try { await settleOfflineEconomy(); } catch (e) { console.error('[economy]', e.message); }
+    // M10: LAPO auto-debits + weekly tax for offline players (DB-credited).
+    try { await m10.settleOfflinePlayers(ctx, (id) => online.has(Number(id))); } catch (e) { console.error('[m10]', e.message); }
     const { day } = getDay();
     try {
       let el = await currentElection();
@@ -436,6 +464,27 @@ export function createHub({ getDay }) {
     } catch (e) { console.error('[election]', e.message); }
     try { await creditGovernorSalary(); } catch (e) { console.error('[gov salary]', e.message); }
     broadcast({ t: 'day', day, endsIn: DAY_MS });
+  }
+
+  // ---- V2: send a raw message to one online user ----
+  function sendTo(userId, msg) {
+    const conn = online.get(Number(userId));
+    if (conn) send(conn, msg);
+  }
+
+  // ---- V2: push a fresh `you` snapshot to one player ----
+  // Re-reads the character row (covers DB-credit paths like M7 shift ticks
+  // and M10 owner refreshes), merges the async M12 skills/academy fields.
+  async function pushYou(userId) {
+    const conn = online.get(Number(userId));
+    if (!conn) return;
+    try {
+      const fresh = await getCharacter(Number(userId));
+      if (fresh) conn.character = fresh;
+    } catch (e) { console.error('[pushYou] re-read:', e.message); }
+    let extra = {};
+    try { extra = await m12YouSnapshot(conn); } catch (e) { console.error('[pushYou] m12:', e.message); }
+    send(conn, { t: 'you', you: { ...youSnapshot(conn), ...extra } });
   }
 
   // ---- M5: push fresh per-player election state to everyone online ----
@@ -492,10 +541,20 @@ export function createHub({ getDay }) {
   async function decayTickAll() {
     for (const conn of online.values()) {
       try {
-        const res = decayTick(conn.character);
+        const moodlets = await listActiveMoodlets(conn.user.id);
+        const effects = activePerkEffects(conn.character);
+        const res = decayTick(conn.character, { moodlets, perks: effects });
         await saveCharacter(conn.character);
-        const out = { t: 'you', you: youSnapshot(conn) };
-        if (res.starving) out.note = '🍽️ You are starving! Eat something soon.';
+        let extra = {};
+        try { extra = await m12YouSnapshot(conn); } catch (e) { console.error('[decay] m12:', e.message); }
+        const out = { t: 'you', you: { ...youSnapshot(conn), moodlets, ...extra } };
+        const dnotes = [];
+        if (res.starving) dnotes.push('🍽️ You are starving! Eat something soon.');
+        if (res.desperate) dnotes.push('💧 Bladder critical! Find a toilet.');
+        if (res.grimy) dnotes.push('🚿 You need a shower - hygiene is tanking.');
+        if (res.lonely) dnotes.push('😔 You feel lonely. Spend time with people.');
+        if (res.bored) dnotes.push('🥱 You are bored stiff. Do something fun!');
+        if (dnotes.length) out.note = dnotes[0];
         send(conn, out);
       } catch (e) { console.error('[decay]', e.message); }
     }
@@ -564,6 +623,7 @@ export function createHub({ getDay }) {
 
   return {
     attach, broadcast, onlineCount, online, dayRollover, decayTickAll, spawnTick, spawnAPI,
-    bootGame, forceTally, getNews, governorName, forceDisconnect,
+    bootGame, forceTally, getNews, governorName, forceDisconnect, pushYou, sendTo,
+    pushNews: (type, text) => social.pushNews(type, text),
   };
 }
