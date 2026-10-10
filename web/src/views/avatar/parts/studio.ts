@@ -18,13 +18,23 @@ export const ZOOM_MIN = 1.15;
 /** Farthest allowed camera distance — full figure plus headroom. */
 export const ZOOM_MAX = 4.6;
 
-/** "Face" framing: close-up on the head for detail inspection. */
-export const FACE_PRESET: CameraFraming = { distance: 1.3, targetY: 1.5 };
-/** "Full body" framing: the whole figure, grounded, with headroom. */
-export const BODY_PRESET: CameraFraming = { distance: 3.25, targetY: 0.92 };
+/**
+ * "Face" framing: close-up on the head for detail inspection.
+ * Fits chin (≈1.40) through the tallest hairstyle top (afro ≈1.80):
+ * at d=1.15 the frame spans ≈[1.24, 1.95] on the figure plane, so the
+ * whole head is visible with margin — never clipped.
+ */
+export const FACE_PRESET: CameraFraming = { distance: 1.15, targetY: 1.6 };
+/**
+ * "Full body" framing: the whole figure, grounded, with headroom.
+ * Fits feet (≈0.09) through the afro top (≈1.80): at d=3.4 the frame
+ * spans ≈[-0.09, 2.00] on the figure plane — full figure plus ≈0.2 of
+ * headroom in portrait and landscape alike.
+ */
+export const BODY_PRESET: CameraFraming = { distance: 3.4, targetY: 0.98 };
 
-/** Default framing when the studio first mounts (three-quarter full body). */
-export const DEFAULT_FRAMING: CameraFraming = { distance: 3.0, targetY: 1.0 };
+/** Default framing when the studio first mounts (full body, head included). */
+export const DEFAULT_FRAMING: CameraFraming = { distance: 3.4, targetY: 0.98 };
 
 /** Clamp a requested camera distance into the zoom range. */
 export function clampZoom(distance: number): number {
