@@ -1,0 +1,316 @@
+/* Èkó Life — M10 economy views. Mobile-first, self-contained. */
+
+.m10-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+}
+
+/* Section switcher */
+.m10-seg {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.m10-seg-btn {
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.m10-seg-btn--on {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* Cards */
+.m10-card { margin-bottom: var(--space-3); }
+.m10-card-title {
+  margin: 0 0 var(--space-1);
+  font-size: 1.05rem;
+  color: var(--text);
+}
+.m10-card-sub {
+  margin: 0 0 var(--space-3);
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.m10-note {
+  margin: 0 0 var(--space-2);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.m10-warn {
+  margin: var(--space-2) 0 0;
+  font-size: 0.85rem;
+  color: var(--danger, #e5484d);
+}
+
+/* Stat trio */
+.m10-stat-row {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.m10-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  text-align: center;
+}
+.m10-stat-v {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.m10-stat-l {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Shop list */
+.m10-shop-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.m10-shop-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 64px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius-md);
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+}
+.m10-shop-icon { font-size: 1.8rem; }
+.m10-shop-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.m10-shop-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m10-shop-sub, .m10-shop-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m10-shop-chev {
+  font-size: 1.4rem;
+  color: var(--text-muted);
+}
+
+/* Dialog */
+.m10-dialog-title {
+  margin: 0 0 var(--space-1);
+  font-size: 1.1rem;
+  color: var(--text);
+}
+.m10-dialog-sub {
+  margin: 0 0 var(--space-3);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Item rows */
+.m10-item-list {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.m10-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  min-height: 56px;
+}
+.m10-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.m10-item-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.m10-item-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.m10-buy-ctl {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.m10-stepper {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.m10-qty {
+  min-width: 2ch;
+  text-align: center;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Rating row */
+.m10-rate-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--surface-2);
+}
+.m10-rate-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.m10-stars { display: flex; gap: 2px; }
+.m10-star {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  font-size: 1.5rem;
+  color: var(--text-muted);
+  opacity: 0.45;
+  cursor: pointer;
+}
+.m10-star--on { opacity: 1; color: #f5a623; }
+
+/* Forms */
+.m10-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.m10-input {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+.m10-type-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-1);
+}
+.m10-type {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: var(--space-2) var(--space-1);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.m10-type span:first-child { font-size: 1.4rem; }
+.m10-type--on {
+  border-color: var(--accent, #22d3ee);
+  color: var(--text);
+}
+.m10-stock-form {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+.m10-stock-form .m10-input { flex: 1 1 120px; }
+
+/* Confirm */
+.m10-confirm {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  margin-top: var(--space-2);
+}
+.m10-confirm p {
+  margin: 0 0 var(--space-2);
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.m10-confirm-btns {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* Money section stack */
+.m10-money {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.m10-myshop {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m10-shop-row, .m10-type, .m10-star, .m10-stepper, .m10-seg-btn {
+    transition: none;
+  }
+}
