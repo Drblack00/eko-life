@@ -106,11 +106,12 @@ Top 10 players by money: `{ leaders:[{username,money}] }`, descending.
 | `profile {id}` | — | Public profile card |
 
 ### `act` actions (server-authoritative; each returns updated `you` + note)
-- `work {job}` — must be at job's location, energy & cooldown checked
-- `eat {item}`, `fun {what}`, `study`, `sleep`, `rest`
-- `travel {locationId}` — costs time/fare where applicable
-- `rent {housing}` — change rental (at housing office zone)
-- `buy_property {property}`, `buy_vehicle {v}`, `buy_biz {biz}`, `buy_furniture {item}`, `place_furniture {id,placed}`
+- `work {job}` — **retired in v2 (M7):** now returns an error pointing to 1-hour shifts. Use `shift_start` instead.
+- `shift_start {job}`, `shift_leave`, `shift_status` — 1-hour real-time shifts (M7). Clock in at the role's location; pay lands on completion via the 60s tick (offline completion DB-credited). Leaving mid-shift forfeits (no prorata).
+- `eat {item}`, `fun {what}`, `study`, `sleep`, `rest` — v2: also restore the six needs + trigger moodlets (M8)
+- `travel {locationId}` — costs time/fare where applicable (+ road-trip moodlet, M8)
+- `rent {housing}` — change rental (at housing office zone); moving forfeits rent-to-own status (M10)
+- `buy_property {property}`, `buy_vehicle {v}`, `buy_biz {biz}`, `buy_furniture {item}`, `place_furniture {id,placed}` — prices × governor `market_mult` (M11)
 - `bank {op:"deposit"|"withdraw", amount}`, `loan {amount}`, `repay {amount}`
   - `loan {amount}` — normal rules: ₦1–₦100,000, none while a loan is
     outstanding, 10%/day interest. **Starter loan (M4):** a street_smart
@@ -120,6 +121,11 @@ Top 10 players by money: `{ leaders:[{username,money}] }`, descending.
     `/api/me` and the WS `you` snapshot expose `loan_free`.
 - `run {candidate?}` — enter governor race (fee), `vote {candidate}` — one per election
 - `gov_broadcast {text}` — governor only, 1/day
+- `gov_policy {policy}`, `gov_appoint {username,title}`, `gov_dismiss {title}` — governor only (M11)
+- `moodlet_list` — active moodlets (M8)
+- `hunt_claim`, `hunt_status`, `hustle_status`, `hustle_claim {mission}`, `perk_list`, `perk_buy {perk}` (M9)
+- `shop_create {type,locationId,name}`, `shop_stock {name,price,qty}`, `shop_buy {shopId,itemId,qty}`, `shop_rate {shopId,stars}`, `shop_browse`, `shop_mine`, `buy_rental`, `lapo_borrow {amount}`, `lapo_status`, `lapo_repay {amount}`, `lapo_repay_all` (M10)
+- `skill_train {skill}`, `academy_lesson {course}`, `academy_quiz {course,answers}` (M12)
 
 ## WebSocket — server → client
 
@@ -142,6 +148,37 @@ Top 10 players by money: `{ leaders:[{username,money}] }`, descending.
 | `news {item}` | News ticker event (M5) |
 | `mention {from,where,text}` | @mention ping |
 | `snap {lat,lng}` | Anti-cheat correction (client snapped back) |
+| `clock {label,…}` | Real-time Africa/Lagos clock broadcast, every 30s (M7) |
+| `shift_done {job,pay,note}` | A shift completed — pay landed (M7) |
+| `shift_status {shift}` / `hunt_status` / `hustle_status` / `perk_list` / `lapo {…}` / `shops {…}` / `shop_mine {…}` | v2 intent query replies (M7/M9/M10) |
+
+## V2 endpoints (2026-10-10)
+
+### REST — public
+- `GET /api/v2/m7/clock` — `{ label, … }` current Africa/Lagos time
+- `GET /api/v2/m10/shops?location=` — browse player shops
+- `GET /api/v2/m10/shops/:id/items` — one shop's shelf
+- `GET /api/v2/m13/billboards` — active billboards for the 3D map
+
+### REST — auth (Bearer)
+- `GET /api/v2/m8/moodlets` — my active moodlets
+- `GET /api/v2/m9/hunt` — active riddle round + my claim state
+- `GET /api/v2/m9/hustle` — today's 3 missions + stars
+- `GET /api/v2/m9/perks` — star balance + owned perks + catalog
+- `GET /api/v2/m10/shop/mine` — my shop (owner view)
+- `GET /api/v2/m10/lapo` — my LAPO loan status
+- `GET /api/v2/m10/tax` — this week's earnings + projected tax bill
+- `GET /api/config` — now also includes `careerTracks`, `skillLabels`, `needs`, `housingBuy`, `shopTypes`, `lapo`, `tax`, `skills`, `courses`, `skillTuning`
+
+### REST — admin (`/api/admin`, is_admin)
+- `GET /api/admin/election` — full election state incl. policy + commissioners (M11)
+- `POST /api/admin/billboards` / `PATCH /api/admin/billboards/:id` / `DELETE /api/admin/billboards/:id` — billboard CRUD (M13)
+
+### `you` snapshot — new v2 fields
+`fun, social, hygiene, bladder` (M8), `moodlets[]` (on decay ticks), `perk_stars`, `perks[]` (M9), `housing_owned` (M10), `shift {job,name,endsAt,secondsLeft}|null` (M7), `skills {id:{level,xp}}`, `academy {lessonsToday,certs}` (M12).
+
+### `election` payload — new v2 fields (M11)
+`policy {id,name,desc,…}|null`, `pickablePolicies[]`, `commissioners [{title,icon,holder}]`, `policyWindowOpen`.
 
 ## Error conventions
 REST errors: `{ error:string }` with proper HTTP codes (400/401/403/404/409/429).

@@ -47,3 +47,14 @@ real browser — needs parent's browser check.
 | 22 | Skills/progression, inventory, furniture | INACCESSIBLE | ✅ | ✅ | ✅ | ⚠️ | ✅ | Furniture inventory + 6 placement slots with gameplay effects; study/cert progression |
 | 23 | Nightlife/clubs | INACCESSIBLE | ✅ | ✅ | ✅ | ⚠️ | — | Club/beach locations with fun actions (location-tagged) |
 | 24 | Leaderboards | INACCESSIBLE | ✅ | ✅ | n/a | ⚠️ | — | GET /api/leaderboard top-10 by money (public) |
+
+## v2 build notes (2026-10-10) — M7–M13 integrated, all original code/art/text
+- M7 real-time clock + 1-hour shifts: `work` intent retired (errors, points to shifts); 24 career tracks; Lagos clock broadcast 30s + REST; forfeit-on-leave (no prorata).
+- M8 six needs + moodlets: decay tick honors moodlet/perk/city-event multipliers; eat/fun/sleep/rest/travel/loan/bank trigger moodlets.
+- M9 daily hunt (21h riddles, tiered prizes) + Today's Hustle (3 missions → stars) + 14 perks on the shared effect contract.
+- M10 player shops (city-wide; no open/closed state), rent-to-own 48× weekly rent, LAPO loans (4 weekly debits, 5% flat), progressive tax from the ledger.
+- M11 governor policies with real teeth (48h pick window, default fallback, multipliers reset per term) + persistent commissioners.
+- M12 nine skills + rust (capped) + academy (2 lessons/day, quizzes, certs boost job gates).
+- M13 3D billboards (canvas-generated original ads) + admin CRUD.
+- Full suite green: server 245/245, client 36/36; two-client smoke (register→shift→needs→hunt→shop→rent→vote) passed — see docs/smoke-v2.mjs.
+- Not deployed; no live-service changes.
