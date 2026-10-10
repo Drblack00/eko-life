@@ -55,6 +55,11 @@ export interface You {
   /** M12: skills + academy progress (merged by the coordinator). */
   skills?: Record<string, { level: number; xp: number }>;
   academy?: { lessonsToday?: number; certs?: string[] } | null;
+  /** M15: staged 3D avatar look (server contract: character.avatar_look). */
+  avatar_look?: AvatarLook | null;
+  /** M15: purchased wall/floor style ids (server contract: character.home_wall/home_floor). */
+  home_wall?: string | null;
+  home_floor?: string | null;
 }
 
 /** A server-side named reference — either a bare id or an expanded object. */
@@ -319,6 +324,8 @@ export type ActName =
   | "buy_furniture"
   | "place_furniture"
   | "sell_furniture"
+  | "buy_home_style"
+  | "save_avatar"
   | "loan"
   | "repay"
   | "bank"
@@ -440,4 +447,185 @@ export interface ServerMsg {
 export function naira(n: number): string {
   const v = Math.max(0, Math.round(Number(n) || 0));
   return `₦${v.toLocaleString("en-NG")}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* M15 — avatar studio (contract: task brief; server implements it).    */
+/* character.avatar_look = {body,skin,hair,outfit,fabric,topColor,      */
+/* bottomColor}; /api/config exposes avatarLook with the option lists. */
+/* ------------------------------------------------------------------ */
+
+/** The staged 3D avatar look — the payload shape sent to `save_avatar`. */
+export interface AvatarLook {
+  body: "woman" | "man";
+  /** Skin tone option id (or a #hex; the 3D builder tolerates both). */
+  skin: string;
+  /** Hairstyle option id. */
+  hair: string;
+  /** Outfit option id. */
+  outfit: string;
+  /** Fabric option id (`plain` = solid, others = canvas pattern). */
+  fabric: string;
+  /** Top garment colour (#rrggbb). */
+  topColor: string;
+  /** Bottom garment colour (#rrggbb). */
+  bottomColor: string;
+}
+
+export interface AvatarBodyOption {
+  id: string;
+  name: string;
+}
+
+export interface AvatarSkinOption {
+  id: string;
+  name: string;
+  hex: string;
+}
+
+export interface AvatarNamedOption {
+  id: string;
+  name: string;
+}
+
+/** Option lists from `/api/config` → `avatarLook` (all original content). */
+export interface AvatarLookOptions {
+  bodies: AvatarBodyOption[];
+  skins: AvatarSkinOption[];
+  hairs: AvatarNamedOption[];
+  outfits: AvatarNamedOption[];
+  fabrics: AvatarNamedOption[];
+  topColors: string[];
+  bottomColors: string[];
+  defaults: AvatarLook;
+}
+
+/** Client-safe defaults used when the server hasn't sent its option lists. */
+export const AVATAR_LOOK_DEFAULTS: AvatarLook = {
+  body: "woman",
+  skin: "rich",
+  hair: "lowcut",
+  outfit: "casual",
+  fabric: "plain",
+  topColor: "#22d3ee",
+  bottomColor: "#1f2937",
+};
+
+/** Local fallback option lists (used until /api/config serves avatarLook). */
+export const AVATAR_LOOK_FALLBACK_OPTIONS: AvatarLookOptions = {
+  bodies: [
+    { id: "woman", name: "Woman" },
+    { id: "man", name: "Man" },
+  ],
+  skins: [
+    { id: "deep", name: "Deep", hex: "#4a2c1a" },
+    { id: "rich", name: "Rich", hex: "#6f4527" },
+    { id: "warm", name: "Warm", hex: "#96613a" },
+    { id: "golden", name: "Golden", hex: "#bd8452" },
+    { id: "light", name: "Light", hex: "#e0b184" },
+  ],
+  hairs: [
+    { id: "lowcut", name: "Low cut" },
+    { id: "bald", name: "Bald" },
+    { id: "curls", name: "Curls" },
+    { id: "afro", name: "Afro" },
+    { id: "locs", name: "Locs" },
+    { id: "braids", name: "Braids" },
+    { id: "classic", name: "Classic" },
+  ],
+  outfits: [
+    { id: "casual", name: "Casual" },
+    { id: "native", name: "Native" },
+    { id: "smart", name: "Smart" },
+    { id: "street", name: "Street" },
+  ],
+  fabrics: [
+    { id: "plain", name: "Plain" },
+    { id: "ankara", name: "Ankara" },
+    { id: "adire", name: "Adire" },
+    { id: "asoke", name: "Aso-oke" },
+  ],
+  topColors: [
+    "#22d3ee",
+    "#f472b6",
+    "#a3e635",
+    "#fbbf24",
+    "#c084fc",
+    "#fb7185",
+    "#34d399",
+    "#60a5fa",
+  ],
+  bottomColors: [
+    "#1f2937",
+    "#374151",
+    "#7c2d12",
+    "#1e3a8a",
+    "#14532d",
+    "#713f12",
+    "#831843",
+    "#0f172a",
+  ],
+  defaults: AVATAR_LOOK_DEFAULTS,
+};
+
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+function pickId(
+  value: unknown,
+  allowed: readonly string[] | undefined,
+  fallback: string
+): string {
+  const v = typeof value === "string" ? value.trim() : "";
+  if (!v) return fallback;
+  if (allowed && allowed.length > 0 && !allowed.includes(v)) return fallback;
+  return v;
+}
+
+function pickBody(value: unknown, opts: Partial<AvatarLookOptions> | undefined): "woman" | "man" {
+  const v = typeof value === "string" ? value.trim().toLowerCase() : "";
+  const allowed = opts?.bodies?.length
+    ? opts.bodies.map((b) => b.id)
+    : ["woman", "man"];
+  if (v === "man" && allowed.includes("man")) return "man";
+  if (v === "woman" && allowed.includes("woman")) return "woman";
+  return opts?.defaults?.body === "man" ? "man" : "woman";
+}
+
+/** Colour pick: must be a valid #hex; when a list is given it must be on it. */
+function pickColor(
+  value: unknown,
+  allowed: readonly string[] | undefined,
+  fallback: string
+): string {
+  const v = typeof value === "string" ? value.trim() : "";
+  if (!HEX_RE.test(v)) return fallback;
+  if (allowed && allowed.length > 0) {
+    const hit = allowed.find((c) => c.toLowerCase() === v.toLowerCase());
+    return hit ?? fallback;
+  }
+  return v;
+}
+
+/**
+ * Coerce/validate a raw avatar look against the option lists, falling back
+ * to the defaults field-by-field. Never throws; unknown junk → defaults.
+ */
+export function sanitizeAvatarLook(
+  raw: unknown,
+  opts?: Partial<AvatarLookOptions>
+): AvatarLook {
+  const r =
+    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const d = opts?.defaults ?? AVATAR_LOOK_DEFAULTS;
+  const ids = (list: { id: string }[] | undefined) =>
+    list && list.length > 0 ? list.map((o) => o.id) : undefined;
+  return {
+    body: pickBody(r.body, opts),
+    skin: pickId(r.skin, ids(opts?.skins), d.skin),
+    hair: pickId(r.hair, ids(opts?.hairs), d.hair),
+    outfit: pickId(r.outfit, ids(opts?.outfits), d.outfit),
+    fabric: pickId(r.fabric, ids(opts?.fabrics), d.fabric),
+    topColor: pickColor(r.topColor, opts?.topColors, d.topColor),
+    bottomColor: pickColor(r.bottomColor, opts?.bottomColors, d.bottomColor),
+  };
 }
