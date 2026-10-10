@@ -1,0 +1,308 @@
+/* Èkó Life — Liquid Glass design system (Worker A)
+ *
+ * Original CSS implementing Apple's Liquid Glass design language:
+ * translucent frosted materials, specular edge highlights, floating rounded
+ * elements. No Apple assets, no copied code.
+ *
+ * Single source of truth for glass materials. WORKER B consumes the utility
+ * class names (.glass, .glass--strong, .glass--tint-*) — do not rename them.
+ * The "App chrome mapping" section at the bottom reskins the existing HUD,
+ * tab bar, pill buttons, stat bars and hint banner (material only — no
+ * layout or behaviour changes).
+ *
+ * Performance: backdrop-filter is used ONLY on chrome surfaces (HUD, tab
+ * bar, pills, buttons, hint banner) with modest blur (10–18px). Never apply
+ * .glass to long lists or per-row cards — iPhones must stay smooth.
+ */
+
+:root,
+[data-theme="day"] {
+  /* Shared glass knobs */
+  --glass-blur: 16px;
+  --glass-saturate: 160%;
+  /* Top-light sheen: the "specular" gradient washed over the surface. */
+  --glass-sheen: rgb(255 255 255 / 0.22);
+  /* Tints */
+  --glass-tint: rgb(255 255 255 / 0.55);
+  --glass-tint-strong: rgb(255 255 255 / 0.82);
+  --glass-tint-dark: rgb(15 23 42 / 0.58);
+  --glass-tint-dark-strong: rgb(15 23 42 / 0.84);
+  --glass-tint-green: rgb(22 163 74 / 0.88);
+  --glass-tint-mint: rgb(217 246 231 / 0.85);
+  --glass-tint-hint: rgb(255 251 235 / 0.78);
+  /* Edge light */
+  --glass-highlight: rgb(255 255 255 / 0.38);
+  --glass-border: rgb(255 255 255 / 0.30);
+  --glass-radius: 22px;
+  --glass-shadow: 0 8px 28px rgb(28 24 20 / 0.15),
+    0 2px 6px rgb(28 24 20 / 0.08);
+  --glass-inset: inset 0 1px 1px var(--glass-highlight),
+    inset 0 -1px 2px rgb(255 255 255 / 0.06);
+}
+
+[data-theme="night"] {
+  --glass-blur: 18px;
+  --glass-saturate: 140%;
+  --glass-sheen: rgb(255 255 255 / 0.12);
+  --glass-tint: rgb(20 42 62 / 0.55);
+  --glass-tint-strong: rgb(13 28 43 / 0.84);
+  --glass-tint-dark: rgb(6 12 22 / 0.62);
+  --glass-tint-dark-strong: rgb(6 12 22 / 0.88);
+  --glass-tint-green: rgb(34 197 94 / 0.88);
+  --glass-tint-mint: rgb(46 110 80 / 0.60);
+  --glass-tint-hint: rgb(42 33 19 / 0.80);
+  --glass-highlight: rgb(255 255 255 / 0.20);
+  --glass-border: rgb(255 255 255 / 0.16);
+  --glass-shadow: 0 8px 28px rgb(0 0 0 / 0.45),
+    0 2px 6px rgb(0 0 0 / 0.30);
+}
+
+/* ============ Utilities ============ */
+
+/* Base glass: frosted tint + specular top gradient + inner highlight border. */
+.glass {
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 42%),
+    var(--glass-tint);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
+}
+
+/* Denser tint for text legibility over busy/3D backgrounds. */
+.glass--strong {
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 42%),
+    var(--glass-tint-strong);
+}
+
+/* Explicit tint families (used with .glass). */
+.glass--tint-light {
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 42%),
+    var(--glass-tint);
+}
+.glass--tint-dark {
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 42%),
+    var(--glass-tint-dark);
+  color: #fff;
+}
+.glass--tint-green {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.30), transparent 48%),
+    var(--glass-tint-green);
+  color: #fff;
+}
+
+/* ============ App chrome mapping (Worker A scope) ============
+   Material reskin of existing selectors. No layout/behaviour changes:
+   metrics, DOM order and interaction states are untouched. */
+
+/* Top HUD: floating frosted bar with rounded bottom edge. */
+.eko-game .eko-hud {
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 38%),
+    var(--glass-tint-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  border-top: none;
+  border-radius: 0 0 var(--glass-radius) var(--glass-radius);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
+}
+
+/* HUD avatar pill: glass ring over the solid avatar colour. */
+.eko-game .eko-hud__avatar {
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm),
+    inset 0 1px 2px rgb(255 255 255 / 0.5);
+}
+
+/* Governor / day / clock pills: small frosted capsules with specular edge. */
+.eko-game .eko-hud .eko-hud__gov,
+.eko-game .eko-hud__day,
+.eko-game .eko-hud .m7-clock {
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 60%),
+    var(--glass-tint-strong);
+  -webkit-backdrop-filter: blur(12px) saturate(var(--glass-saturate));
+  backdrop-filter: blur(12px) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inset), 0 2px 8px rgb(28 24 20 / 0.10);
+}
+/* Governor pill keeps its amber identity ring. */
+.eko-game .eko-hud .eko-hud__gov {
+  border-color: rgb(245 158 11 / 0.55);
+}
+/* Clock gets the pill capsule shape to match. */
+.eko-game .eko-hud .m7-clock {
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+}
+
+/* Stat bars: glass cards so labels stay legible over the map. */
+.eko-hud .eko-statbar {
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 55%),
+    var(--glass-tint);
+  -webkit-backdrop-filter: blur(12px) saturate(var(--glass-saturate));
+  backdrop-filter: blur(12px) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  padding: var(--space-2) var(--space-3);
+  box-shadow: var(--glass-inset);
+}
+
+/* Floating bottom tab bar: frosted dock. */
+.eko-game .eko-tabs {
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 40%),
+    var(--glass-tint-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
+}
+
+/* Active tab: keeps the green pill identity, now with a glass sheen. */
+.eko-game .eko-tabs__btn--active {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.30), transparent 50%),
+    var(--glass-tint-green);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  border: 1px solid rgb(255 255 255 / 0.40);
+  box-shadow: 0 4px 14px rgb(34 197 94 / 0.35),
+    inset 0 1px 1px rgb(255 255 255 / 0.55);
+}
+
+/* ---- Pill buttons: identity colours kept, glass material added ---- */
+
+/* Primary green */
+.eko-btn.eko-btn--primary {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.30), transparent 48%),
+    var(--glass-tint-green);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: blur(12px) saturate(150%);
+  border: 1px solid rgb(255 255 255 / 0.38);
+  box-shadow: 0 6px 18px rgb(34 197 94 / 0.32),
+    inset 0 1px 1px rgb(255 255 255 / 0.50);
+}
+
+/* Dark navy */
+.eko-btn.eko-btn--dark {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.16), transparent 48%),
+    var(--glass-tint-dark-strong);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid rgb(255 255 255 / 0.22);
+  color: #fff;
+  box-shadow: var(--glass-shadow),
+    inset 0 1px 1px rgb(255 255 255 / 0.28);
+}
+
+/* White floating */
+.eko-btn.eko-btn--light {
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 50%),
+    var(--glass-tint);
+  -webkit-backdrop-filter: blur(12px) saturate(var(--glass-saturate));
+  backdrop-filter: blur(12px) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
+}
+
+/* Disabled mint */
+.eko-btn.eko-btn:disabled {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.40), transparent 50%),
+    var(--glass-tint-mint);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
+  backdrop-filter: blur(10px) saturate(130%);
+  border: 1px solid rgb(255 255 255 / 0.45);
+  color: #4c7a5f;
+  box-shadow: inset 0 1px 1px rgb(255 255 255 / 0.60);
+  cursor: not-allowed;
+  transform: none;
+}
+[data-theme="night"] .eko-btn.eko-btn:disabled {
+  color: #bfe3cf;
+}
+
+/* Hunger/hint banner: warm frosted capsule with amber edge light. */
+.eko-game .eko-hint {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.30), transparent 45%),
+    var(--glass-tint-hint);
+  -webkit-backdrop-filter: blur(14px) saturate(var(--glass-saturate));
+  backdrop-filter: blur(14px) saturate(var(--glass-saturate));
+  border: 1px solid rgb(245 158 11 / 0.50);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow),
+    inset 0 1px 1px rgb(255 255 255 / 0.55);
+}
+
+/* ============ Accessibility: solid fallbacks ============ */
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass--strong,
+  .glass--tint-light,
+  .eko-game .eko-hud,
+  .eko-game .eko-tabs,
+  .eko-hud .eko-statbar,
+  .eko-btn.eko-btn--light,
+  .eko-game .eko-hud .eko-hud__gov,
+  .eko-game .eko-hud__day,
+  .eko-game .eko-hud .m7-clock {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: 1px solid var(--neutral-200);
+    box-shadow: var(--shadow-sm);
+  }
+  .glass--tint-dark,
+  .eko-btn.eko-btn--dark {
+    background: #0f172a;
+    color: #fff;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: 1px solid transparent;
+    box-shadow: var(--shadow-md);
+  }
+  .glass--tint-green,
+  .eko-btn.eko-btn--primary,
+  .eko-game .eko-tabs__btn--active {
+    background: var(--palm-600);
+    color: #fff;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: 1px solid transparent;
+    box-shadow: var(--shadow-md);
+  }
+  .eko-btn.eko-btn:disabled {
+    background: #d9f6e7;
+    color: #5f8a73;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: 1px solid transparent;
+    box-shadow: none;
+  }
+  .eko-game .eko-hint {
+    background: #fffbeb;
+    color: var(--neutral-900);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: 1px solid var(--danfo-500);
+    box-shadow: var(--shadow-sm);
+  }
+  [data-theme="night"] .eko-game .eko-hint {
+    background: #2a2113;
+    color: #fde68a;
+  }
+}
