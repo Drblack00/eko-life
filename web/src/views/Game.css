@@ -103,26 +103,46 @@
   font-size: 0.95rem;
 }
 
-/* Narrow phones: tighten the HUD so avatar, money, governor pill, day and
-   clock all fit side by side without overlap. */
-@media (max-width: 400px) {
+/* Narrow phones: two-line HUD so the name + balance always have room.
+   Line 1: avatar + identity (name/money). Line 2: governor pill, day, clock
+   (date hidden, time only). A ::after line-breaker forces the wrap. */
+@media (max-width: 430px) {
   .eko-hud__row {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
     gap: var(--space-2);
   }
+  .eko-hud__avatar {
+    width: 40px;
+    height: 40px;
+  }
+  .eko-hud__identity {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .eko-hud__row::after {
+    content: "";
+    flex-basis: 100%;
+    height: 0;
+    order: 3;
+  }
   .eko-hud .eko-hud__gov {
-    max-width: 6.5rem;
-    padding: 6px 8px;
+    order: 4;
+    max-width: 8rem;
+    padding: 6px 10px;
     font-size: 0.75rem;
   }
   .eko-hud__day {
-    padding: var(--space-2);
+    order: 5;
+    padding: var(--space-2) var(--space-3);
     font-size: 0.85rem;
   }
   .eko-hud .m7-clock {
-    font-size: 0.82rem;
+    order: 6;
+    font-size: 0.85rem;
   }
-  .eko-hud__money {
-    font-size: 1rem;
+  .m7-clock__date {
+    display: none;
   }
 }
 
