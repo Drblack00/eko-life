@@ -22,11 +22,17 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
-  border: 1px solid var(--accent);
+  /* Frosted row material from .glass (no blur — repeating row); the accent
+     edge is kept as the event signal. */
   font-size: 0.9rem;
   min-height: 44px;
+}
+
+.eko-needs__event.glass {
+  --glass-tint: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  --glass-radius: var(--radius-lg);
+  --glass-blur: 0px;
+  border: 1px solid var(--accent);
 }
 
 .eko-needs__event-label {
@@ -65,11 +71,15 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-3);
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--text-muted);
+  /* Frosted chip material from .glass (no blur — small repeating chip). */
   font-size: 0.85rem;
   min-height: 44px;
+}
+
+.eko-needs__chip.glass {
+  --glass-tint: color-mix(in srgb, var(--surface) 70%, transparent);
+  --glass-radius: 999px;
+  --glass-blur: 0px;
 }
 
 .eko-needs__chip-label {
@@ -79,10 +89,4 @@
 .eko-needs__chip-timer {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .eko-needs__event {
-    background: var(--surface-2);
-  }
 }

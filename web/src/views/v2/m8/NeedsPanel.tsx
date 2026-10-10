@@ -112,7 +112,7 @@ export function NeedsPanel({
       {cityEvents.length > 0 && (
         <div className="eko-needs__events" role="status" aria-live="polite">
           {cityEvents.map((e) => (
-            <div key={e.key} className="eko-needs__event">
+            <div key={e.key} className="eko-needs__event glass">
               <span className="eko-needs__event-label">🌆 {e.label}</span>
               <span className="eko-needs__event-timer">
                 {fmtCountdown(e.expires_in_ms)} left
@@ -162,7 +162,7 @@ export function NeedsPanel({
       ) : (
         <ul className="eko-needs__chips">
           {personal.map((m) => (
-            <li key={m.key} className="eko-needs__chip">
+            <li key={m.key} className="eko-needs__chip glass">
               <span className="eko-needs__chip-label">{m.label}</span>
               <span className="eko-needs__chip-timer">
                 {fmtCountdown(m.expires_in_ms)}
