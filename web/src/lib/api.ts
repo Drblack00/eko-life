@@ -409,7 +409,7 @@ export async function authGet<T>(path: string, token: string): Promise<T> {
 }
 
 /** Bearer-auth POST-with-JSON helper. */
-async function authPost<T>(path: string, token: string, body: unknown): Promise<T> {
+export async function authPost<T>(path: string, token: string, body: unknown): Promise<T> {
   return request<T>(path, {
     method: "POST",
     headers: {
@@ -417,6 +417,17 @@ async function authPost<T>(path: string, token: string, body: unknown): Promise<
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(body),
+  });
+}
+
+/** Bearer-auth DELETE helper. */
+export async function authDelete<T>(path: string, token: string): Promise<T> {
+  return request<T>(path, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
   });
 }
 
@@ -515,6 +526,8 @@ export const api = {
     password: string;
     dob: string;
     guestToken?: string;
+    /** W3: referral code from a ?ref= invite link (invalid codes are ignored). */
+    ref?: string;
   }) =>
     request<{ token: string; username: string; is_admin?: boolean }>("/api/auth/register", {
       method: "POST",
@@ -595,4 +608,78 @@ export const api = {
     request<unknown>("/api/presence")
       .then((body) => pickPresence(body))
       .catch(() => null),
+};
+
+/**
+ * W3 — Friends page + referral links.
+ * Contract: server/src/routes/friends.js (+ GET /api/referral/:code).
+ * Referral attribution is data-only: no coins, no rewards, no payouts.
+ */
+export interface FriendEntry {
+  id: number;
+  other_id: number;
+  other_username: string;
+  status: "pending" | "accepted" | "declined";
+  /** True when the other side sent the request (incoming to me). */
+  incoming: boolean;
+  /** Live WS presence (false when the endpoint can't tell). */
+  online: boolean;
+  /** Other side's last WS connect timestamp (ms), null when unknown. */
+  last_seen: number | null;
+  created_ts: number;
+}
+
+export interface FriendLookup {
+  id: number;
+  username: string;
+  avatar: string;
+  color: string;
+  is_self: boolean;
+}
+
+export interface InviteInfo {
+  code: string;
+  link: string;
+  joined: number;
+}
+
+export const friendsApi = {
+  /** Pending + accepted friendships for me, with online flags. */
+  list: (token: string) =>
+    authGet<{ friends: FriendEntry[] }>("/api/friends", token),
+  /** Pending requests split into incoming / outgoing. */
+  requests: (token: string) =>
+    authGet<{ incoming: FriendEntry[]; outgoing: FriendEntry[] }>(
+      "/api/friends/requests",
+      token
+    ),
+  /** Exact-username lookup → profile snippet (for "add by username"). */
+  lookup: (token: string, username: string) =>
+    authGet<FriendLookup>(
+      `/api/friends/lookup?username=${encodeURIComponent(username)}`,
+      token
+    ),
+  /** Send a friend request (idempotent — duplicate returns the existing row). */
+  sendRequest: (token: string, username: string) =>
+    authPost<{
+      ok: boolean;
+      result: "ok" | "exists" | "accepted";
+      friendship: FriendEntry | null;
+    }>("/api/friends/request", token, { username }),
+  /** Accept an incoming request (recipient only). */
+  accept: (token: string, id: number) =>
+    authPost<{ ok: boolean }>(`/api/friends/${id}/accept`, token, {}),
+  /** Decline an incoming request (recipient only). */
+  decline: (token: string, id: number) =>
+    authPost<{ ok: boolean }>(`/api/friends/${id}/decline`, token, {}),
+  /** Cancel an outgoing request or unfriend. */
+  remove: (token: string, id: number) =>
+    authDelete<{ ok: boolean }>(`/api/friends/${id}`, token),
+  /** My referral code + shareable invite link + join count. */
+  invite: (token: string) => authGet<InviteInfo>("/api/friends/invite", token),
+  /** Resolve a public ?ref= code → the inviter's username (404 when unknown). */
+  resolveReferral: (code: string) =>
+    request<{ username: string }>(
+      `/api/referral/${encodeURIComponent(code)}`
+    ),
 };
