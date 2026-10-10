@@ -14,6 +14,7 @@ import { CityMap } from "../game/CityMap";
 import { mapXYToWorld, toPin } from "../game/mapPins";
 import type { PinLocation } from "../game/stubLocations";
 import {
+  AVATAR_LOOK_FALLBACK_OPTIONS,
   naira,
   spawnEmoji,
   spawnLabel,
@@ -35,7 +36,9 @@ import {
 import { ChatTab } from "./chat/ChatTab";
 import { ElectionSheet } from "./election/ElectionSheet";
 import { HomeTab, type HomeFocus } from "./home/HomeTab";
+import { HomeView } from "./home/HomeView";
 import { LedgerSheet } from "./home/LedgerSheet";
+import { AvatarEditButton } from "./avatar/AvatarEditButton";
 import { AdminView } from "./Admin";
 import "./Admin.css";
 import "./Game.css";
@@ -53,9 +56,10 @@ import "./v2/m10/m10.css";
 import { SkillsPanel, AcademyView } from "./v2/m12";
 import "./v2/m12/m12.css";
 
-type Tab = "city" | "jobs" | "needs" | "daily" | "market" | "chat" | "me";
+type Tab = "home" | "city" | "jobs" | "needs" | "daily" | "market" | "chat" | "me";
 
 const TABS: Array<{ id: Tab; label: string; icon: string }> = [
+  { id: "home", label: "Home", icon: "🏠" },
   { id: "city", label: "City", icon: "🌆" },
   { id: "jobs", label: "Jobs", icon: "💼" },
   { id: "needs", label: "Needs", icon: "💚" },
@@ -579,6 +583,7 @@ function MeTab({
   onSignOut,
   onUpgrade,
   onOpenAdmin,
+  sendAct,
 }: {
   you: You;
   config: GameConfig | null;
@@ -588,6 +593,7 @@ function MeTab({
   onSignOut: () => void;
   onUpgrade: () => void;
   onOpenAdmin: () => void;
+  sendAct: (a: ActName, params?: Record<string, unknown>) => void;
 }) {
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const className =
@@ -613,6 +619,11 @@ function MeTab({
             </div>
           </div>
         </div>
+        <AvatarEditButton
+          look={you.avatar_look}
+          options={config?.avatarLook ?? AVATAR_LOOK_FALLBACK_OPTIONS}
+          sendAct={sendAct}
+        />
         <dl className="eko-me__rows">
           <div>
             <dt>Wallet</dt>
@@ -915,6 +926,9 @@ export function Game({
       ) : (
         <>
           <main className="eko-main">
+        {tab === "home" && config && (
+          <HomeView you={you} config={config} sendAct={sock.sendAct} />
+        )}
         {tab === "city" && (
           <CityTab
             you={you}
@@ -973,6 +987,7 @@ export function Game({
               onSignOut={onSignOut}
               onUpgrade={onUpgrade}
               onOpenAdmin={() => setAdminOpen(true)}
+              sendAct={sock.sendAct}
             />
             {config && (
               <HomeTab

@@ -1,5 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, asList, type ClassInfo } from "../lib/api";
+import {
+  AVATAR_LOOK_DEFAULTS,
+  AVATAR_LOOK_FALLBACK_OPTIONS,
+  sanitizeAvatarLook,
+  type AvatarLook,
+  type AvatarLookOptions,
+} from "../game/types";
+import { AvatarStudio } from "./avatar/AvatarStudio";
 import { Button, Card, Skeleton, useToast } from "../components";
 import "./CreateCharacter.css";
 
@@ -48,6 +56,10 @@ export function CreateCharacter({
   const [color, setColor] = useState(COLORS[0]);
   const [avatarOpts, setAvatarOpts] = useState<string[]>(AVATARS);
   const [colorOpts, setColorOpts] = useState<string[]>(COLORS);
+  // M15: 3D look — options from /api/config, local fallback until the
+  // server serves avatarLook; the staged look is saved on submit only.
+  const [lookOpts, setLookOpts] = useState<AvatarLookOptions | null>(null);
+  const [look, setLook] = useState<AvatarLook>(AVATAR_LOOK_DEFAULTS);
   const [busy, setBusy] = useState(false);
   const [nameError, setNameError] = useState("");
   const [submitError, setSubmitError] = useState("");
@@ -74,6 +86,20 @@ export function CreateCharacter({
         if (Array.isArray(cfg.colors) && cfg.colors.length > 0) {
           setColorOpts(cfg.colors);
           if (!cfg.colors.includes(color)) setColor(cfg.colors[0]);
+        }
+        // M15: prefer the server's avatar option lists (fall back to local).
+        const serverLook = cfg.avatarLook;
+        if (
+          serverLook &&
+          Array.isArray(serverLook.bodies) &&
+          serverLook.bodies.length > 0 &&
+          serverLook.defaults &&
+          typeof serverLook.defaults === "object"
+        ) {
+          setLookOpts(serverLook);
+          setLook(sanitizeAvatarLook(serverLook.defaults, serverLook));
+        } else {
+          setLookOpts(AVATAR_LOOK_FALLBACK_OPTIONS);
         }
       })
       .catch((err) => {
@@ -108,6 +134,7 @@ export function CreateCharacter({
         class: classId,
         avatar,
         color,
+        avatar_look: sanitizeAvatarLook(look, lookOpts ?? undefined),
       });
       try {
         localStorage.setItem(`eko_char_done:${username}`, "1");
@@ -293,6 +320,33 @@ export function CreateCharacter({
                   />
                 ))}
               </div>
+            </section>
+
+            <section aria-labelledby="cc-3dlook">
+              <h2 id="cc-3dlook" className="eko-create__h2">
+                Your 3D look
+              </h2>
+              <p className="eko-create__3dnote">
+                Spin it, style it — this is how you'll appear in 3D scenes.
+                Your emoji above stays as your chat icon.
+              </p>
+              {lookOpts ? (
+                <AvatarStudio
+                  compact
+                  initial={look}
+                  options={lookOpts}
+                  onSave={setLook}
+                />
+              ) : (
+                <div
+                  className="eko-create__loading"
+                  aria-label="Loading 3D look options"
+                >
+                  <Skeleton height={220} />
+                  <Skeleton height={48} />
+                  <Skeleton height={48} />
+                </div>
+              )}
             </section>
 
             {submitError && (
