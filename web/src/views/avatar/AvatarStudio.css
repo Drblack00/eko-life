@@ -165,3 +165,24 @@
   color: var(--text-muted);
   font-size: 0.9rem;
 }
+
+/* ---- Workstream B: landscape studio ----
+   Side-by-side on short viewports: the 3D preview sticks to the left while
+   the option rows scroll beside it; the footer spans full width. Portrait
+   keeps the stacked layout above. */
+@media (orientation: landscape) {
+  .eko-studio {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    align-items: start;
+  }
+  .eko-studio__preview {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    position: sticky;
+    top: 0;
+  }
+  .eko-studio__footer {
+    grid-column: 1 / -1;
+  }
+}
