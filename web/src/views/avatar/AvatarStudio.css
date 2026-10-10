@@ -1,0 +1,162 @@
+/* AvatarStudio — M15 avatar creator */
+
+.eko-studio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.eko-studio__preview {
+  position: relative;
+  height: 300px;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(120% 90% at 50% 10%, #1e293b 0%, #0b1220 70%);
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  border: 1px solid var(--surface-2);
+}
+
+.eko-studio__preview:active {
+  cursor: grabbing;
+}
+
+.eko-studio__preview canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.eko-studio--compact .eko-studio__preview {
+  height: 220px;
+}
+
+.eko-studio__nogl {
+  padding: var(--space-4);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.eko-studio__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-studio__label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.eko-studio__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.eko-studio__pill {
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 999px;
+  border: 2px solid var(--surface-2);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.eko-studio__pill--active {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+}
+
+.eko-studio__swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.eko-studio__swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--surface-2);
+  padding: 0;
+}
+
+.eko-studio__swatch--active {
+  border-color: var(--primary);
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.eko-studio__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+.eko-studio__reset {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-weight: 600;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  text-decoration: underline;
+}
+
+.eko-studio__reset:disabled {
+  opacity: 0.4;
+  text-decoration: none;
+}
+
+.eko-studio__save {
+  flex: 1;
+  min-height: 48px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.eko-studio__save:disabled {
+  opacity: 0.55;
+}
+
+/* "Edit look" entry button (Me tab profile header) */
+.eko-avatar-edit {
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 999px;
+  border: 2px solid var(--surface-2);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.eko-avatar-edit__wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-2);
+}
+
+.eko-avatar-edit__sheet h2 {
+  margin: 0 0 var(--space-1);
+  font-size: 1.25rem;
+}
+
+.eko-avatar-edit__sheet p {
+  margin: 0 0 var(--space-4);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
