@@ -1,0 +1,191 @@
+/* M7 — jobs tab + game clock. Mobile-first, own namespace (m7-*). */
+
+.m7-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 12px calc(16px + env(safe-area-inset-bottom));
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.m7-section {
+  font-size: 1.05rem;
+  margin: 8px 2px 0;
+}
+
+.m7-note {
+  font-size: 0.85rem;
+  opacity: 0.75;
+  margin: 0 2px;
+}
+
+/* ---- game clock ---- */
+.m7-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---- active shift card ---- */
+.m7-shift {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-left: 4px solid var(--eko-accent, #22d3ee);
+}
+
+.m7-shift__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.1rem;
+}
+
+.m7-shift__title {
+  font-weight: 700;
+}
+
+.m7-shift__time {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  font-size: 0.95rem;
+}
+
+.m7-shift__bar {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.25);
+  overflow: hidden;
+}
+
+.m7-shift__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #22d3ee, #34d399);
+  transition: width 1s linear;
+}
+
+/* ---- track cards ---- */
+.m7-track {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.m7-track__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.m7-track__icon {
+  font-size: 1.6rem;
+  line-height: 1.2;
+}
+
+.m7-track__name {
+  font-weight: 700;
+}
+
+.m7-track__blurb {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.m7-track__roles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---- role rows ---- */
+.m7-role {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(127, 127, 127, 0.12);
+}
+
+.m7-role__main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.m7-role__icon {
+  font-size: 1.4rem;
+}
+
+.m7-role__text {
+  min-width: 0;
+}
+
+.m7-role__name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.m7-role__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.m7-role__pay {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.m7-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.25);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.m7-role .eko-btn {
+  flex-shrink: 0;
+  min-height: 44px;
+  max-width: 120px;
+}
+
+.m7-role__gate {
+  font-size: 0.75rem;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+/* ---- leave-shift dialog ---- */
+.m7-dialog__text {
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.m7-dialog__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.m7-dialog__actions .eko-btn {
+  min-height: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m7-shift__fill {
+    transition: none;
+  }
+}
