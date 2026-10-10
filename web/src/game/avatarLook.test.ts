@@ -11,9 +11,9 @@ import {
 
 const FULL = {
   body: "man",
-  skin: "deep",
+  skin: "deep_espresso",
   hair: "afro",
-  outfit: "native",
+  outfit: "hoodie",
   fabric: "ankara",
   topColor: "#f472b6",
   bottomColor: "#1e3a8a",

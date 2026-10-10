@@ -503,26 +503,34 @@ export interface AvatarLookOptions {
 /** Client-safe defaults used when the server hasn't sent its option lists. */
 export const AVATAR_LOOK_DEFAULTS: AvatarLook = {
   body: "woman",
-  skin: "rich",
+  skin: "cocoa",
   hair: "lowcut",
   outfit: "casual",
   fabric: "plain",
   topColor: "#22d3ee",
-  bottomColor: "#1f2937",
+  bottomColor: "#334155",
 };
 
-/** Local fallback option lists (used until /api/config serves avatarLook). */
+/** Local fallback option lists (used until /api/config serves avatarLook).
+ *  Ids mirror the server allowlists exactly so fallback saves also validate. */
 export const AVATAR_LOOK_FALLBACK_OPTIONS: AvatarLookOptions = {
   bodies: [
     { id: "woman", name: "Woman" },
     { id: "man", name: "Man" },
   ],
   skins: [
-    { id: "deep", name: "Deep", hex: "#4a2c1a" },
-    { id: "rich", name: "Rich", hex: "#6f4527" },
-    { id: "warm", name: "Warm", hex: "#96613a" },
-    { id: "golden", name: "Golden", hex: "#bd8452" },
-    { id: "light", name: "Light", hex: "#e0b184" },
+    { id: "deep_espresso", name: "Deep Espresso", hex: "#3b2314" },
+    { id: "dark_cocoa", name: "Dark Cocoa", hex: "#4a2c17" },
+    { id: "burnt_caramel", name: "Burnt Caramel", hex: "#5d3a1f" },
+    { id: "mahogany", name: "Mahogany", hex: "#6f4426" },
+    { id: "walnut", name: "Walnut", hex: "#7d5330" },
+    { id: "cocoa", name: "Cocoa", hex: "#8a5f38" },
+    { id: "coffee", name: "Coffee", hex: "#9a6f45" },
+    { id: "latte", name: "Latte", hex: "#ab8054" },
+    { id: "honey", name: "Honey", hex: "#bc9066" },
+    { id: "sand", name: "Sand", hex: "#cda077" },
+    { id: "amber", name: "Amber", hex: "#dcb07e" },
+    { id: "cream", name: "Cream", hex: "#e8cfa3" },
   ],
   hairs: [
     { id: "lowcut", name: "Low cut" },
@@ -535,9 +543,10 @@ export const AVATAR_LOOK_FALLBACK_OPTIONS: AvatarLookOptions = {
   ],
   outfits: [
     { id: "casual", name: "Casual" },
-    { id: "native", name: "Native" },
-    { id: "smart", name: "Smart" },
-    { id: "street", name: "Street" },
+    { id: "hoodie", name: "Hoodie" },
+    { id: "office", name: "Office" },
+    { id: "chill", name: "Chill" },
+    { id: "sitework", name: "Site work" },
   ],
   fabrics: [
     { id: "plain", name: "Plain" },
@@ -546,24 +555,12 @@ export const AVATAR_LOOK_FALLBACK_OPTIONS: AvatarLookOptions = {
     { id: "asoke", name: "Aso-oke" },
   ],
   topColors: [
-    "#22d3ee",
-    "#f472b6",
-    "#a3e635",
-    "#fbbf24",
-    "#c084fc",
-    "#fb7185",
-    "#34d399",
-    "#60a5fa",
+    "#22d3ee", "#f472b6", "#a3e635", "#fbbf24", "#c084fc",
+    "#fb7185", "#34d399", "#60a5fa", "#ef4444", "#fb923c",
   ],
   bottomColors: [
-    "#1f2937",
-    "#374151",
-    "#7c2d12",
-    "#1e3a8a",
-    "#14532d",
-    "#713f12",
-    "#831843",
-    "#0f172a",
+    "#334155", "#111827", "#f8fafc", "#1e3a8a", "#64748b",
+    "#78350f", "#14532d", "#7c2d12", "#831843", "#3b0764",
   ],
   defaults: AVATAR_LOOK_DEFAULTS,
 };
