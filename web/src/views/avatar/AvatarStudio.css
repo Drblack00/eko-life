@@ -1,4 +1,9 @@
-/* AvatarStudio — M15 avatar creator */
+/* AvatarStudio — M20 studio rebuild (workstream 3) */
+
+/* Self-sufficient design tokens: the M20 harness mounts this component
+   without the app boot styles, so the studio brings its own tokens. In the
+   real app these are already defined (identical values, harmless). */
+@import "../../styles/tokens.css";
 
 .eko-studio {
   display: flex;
@@ -8,14 +13,31 @@
 
 .eko-studio__preview {
   position: relative;
-  height: 300px;
+  height: 340px;
   border-radius: var(--radius-lg);
+  /* Layered studio backdrop: warm key-glow from upper left, cool ambient
+     wash, deep base, and a floor bounce from below. */
   background:
-    radial-gradient(120% 90% at 50% 10%, #1e293b 0%, #0b1220 70%);
+    radial-gradient(90% 60% at 28% 12%, rgb(255 214 170 / 0.10) 0%, transparent 60%),
+    radial-gradient(110% 80% at 72% 8%, rgb(125 180 255 / 0.12) 0%, transparent 55%),
+    radial-gradient(130% 100% at 50% 0%, #26334d 0%, #141d31 52%, #0a0f1c 100%),
+    radial-gradient(100% 40% at 50% 108%, rgb(56 90 140 / 0.35) 0%, transparent 70%);
   overflow: hidden;
   touch-action: none;
   cursor: grab;
-  border: 1px solid var(--surface-2);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.07),
+    0 12px 32px rgb(0 0 0 / 0.35);
+}
+
+/* Vignette: pulls focus to the figure. */
+.eko-studio__preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(115% 95% at 50% 42%, transparent 52%, rgb(2 6 14 / 0.5) 100%);
 }
 
 .eko-studio__preview:active {
@@ -23,9 +45,64 @@
 }
 
 .eko-studio__preview canvas {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* Camera framing presets — glassy pills floating over the preview. */
+.eko-studio__framing {
+  position: absolute;
+  z-index: 3;
+  top: var(--space-3);
+  left: var(--space-3);
+  display: flex;
+  gap: var(--space-2);
+}
+
+.eko-studio__framebtn {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid rgb(255 255 255 / 0.22);
+  background: rgb(10 18 32 / 0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #e8f1fb;
+  font-weight: 700;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.eko-studio__framebtn--active {
+  background: var(--palm-500);
+  border-color: var(--palm-500);
+  color: #fff;
+  box-shadow: 0 4px 14px rgb(34 197 94 / 0.45);
+}
+
+/* First-run zoom hint; hides after the first zoom gesture. */
+.eko-studio__zoomhint {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: var(--space-3);
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: rgb(10 18 32 / 0.6);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgb(255 255 255 / 0.14);
+  color: rgb(232 241 251 / 0.85);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .eko-studio--compact .eko-studio__preview {
@@ -42,13 +119,17 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--surface-2) 70%, transparent);
 }
 
 .eko-studio__label {
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: 0.78rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--text-muted);
 }
 
