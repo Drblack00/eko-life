@@ -15,6 +15,8 @@ import {
   CLASSES, LOCATIONS, JOBS, FOOD, FUN, HOUSING, SPAWN, WORLD_BOUNDS,
   PROPERTIES, BIZ, VEHICLES, FURN, HOME_SLOTS, BANK, TRAVEL_FARES, STUDY_COST,
   COLLECT_RADIUS, SPAWN_TTL_MS, SPAWN_KINDS, MOVE_BASE_SPEED,
+  AVATAR_BODIES, AVATAR_SKINS, AVATAR_HAIRS, AVATAR_OUTFITS, AVATAR_FABRICS,
+  AVATAR_TOP_COLORS, AVATAR_BOTTOM_COLORS, DEFAULT_AVATAR, WALLS, FLOORS,
   cleanText, DAY_MS,
 } from '../game/data.js';
 import { decayTick, distUnits, applyDayEconomy } from '../game/sim.js';
@@ -285,6 +287,16 @@ export function createHub({ getDay }) {
         food: FOOD, fun: FUN, housing: HOUSING, spawn: SPAWN, bounds: WORLD_BOUNDS,
         properties: PROPERTIES, biz: BIZ, vehicles: VEHICLES, furn: FURN,
         homeSlots: HOME_SLOTS, bank: BANK, travelFares: TRAVEL_FARES, studyCost: STUDY_COST,
+        // M17 fix: WS init must carry the same avatar/home-style config as
+        // GET /api/config — the client prefers this object, and without it
+        // the studio fell back to stale option ids the server rejects.
+        avatarLook: {
+          bodies: AVATAR_BODIES, skins: AVATAR_SKINS, hairs: AVATAR_HAIRS,
+          outfits: AVATAR_OUTFITS, fabrics: AVATAR_FABRICS,
+          topColors: AVATAR_TOP_COLORS, bottomColors: AVATAR_BOTTOM_COLORS,
+          defaults: DEFAULT_AVATAR,
+        },
+        walls: WALLS, floors: FLOORS,
       },
       election: elState,
       governor: governorId ? { id: governorId, name: govName } : null,
