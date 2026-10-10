@@ -187,17 +187,30 @@ export const VEHICLES = {
 // Buy into inventory, place up to HOME_SLOTS at home. Placed items feed
 // gameplay effect hooks (see FURN_EFFECTS) instead of being decoration.
 export const FURN = {
-  bed:    { id: 'bed',    name: 'Comfy Bed',       price: 15000, icon: '🛏️', effect: 'sleep_health', desc: 'Sleep restores +20 extra health' },
-  fridge: { id: 'fridge', name: 'Fridge',          price: 20000, icon: '🧊', effect: 'eat_hunger',   desc: 'Eating restores +15 extra hunger' },
-  tv:     { id: 'tv',     name: 'Flat-screen TV',  price: 25000, icon: '📺', effect: 'fun_happy',    desc: 'Fun gives +10 extra happiness' },
-  sofa:   { id: 'sofa',   name: 'Sofa Set',        price: 18000, icon: '🛋️', effect: 'fun_happy',    desc: 'Fun gives +8 extra happiness' },
-  gen:    { id: 'gen',    name: 'Generator',       price: 30000, icon: '🔌', effect: 'daily_happy',  desc: '+5 happiness every game day (no more "up NEPA")' },
-  ac:     { id: 'ac',     name: 'Air Conditioner', price: 45000, icon: '❄️', effect: 'sleep_happy',  desc: 'Sleep restores +10 extra happiness' },
+  bed:    { id: 'bed',    name: 'Comfy Bed',       price: 15000, icon: '🛏️', effect: 'sleep_health', desc: 'Sleep restores +20 extra health', category: 'sleep',   size: [2, 1] },
+  fridge: { id: 'fridge', name: 'Fridge',          price: 20000, icon: '🧊', effect: 'eat_hunger',   desc: 'Eating restores +15 extra hunger', category: 'kitchen', size: [1, 1] },
+  tv:     { id: 'tv',     name: 'Flat-screen TV',  price: 25000, icon: '📺', effect: 'fun_happy',    desc: 'Fun gives +10 extra happiness', category: 'comfort', size: [2, 1] },
+  sofa:   { id: 'sofa',   name: 'Sofa Set',        price: 18000, icon: '🛋️', effect: 'fun_happy',    desc: 'Fun gives +8 extra happiness', category: 'comfort', size: [2, 1] },
+  gen:    { id: 'gen',    name: 'Generator',       price: 30000, icon: '🔌', effect: 'daily_happy',  desc: '+5 happiness every game day (no more "up NEPA")', category: 'comfort', size: [1, 1] },
+  ac:     { id: 'ac',     name: 'Air Conditioner', price: 45000, icon: '❄️', effect: 'sleep_happy',  desc: 'Sleep restores +10 extra happiness', category: 'comfort', size: [1, 1] },
+  // M14: buy-mode catalogue expansion — category + 2D grid footprint (size: [w, d] cells on the 6×6 home grid)
+  mattress:     { id: 'mattress',     name: 'Sturdy Mattress', price: 3000,  icon: '🛏️', effect: 'sleep_health', desc: 'Sleep restores +8 extra health', category: 'sleep',   size: [2, 1] },
+  cooler:       { id: 'cooler',       name: 'Party Cooler',    price: 2500,  icon: '🧊', effect: 'eat_hunger',   desc: 'Eating restores +5 extra hunger', category: 'kitchen', size: [1, 1] },
+  stove:        { id: 'stove',        name: 'Gas Stove',       price: 8000,  icon: '🍳', effect: 'eat_hunger',   desc: 'Eating restores +10 extra hunger', category: 'kitchen', size: [1, 1] },
+  dining_table: { id: 'dining_table', name: 'Dining Table',    price: 6600,  icon: '🍽️', effect: 'eat_hunger',   desc: 'Eating restores +8 extra hunger', category: 'kitchen', size: [2, 1] },
+  drum:         { id: 'drum',         name: 'Water Drum',      price: 1500,  icon: '🛢️', effect: 'day_happy',    desc: '+2 happiness every game day', category: 'bath',    size: [1, 1] },
+  mirror:       { id: 'mirror',       name: 'Standing Mirror', price: 4000,  icon: '🪞', effect: 'day_happy',    desc: '+2 happiness every game day', category: 'bath',    size: [1, 1] },
+  plastic_chair:{ id: 'plastic_chair',name: 'Plastic Chair',   price: 500,   icon: '🪑', effect: 'fun_happy',    desc: 'Fun gives +2 extra happiness', category: 'comfort', size: [1, 1] },
+  fan:          { id: 'fan',          name: 'Standing Fan',    price: 2200,  icon: '🌀', effect: 'sleep_happy',  desc: 'Sleep restores +5 extra happiness', category: 'comfort', size: [1, 1] },
+  beanbag:      { id: 'beanbag',      name: 'Bean Bag',        price: 12000, icon: '🟠', effect: 'fun_happy',    desc: 'Fun gives +6 extra happiness', category: 'comfort', size: [1, 1] },
+  bookshelf:    { id: 'bookshelf',    name: 'Bookshelf',       price: 9000,  icon: '📚', effect: 'fun_happy',    desc: 'Fun gives +4 extra happiness', category: 'comfort', size: [1, 1] },
 };
 export const HOME_SLOTS = 6;
 
 // Placed-furniture effect hooks consumed by actions/day tick.
-// gen is the only daily one; the rest trigger inside eat/fun/sleep.
+// sleep/eat/fun trigger inside those actions (aggregated by
+// furnitureEffects()); day hooks are consumed by applyDayEconomy()
+// from each placed item's `day` key (gen/drum/mirror).
 export const FURN_EFFECTS = {
   bed:    { sleep: { health: 20 } },
   fridge: { eat: { hunger: 15 } },
@@ -205,6 +218,17 @@ export const FURN_EFFECTS = {
   sofa:   { fun: { happiness: 8 } },
   ac:     { sleep: { happiness: 10 } },
   gen:    { day: { happiness: 5 } },
+  // M14: hooks for the expanded catalogue
+  mattress:      { sleep: { health: 8 } },
+  cooler:        { eat: { hunger: 5 } },
+  stove:         { eat: { hunger: 10 } },
+  dining_table:  { eat: { hunger: 8 } },
+  drum:          { day: { happiness: 2 } },
+  mirror:        { day: { happiness: 2 } },
+  plastic_chair: { fun: { happiness: 2 } },
+  fan:           { sleep: { happiness: 5 } },
+  beanbag:       { fun: { happiness: 6 } },
+  bookshelf:     { fun: { happiness: 4 } },
 };
 
 // ---------------- Bank & economy rates ----------------

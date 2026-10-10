@@ -5,6 +5,8 @@
 // game/actions.js and ws/hub.js. Unit-tested in tests/sim.test.js.
 // ============================================================
 
+import { FURN_EFFECTS } from './data.js';
+
 export function clamp(n, lo, hi) {
   const v = Math.floor(Number(n));
   if (!Number.isFinite(v)) return lo;
@@ -81,10 +83,16 @@ export function applyDayEconomy(char, { bizDef = null, propDef = null, placed = 
     res.dirty = true;
   }
 
-  // owned property + placed generator happiness
+  // owned property + placed-furniture day hooks (gen/drum/mirror, ...).
+  // Day happiness comes from each placed item's FURN_EFFECTS `day` key —
+  // identical to the old hardcoded generator bonus, generalized.
   let happy = 0;
   if (propDef) happy += Math.max(0, Math.floor(Number(propDef.happy) || 0));
-  if ((placed || []).includes('gen')) happy += 5; // Generator: "up NEPA" immunity
+  for (const id of placed || []) {
+    const fx = FURN_EFFECTS[String(id)];
+    const h = fx && fx.day ? Number(fx.day.happiness) || 0 : 0;
+    if (h > 0) happy += h;
+  }
   if (happy > 0) {
     char.happiness = clamp(Number(char.happiness) + happy, 0, 100);
     res.happyGain = happy;

@@ -20,7 +20,8 @@ import {
 } from './elections.js';
 import {
   addTransaction, saveCharacter, getMeta,
-  addFurniture, listFurniture, getFurnitureById, setFurniturePlaced, countPlacedFurniture,
+  addFurniture, listFurniture, getFurnitureById, setFurniturePlacement,
+  deleteFurniture, countPlacedFurniture,
 } from '../db.js';
 // V2 milestones: delegated intent modules (M7 shifts, M8 needs, M9 daily,
 // M10 economy, M11 governance, M12 skills). Wired into handleAct below.
@@ -424,6 +425,19 @@ export async function handleAct(ctx, msg) {
   }
 
   // ---------- place_furniture (up to HOME_SLOTS placed items) ----------
+  // M14: optional home-grid coordinates {x, z, rot}. Placing without them
+  // keeps the old slot-only behavior. rot 1/3 swaps the item's w/d.
+  const HOME_GRID = 6; // the home room is a 6×6 cell grid
+  function furnFootprint(itemId, x, z, rot) {
+    const def = FURN[String(itemId)];
+    if (!def || !Array.isArray(def.size)) return null;
+    let [w, d] = def.size;
+    if (Math.abs(Math.floor(Number(rot))) % 2 === 1) [w, d] = [d, w]; // rot 1/3 → swapped
+    return { x: Math.floor(Number(x)), z: Math.floor(Number(z)), w, d };
+  }
+  function rectsOverlap(a, b) {
+    return a.x < b.x + b.w && b.x < a.x + a.w && a.z < b.z + b.d && b.z < a.z + a.d;
+  }
   if (a === 'place_furniture') {
     const fid = Math.floor(Number(msg.id));
     if (!fid) { err('Unknown furniture.'); return; }
@@ -432,18 +446,70 @@ export async function handleAct(ctx, msg) {
       err('That furniture is not yours.'); return;
     }
     const placed = !!msg.placed;
+    const hasCoords = msg.x !== undefined || msg.z !== undefined || msg.rot !== undefined;
+    let x = null, z = null, rot = null;
     if (placed && !Number(row.placed)) {
       const n = await countPlacedFurniture(conn.user.id);
       if (n >= HOME_SLOTS) {
         err(`Your home has only ${HOME_SLOTS} slots. Unplace something first.`); return;
       }
     }
-    const ok = await setFurniturePlaced(fid, conn.user.id, placed);
+    if (placed && hasCoords) {
+      // validate integers 0..5 for all three
+      for (const [k, v] of [['x', msg.x], ['z', msg.z], ['rot', msg.rot]]) {
+        if (!Number.isInteger(Number(v)) || Number(v) < 0 || Number(v) > 5) {
+          err(`${k} must be a whole number from 0 to 5.`); return;
+        }
+      }
+      x = Number(msg.x); z = Number(msg.z); rot = Number(msg.rot);
+      const fp = furnFootprint(row.item, x, z, rot);
+      if (!fp) { err('Unknown furniture.'); return; }
+      if (fp.x + fp.w > HOME_GRID || fp.z + fp.d > HOME_GRID) {
+        err(`${FURN[row.item].name} doesn't fit there — it needs ${fp.w}×${fp.d} on the 6×6 grid.`); return;
+      }
+      // overlap check against the player's other placed items that have coordinates
+      const others = (await listFurniture(conn.user.id)).filter(
+        r => Number(r.placed) && Number(r.id) !== fid && r.x != null && r.z != null && r.rot != null);
+      for (const o of others) {
+        const ofp = furnFootprint(o.item, o.x, o.z, o.rot);
+        if (ofp && rectsOverlap(fp, ofp)) {
+          err(`No space — that spot overlaps your ${(FURN[o.item] || {}).name || 'furniture'}.`); return;
+        }
+      }
+    }
+    // unplacing clears the grid position back to inventory
+    const ok = await setFurniturePlacement(fid, conn.user.id, { placed, x, z, rot });
     if (!ok) { err('Could not place that.'); return; }
     await refreshFurniture(conn);
     const def = FURN[row.item];
-    console.log(`[act] ${conn.user.username} ${placed ? 'placed' : 'stored'} furniture ${row.item}`);
+    console.log(`[act] ${conn.user.username} ${placed ? 'placed' : 'stored'} furniture ${row.item}${placed && hasCoords ? ` at (${x},${z}) r${rot}` : ''}`);
     await commit({ note: placed ? `${(def && def.icon) || '🪑'} ${def ? def.name : 'Furniture'} placed at home.` : 'Stored back in inventory.' });
+    return;
+  }
+
+  // ---------- sell_furniture (M14: unplaced inventory only, 50% refund) ----------
+  if (a === 'sell_furniture') {
+    const fid = Math.floor(Number(msg.id));
+    if (!fid) { err('Unknown furniture.'); return; }
+    const row = await getFurnitureById(fid);
+    if (!row || Number(row.owner_id) !== Number(conn.user.id)) {
+      err('That furniture is not yours.'); return;
+    }
+    if (Number(row.placed)) {
+      err('Unplace it first before selling.'); return;
+    }
+    const def = FURN[row.item];
+    if (!def) { err('Unknown furniture.'); return; }
+    const refund = Math.floor(Number(def.price) * 0.5); // flat 50%, ignores Market Boom
+    const ok = await deleteFurniture(fid, conn.user.id);
+    if (!ok) { err('Could not sell that.'); return; }
+    c.money = Math.floor(Number(c.money)) + refund;
+    await refreshFurniture(conn);
+    console.log(`[act] ${conn.user.username} sold furniture ${row.item} (+${naira(refund)})`);
+    await commit({
+      kind: 'sell_furniture', amount: refund, meta: { item: row.item, furniture_id: fid },
+      note: `${def.icon} Sold the ${def.name} for ${naira(refund)}.`,
+    });
     return;
   }
 
@@ -644,7 +710,7 @@ export async function settleDayRent(ctx, conn) {
 
 // ---- Day-rollover economy for one connected player ----
 // Business income → note; savings +2%/day; loan +10%/day; owned-property and
-// placed-generator happiness. Ledger rows for every money/balance move.
+// placed-furniture day-hook happiness. Ledger rows for every money/balance move.
 export async function settleDayEconomy(ctx, conn) {
   const { send, youSnapshot } = ctx;
   const c = conn.character;
