@@ -26,8 +26,8 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   touch-action: none;
-  background: #f7f1e3;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: radial-gradient(120% 90% at 50% 20%, #16233d 0%, #0f1a2e 70%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .eko-room__nogl {
@@ -251,4 +251,188 @@
   background: rgba(0, 0, 0, 0.12);
   color: var(--text-muted);
   cursor: not-allowed;
+}
+
+/* ---- M15 buy-mode v2 ---- */
+
+.eko-room__card--poor {
+  opacity: 0.85;
+  border-style: dashed;
+}
+
+.eko-room__card-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.eko-room__price {
+  font-weight: 800;
+  font-size: 0.95rem;
+  flex: 1;
+}
+
+.eko-room__card-foot .eko-room__buy {
+  flex: 2;
+}
+
+/* Design tab: wall/floor swatches. */
+
+.eko-room__design {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-room__group-h {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: 0.95rem;
+}
+
+.eko-room__swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: var(--space-2);
+}
+
+.eko-room__swatch {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.eko-room__swatch:disabled {
+  cursor: default;
+}
+
+.eko-room__swatch--current {
+  border: 2px solid var(--palm-500);
+}
+
+.eko-room__swatch--preview {
+  border: 2px dashed var(--palm-500);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+}
+
+.eko-room__swatch-color {
+  width: 100%;
+  height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.eko-room__swatch-name {
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.eko-room__swatch-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* Free-preview banner over the canvas. */
+
+.eko-room__trybar {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  top: var(--space-3);
+  background: rgba(255, 255, 255, 0.96);
+  border: 2px dashed var(--palm-500);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: 0.88rem;
+  z-index: 2;
+}
+
+.eko-room__trybar-btns {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* Placement d-pad (≥44px touch targets). */
+
+.eko-room__dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 48px);
+  grid-template-rows: repeat(2, 48px);
+  gap: 4px;
+  justify-content: center;
+  align-content: center;
+}
+
+.eko-room__dpad-btn {
+  min-width: 48px;
+  min-height: 48px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  border-radius: var(--radius-md);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eko-room__dpad-btn:active {
+  background: var(--palm-500);
+  color: #fff;
+}
+
+.eko-room__dpad-gap {
+  min-width: 48px;
+  min-height: 48px;
+}
+
+/* Tapped-item action rows. */
+
+.eko-room__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-room__action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: var(--palm-500);
+  border-color: var(--palm-600);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-3);
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.eko-room__action-hint {
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-2);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.eko-room__daily-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
 }

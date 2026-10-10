@@ -2,27 +2,38 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { priceOf, type GameConfig } from "../../lib/api";
 import {
+  AVATAR_LOOK_FALLBACK_OPTIONS,
   furnitureItemId,
   furnitureKey,
   naira,
+  sanitizeAvatarLook,
   type ActName,
+  type AvatarLook,
   type FurnitureEntry,
   type You,
 } from "../../game/types";
+import { buildAvatarLook } from "../avatar/avatarModel";
 import {
   footprintCells,
   fitsInGrid,
   layoutPlaced,
   overlaps,
   useActFor,
-  useLabel,
-  ROOM_CATEGORIES,
   ROOM_GRID,
   type GridCell,
   type Footprint,
-  type RoomCategory,
 } from "./roomGrid";
-import { roomSizeFor, roomCategoryFor } from "./catalogue";
+import {
+  roomSizeFor,
+  buyTabFor,
+  visibleBuyTabs,
+  normalizeStyleEntry,
+  validHex,
+  itemActionsFor,
+  isDailyEffect,
+  type BuyTabId,
+  type HomeStyleEntry,
+} from "./catalogue";
 import "./HomeRoom.css";
 
 /* ============ Procedural models (original, primitives only) ============ */
@@ -363,6 +374,91 @@ export function buildModel(id: string, p: Palette): THREE.Group {
   }
 }
 
+/* ============ M15: avatar look + home style ============ */
+
+/**
+ * home_wall/home_floor are not yet on the You type — read them through a
+ * local extension interface so tsc stays green before the server worker
+ * lands them. (avatar_look, config.walls/floors, and the avatar module are
+ * all in place now.)
+ */
+interface HomeExtras {
+  home_wall?: unknown;
+  home_floor?: unknown;
+}
+
+/** Resolve a look's skin to a hex for the fallback capsule figure. */
+function capsuleSkinHex(look: AvatarLook): string {
+  return (
+    validHex(look.skin) ??
+    validHex(
+      AVATAR_LOOK_FALLBACK_OPTIONS.skins.find((s) => s.id === look.skin)?.hex
+    ) ??
+    "#8d5a3b"
+  );
+}
+
+/**
+ * Fallback player figure (simple capsule person). Only used if the real
+ * buildAvatarLook ever throws on bad look data — the room keeps rendering.
+ */
+function buildCapsuleAvatar(T: typeof THREE, look: AvatarLook): THREE.Group {
+  const g = new T.Group();
+  const mat = (color: string) =>
+    new T.MeshStandardMaterial({
+      color: new T.Color(validHex(color) ?? "#888888"),
+      roughness: 0.85,
+      metalness: 0.02,
+    });
+  const skin = mat(capsuleSkinHex(look));
+  const top = mat(look.topColor);
+  const bottom = mat(look.bottomColor);
+  const dark = mat("#2b2118");
+  const add = (m: THREE.Mesh, x: number, y: number, z: number) => {
+    m.position.set(x, y, z);
+    m.castShadow = true;
+    g.add(m);
+    return m;
+  };
+  // Legs + shoes.
+  for (const sx of [-0.11, 0.11]) {
+    add(new T.Mesh(new T.BoxGeometry(0.16, 0.42, 0.18), bottom), sx, 0.21, 0);
+    add(new T.Mesh(new T.BoxGeometry(0.17, 0.08, 0.26), dark), sx, 0.04, 0.03);
+  }
+  // Torso capsule + arms.
+  add(new T.Mesh(new T.CapsuleGeometry(0.21, 0.34, 6, 14), top), 0, 0.78, 0);
+  for (const sx of [-0.3, 0.3])
+    add(new T.Mesh(new T.CapsuleGeometry(0.07, 0.3, 4, 10), top), sx, 0.78, 0);
+  // Head + hair cap.
+  add(new T.Mesh(new T.SphereGeometry(0.17, 18, 14), skin), 0, 1.32, 0);
+  add(
+    new T.Mesh(
+      new T.SphereGeometry(0.175, 18, 14, 0, Math.PI * 2, 0, Math.PI / 2.2),
+      dark
+    ),
+    0,
+    1.34,
+    0
+  );
+  return g;
+}
+
+/** Dispose a group including its own materials (avatar figures). */
+function disposeGroupDeep(g: THREE.Group): void {
+  g.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (mesh.isMesh) {
+      (mesh.geometry as THREE.BufferGeometry | undefined)?.dispose();
+      const m = mesh.material as THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(m)) m.forEach((x) => x.dispose());
+      else m?.dispose();
+    }
+  });
+}
+
+const DEFAULT_WALL_HEX = "#f3e5cd"; // warm cream
+const DEFAULT_FLOOR_HEX = "#b5854f"; // wood tile
+
 /* ============ 3D room canvas ============ */
 
 export interface PlacedSceneEntry {
@@ -386,6 +482,8 @@ export interface RoomSceneApi {
   setPlaced(entries: PlacedSceneEntry[]): void;
   setGhost(g: GhostState | null): void;
   setSelected(key: string | null): void;
+  setStyle(wall: string, floor: string): void;
+  setAvatar(look: AvatarLook, cell: GridCell | null): void;
   rotateCamera(): void;
 }
 
@@ -413,6 +511,10 @@ function RoomCanvas({
   placed,
   ghost,
   selectedKey,
+  wallHex,
+  floorHex,
+  avatarLook,
+  avatarCell,
   onTapItem,
   onTapCell,
   onTapEmpty,
@@ -421,6 +523,10 @@ function RoomCanvas({
   placed: PlacedSceneEntry[];
   ghost: GhostState | null;
   selectedKey: string | null;
+  wallHex: string;
+  floorHex: string;
+  avatarLook: AvatarLook;
+  avatarCell: GridCell | null;
   onTapItem: (key: string) => void;
   onTapCell: (cell: GridCell) => void;
   onTapEmpty: () => void;
@@ -429,6 +535,11 @@ function RoomCanvas({
   const hostRef = useRef<HTMLDivElement>(null);
   const cbRef = useRef({ onTapItem, onTapCell, onTapEmpty });
   cbRef.current = { onTapItem, onTapCell, onTapEmpty };
+  // Latest style/avatar values for the imperative scene (buildScene runs once).
+  const styleRef = useRef({ wallHex, floorHex });
+  styleRef.current = { wallHex, floorHex };
+  const avatarRef = useRef({ look: avatarLook, cell: avatarCell });
+  avatarRef.current = { look: avatarLook, cell: avatarCell };
 
   // Scene API lives for the mount lifetime; prop updates flow through it.
   const apiBox = useRef<RoomSceneApi | null>(null);
@@ -451,7 +562,7 @@ function RoomCanvas({
     function buildScene() {
       if (cancelled) return;
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xf7f1e3);
+      scene.background = new THREE.Color(0x0f1a2e);
 
       const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
 
@@ -562,6 +673,35 @@ function RoomCanvas({
       scene.add(itemLayer);
       scene.add(ghostLayer);
 
+      // M15: the player's avatar figure, standing on a free tile near the door.
+      const avatarLayer = new THREE.Group();
+      scene.add(avatarLayer);
+      let avatarGroup: THREE.Group | null = null;
+
+      function placeAvatar(look: AvatarLook, cell: GridCell | null) {
+        if (avatarGroup) {
+          avatarLayer.remove(avatarGroup);
+          disposeGroupDeep(avatarGroup);
+          avatarGroup = null;
+        }
+        if (!cell) {
+          renderOnce();
+          return;
+        }
+        let g: THREE.Group;
+        try {
+          g = buildAvatarLook(THREE, look);
+        } catch {
+          // Bad look data must never blank the room — capsule fallback.
+          g = buildCapsuleAvatar(THREE, look);
+        }
+        g.position.set(cell[0] - HALF + 0.5, 0, cell[1] - HALF + 0.5);
+        g.rotation.y = Math.PI / 4;
+        avatarGroup = g;
+        avatarLayer.add(g);
+        renderOnce();
+      }
+
       let spinners: THREE.Object3D[] = [];
       let ring: THREE.Mesh | null = null;
       let currentSelected: string | null = null;
@@ -660,6 +800,14 @@ function RoomCanvas({
           }
           renderOnce();
         },
+        setStyle(wall: string, floor: string) {
+          wallMat.color.set(validHex(wall) ?? DEFAULT_WALL_HEX);
+          floorMat.color.set(validHex(floor) ?? DEFAULT_FLOOR_HEX);
+          renderOnce();
+        },
+        setAvatar(look: AvatarLook, cell: GridCell | null) {
+          placeAvatar(look, cell);
+        },
         rotateCamera() {
           quarter = (quarter + 1) % 4;
           angleTarget = Math.PI / 4 + (quarter * Math.PI) / 2;
@@ -671,6 +819,10 @@ function RoomCanvas({
       };
       apiBox.current = api;
       apiRef.current = api;
+
+      // M15: apply initial wall/floor style, then place the avatar figure.
+      api.setStyle(styleRef.current.wallHex, styleRef.current.floorHex);
+      placeAvatar(avatarRef.current.look, avatarRef.current.cell);
 
       // ---- Camera: isometric-style, 90° rotate steps + zoom, no pan ----
       let quarter = 0;
@@ -805,10 +957,12 @@ function RoomCanvas({
       let raf = 0;
       if (!reducedMotion) {
         const clock = new THREE.Clock();
+        let elapsed = 0;
         const tick = () => {
           if (cancelled) return;
           raf = requestAnimationFrame(tick);
           const dt = Math.min(clock.getDelta(), 0.05);
+          elapsed += dt;
           const diff = angleTarget - angle;
           if (Math.abs(diff) > 0.0005) {
             angle += diff * Math.min(1, dt * 5);
@@ -817,6 +971,8 @@ function RoomCanvas({
           }
           placeCamera();
           for (const s of spinners) s.rotation.z += dt * 5;
+          // M15: gentle idle bob for the avatar figure.
+          if (avatarGroup) avatarGroup.position.y = Math.sin(elapsed * 2.4) * 0.05;
           renderer.render(scene, camera);
         };
         tick();
@@ -828,6 +984,11 @@ function RoomCanvas({
       onCleanup(() => {
         clearLayer(itemLayer);
         clearLayer(ghostLayer);
+        if (avatarGroup) {
+          avatarLayer.remove(avatarGroup);
+          disposeGroupDeep(avatarGroup);
+          avatarGroup = null;
+        }
         if (ring) {
           scene.remove(ring);
           ring.geometry.dispose();
@@ -878,8 +1039,57 @@ function RoomCanvas({
   useEffect(() => {
     apiBox.current?.setSelected(selectedKey);
   }, [selectedKey]);
+  useEffect(() => {
+    apiBox.current?.setStyle(wallHex, floorHex);
+  }, [wallHex, floorHex]);
+  useEffect(() => {
+    apiBox.current?.setAvatar(avatarLook, avatarCell);
+  }, [avatarLook, avatarCell]);
 
   return <div ref={hostRef} className="eko-room__canvas" aria-label="3D home room" />;
+}
+
+/* ============ Design swatch (wall/floor) ============ */
+
+function StyleSwatch({
+  style,
+  currentId,
+  previewing,
+  onTap,
+}: {
+  style: HomeStyleEntry;
+  currentId: string | null;
+  previewing: boolean;
+  onTap: () => void;
+}) {
+  const isCurrent = style.id === currentId;
+  const owned = isCurrent || style.price <= 0;
+  return (
+    <button
+      type="button"
+      className={`eko-room__swatch${
+        isCurrent ? " eko-room__swatch--current" : ""
+      }${previewing ? " eko-room__swatch--preview" : ""}`}
+      onClick={onTap}
+      disabled={isCurrent}
+      aria-label={
+        isCurrent
+          ? `${style.name} (current style)`
+          : `${style.name}, ${naira(style.price)}`
+      }
+      title={style.desc ?? style.name}
+    >
+      <span
+        className="eko-room__swatch-color"
+        style={{ backgroundColor: style.hex }}
+        aria-hidden="true"
+      />
+      <span className="eko-room__swatch-name">{style.name}</span>
+      <span className="eko-room__swatch-sub">
+        {isCurrent ? "Current" : owned ? "Owned" : naira(style.price)}
+      </span>
+    </button>
+  );
 }
 
 /* ============ Home room section (room + buy mode) ============ */
@@ -905,6 +1115,90 @@ export function HomeRoomSection({
     }
     return m;
   }, [catalog]);
+
+  /* ---------- M15: home styles (walls/floors) + avatar look ---------- */
+
+  // home_wall/home_floor are not yet on the You type — read defensively.
+  const youX = you as You & HomeExtras;
+  const wallStyles = useMemo(
+    () =>
+      (config.walls ?? [])
+        .map(normalizeStyleEntry)
+        .filter((s): s is HomeStyleEntry => s !== null),
+    [config]
+  );
+  const floorStyles = useMemo(
+    () =>
+      (config.floors ?? [])
+        .map(normalizeStyleEntry)
+        .filter((s): s is HomeStyleEntry => s !== null),
+    [config]
+  );
+
+  const ownedWallId =
+    typeof youX.home_wall === "string" && youX.home_wall ? youX.home_wall : null;
+  const ownedFloorId =
+    typeof youX.home_floor === "string" && youX.home_floor
+      ? youX.home_floor
+      : null;
+
+  // Free live preview of a not-yet-bought style.
+  const [preview, setPreview] = useState<{
+    kind: "wall" | "floor";
+    id: string;
+  } | null>(null);
+
+  const styleHexOf = (kind: "wall" | "floor", id: string | null): string | null =>
+    id ? (kind === "wall" ? wallStyles : floorStyles).find((s) => s.id === id)?.hex ?? null : null;
+
+  const ownedWallHex = validHex(styleHexOf("wall", ownedWallId)) ?? DEFAULT_WALL_HEX;
+  const ownedFloorHex = validHex(styleHexOf("floor", ownedFloorId)) ?? DEFAULT_FLOOR_HEX;
+  const wallHex =
+    preview?.kind === "wall"
+      ? validHex(styleHexOf("wall", preview.id)) ?? ownedWallHex
+      : ownedWallHex;
+  const floorHex =
+    preview?.kind === "floor"
+      ? validHex(styleHexOf("floor", preview.id)) ?? ownedFloorHex
+      : ownedFloorHex;
+
+  const previewStyle: HomeStyleEntry | null = preview
+    ? (preview.kind === "wall" ? wallStyles : floorStyles).find(
+        (s) => s.id === preview.id
+      ) ?? null
+    : null;
+
+  const tapStyle = (kind: "wall" | "floor", s: HomeStyleEntry) => {
+    const currentId = kind === "wall" ? ownedWallId : ownedFloorId;
+    if (s.id === currentId) return; // tapping current = no-op
+    setPreview({ kind, id: s.id });
+  };
+
+  const buyPreview = () => {
+    if (!preview) return;
+    sendAct("buy_home_style", { kind: preview.kind, id: preview.id });
+  };
+
+  // Server confirmation clears the preview; a stuck preview auto-clears.
+  useEffect(() => {
+    if (!preview) return;
+    const cur = preview.kind === "wall" ? ownedWallId : ownedFloorId;
+    if (cur === preview.id) setPreview(null);
+  }, [preview, ownedWallId, ownedFloorId]);
+  useEffect(() => {
+    if (!preview) return;
+    const t = window.setTimeout(() => setPreview(null), 15000);
+    return () => window.clearTimeout(t);
+  }, [preview]);
+
+  const avatarLook = useMemo(
+    () =>
+      sanitizeAvatarLook(
+        you.avatar_look,
+        config.avatarLook ?? AVATAR_LOOK_FALLBACK_OPTIONS
+      ),
+    [you.avatar_look, config]
+  );
 
   const maxPlaced = typeof config.homeSlots === "number" ? config.homeSlots : 6;
 
@@ -937,7 +1231,15 @@ export function HomeRoomSection({
   const [ghostCell, setGhostCell] = useState<GridCell | null>(null);
   const [ghostRot, setGhostRot] = useState<0 | 1 | 2 | 3>(0);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [tab, setTab] = useState<RoomCategory>("sleep");
+  // Buy-mode v2 tabs: design first (when styles exist), then non-empty item tabs.
+  const tabs = useMemo(
+    () => visibleBuyTabs(catalog, wallStyles.length + floorStyles.length > 0),
+    [catalog, wallStyles, floorStyles]
+  );
+  const [tab, setTab] = useState<BuyTabId>("design");
+  const activeTab: BuyTabId = tabs.some((t) => t.id === tab)
+    ? tab
+    : tabs[0]?.id ?? "sleep";
   const [pendingBuy, setPendingBuy] = useState<{
     itemId: string;
     count: number;
@@ -949,6 +1251,37 @@ export function HomeRoomSection({
     placed
       .filter((p) => p.key !== excludeKey)
       .flatMap((p) => footprintCells(p.size, p.rot, p.x, p.z));
+
+  // Free tile near the "door" (front row, biased to front-center) for the avatar.
+  const avatarCell: GridCell | null = useMemo(() => {
+    const taken = takenCells();
+    const cells: GridCell[] = [];
+    for (let z = 0; z < ROOM_GRID; z++)
+      for (let x = 0; x < ROOM_GRID; x++) cells.push([x, z]);
+    cells.sort(
+      (a, b) =>
+        Math.abs(a[1] - (ROOM_GRID - 1)) * 2 +
+        Math.abs(a[0] - 2.5) -
+        (Math.abs(b[1] - (ROOM_GRID - 1)) * 2 + Math.abs(b[0] - 2.5))
+    );
+    for (const c of cells) {
+      if (!overlaps([c], taken)) return c;
+    }
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placed]);
+
+  // D-pad: nudge the ghost one tile (tap-tile-to-move also works via onTapCell).
+  const nudgeGhost = (dx: number, dz: number) => {
+    setGhostCell((prev) => {
+      const bx0 = prev ? prev[0] : 2;
+      const bz0 = prev ? prev[1] : 2;
+      return [
+        Math.min(ROOM_GRID - 1, Math.max(0, bx0 + dx)),
+        Math.min(ROOM_GRID - 1, Math.max(0, bz0 + dz)),
+      ];
+    });
+  };
 
   const placingSize: Footprint = useMemo(
     () =>
@@ -1093,6 +1426,16 @@ export function HomeRoomSection({
     selectedCat?.effect ??
     selectedOwned?.effect ??
     "Decor — it makes the place feel like home.";
+  // M15: action rows derived from the item's effect code (e.g. "sleep_health").
+  const selectedEffectCode = selectedCat?.effect ?? selectedOwned?.effect;
+  const selectedActions = itemActionsFor(
+    { effect: selectedEffectCode },
+    selectedUse
+  );
+  const showDailyNote = isDailyEffect({
+    effect: selectedEffectCode,
+    desc: selectedDesc,
+  });
 
   const rotateValid = (() => {
     if (!selected) return false;
@@ -1135,7 +1478,7 @@ export function HomeRoomSection({
   return (
     <section className="eko-home__section" id="home-room" aria-label="Home Room">
       <h2 className="eko-home__h">
-        <span aria-hidden="true">🏠</span> Home Room
+        <span aria-hidden="true">🏠</span> My Home
       </h2>
       <p className="eko-home__note">
         Placed furniture boosts your daily vibes. {placedCount}/{maxPlaced}{" "}
@@ -1162,17 +1505,85 @@ export function HomeRoomSection({
             placed={placed}
             ghost={ghost}
             selectedKey={selectedKey}
+            wallHex={wallHex}
+            floorHex={floorHex}
+            avatarLook={avatarLook}
+            avatarCell={avatarCell}
             onTapItem={handleTapItem}
             onTapCell={handleTapCell}
             onTapEmpty={handleTapEmpty}
             apiRef={apiRef}
           />
+          {preview && previewStyle && (
+            <div className="eko-room__trybar" role="status">
+              <span>
+                Trying on <strong>{previewStyle.name}</strong> — nothing paid
+                yet.
+              </span>
+              <div className="eko-room__trybar-btns">
+                <button
+                  type="button"
+                  className="eko-room__btn eko-room__btn--primary"
+                  onClick={buyPreview}
+                >
+                  Buy · {naira(previewStyle.price)}
+                </button>
+                <button
+                  type="button"
+                  className="eko-room__btn"
+                  onClick={() => setPreview(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           {placing && (
             <div className="eko-room__placing" role="status">
               <span>
-                Placing <strong>{placingName}</strong> — tap a tile to preview,
-                tap it again or press ✓ to drop it.
+                Placing <strong>{placingName}</strong> — tap a tile to move the
+                ghost, tap it again or press ✓ to drop it.
               </span>
+              <div
+                className="eko-room__dpad"
+                role="group"
+                aria-label="Nudge item position"
+              >
+                <span className="eko-room__dpad-gap" aria-hidden="true" />
+                <button
+                  type="button"
+                  className="eko-room__dpad-btn"
+                  onClick={() => nudgeGhost(0, -1)}
+                  aria-label="Move up"
+                >
+                  ▲
+                </button>
+                <span className="eko-room__dpad-gap" aria-hidden="true" />
+                <button
+                  type="button"
+                  className="eko-room__dpad-btn"
+                  onClick={() => nudgeGhost(-1, 0)}
+                  aria-label="Move left"
+                >
+                  ◀
+                </button>
+                <button
+                  type="button"
+                  className="eko-room__dpad-btn"
+                  onClick={() => nudgeGhost(0, 1)}
+                  aria-label="Move down"
+                >
+                  ▼
+                </button>
+                <button
+                  type="button"
+                  className="eko-room__dpad-btn"
+                  onClick={() => nudgeGhost(1, 0)}
+                  aria-label="Move right"
+                >
+                  ▶
+                </button>
+              </div>
               <div className="eko-room__placing-btns">
                 <button
                   type="button"
@@ -1236,16 +1647,31 @@ export function HomeRoomSection({
                 </button>
               </div>
               <p className="eko-room__popup-desc">{selectedDesc}</p>
+              {selectedActions.length > 0 && (
+                <div
+                  className="eko-room__actions"
+                  role="group"
+                  aria-label={`${selectedName} actions`}
+                >
+                  {selectedActions.map((r) => (
+                    <button
+                      key={r.act}
+                      type="button"
+                      className="eko-room__action"
+                      onClick={() => sendAct(r.act)}
+                    >
+                      <span>{r.title}</span>
+                      <span className="eko-room__action-hint">{r.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {showDailyNote && (
+                <p className="eko-room__daily-note">
+                  ✨ Works automatically every day — no tap needed.
+                </p>
+              )}
               <div className="eko-room__popup-btns">
-                {selectedUse && (
-                  <button
-                    type="button"
-                    className="eko-room__btn eko-room__btn--primary"
-                    onClick={() => sendAct(selectedUse)}
-                  >
-                    {useLabel(selectedUse)}
-                  </button>
-                )}
                 <button
                   type="button"
                   className="eko-room__btn"
@@ -1253,14 +1679,14 @@ export function HomeRoomSection({
                   disabled={!rotateValid}
                   aria-label="Rotate item 90 degrees"
                 >
-                  ⟳ Rotate
+                  ⟳ Rotate item
                 </button>
                 <button
                   type="button"
                   className="eko-room__btn"
                   onClick={storeSelected}
                 >
-                  📦 Store
+                  📦 Store item
                 </button>
                 <button
                   type="button"
@@ -1269,7 +1695,7 @@ export function HomeRoomSection({
                   }`}
                   onClick={sellSelected}
                 >
-                  {confirmSell ? "Tap again to sell (50% back)" : "💰 Sell"}
+                  {confirmSell ? "Tap again to sell (50% back)" : "💰 Sell item"}
                 </button>
               </div>
             </div>
@@ -1300,20 +1726,20 @@ export function HomeRoomSection({
         )}
       </div>
 
-      <h3 className="eko-home__subh">Buy furniture</h3>
+      <h3 className="eko-home__subh">Buy mode</h3>
       <div
         className="eko-room__tabs"
         role="tablist"
-        aria-label="Furniture categories"
+        aria-label="Buy mode categories"
       >
-        {ROOM_CATEGORIES.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
             role="tab"
-            aria-selected={tab === t.id}
+            aria-selected={activeTab === t.id}
             className={`eko-room__tab ${
-              tab === t.id ? "eko-room__tab--active" : ""
+              activeTab === t.id ? "eko-room__tab--active" : ""
             }`}
             onClick={() => setTab(t.id)}
           >
@@ -1321,62 +1747,111 @@ export function HomeRoomSection({
           </button>
         ))}
       </div>
-      <div className="eko-room__cards">
-        {catalog
-          .filter((c) => roomCategoryFor(c) === tab)
-          .map((c) => {
-            const price = priceOf(c);
-            const ok = you.money >= price;
-            const short = Math.max(0, price - you.money);
-            const size = roomSizeFor(c);
-            const ownedCount = owned.filter(
-              (f) =>
-                furnitureItemId(f).toLowerCase() ===
-                String(c.id).toLowerCase()
-            ).length;
-            const isPending =
-              pendingBuy?.itemId === String(c.id).toLowerCase();
-            return (
-              <div key={c.id} className="eko-room__card">
-                <div className="eko-room__card-top">
-                  <span
-                    className="eko-room__card-icon"
-                    aria-hidden="true"
-                  >
-                    {c.icon ?? "🪑"}
-                  </span>
-                  <div className="eko-room__card-meta">
-                    <strong>
-                      {c.name}
-                      {ownedCount > 0 && ` ×${ownedCount}`}
-                    </strong>
-                    <span className="eko-room__card-sub">
-                      {size[0]}×{size[1]} ·{" "}
-                      {c.desc ?? c.effect ?? "Decor."}
+      {activeTab === "design" ? (
+        <div className="eko-room__design">
+          {wallStyles.length > 0 && (
+            <>
+              <h4 className="eko-room__group-h">🎨 Paint it your way</h4>
+              <div className="eko-room__swatches" aria-label="Wall paints">
+                {wallStyles.map((s) => (
+                  <StyleSwatch
+                    key={s.id}
+                    style={s}
+                    currentId={ownedWallId}
+                    previewing={
+                      preview?.kind === "wall" && preview.id === s.id
+                    }
+                    onTap={() => tapStyle("wall", s)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+          {floorStyles.length > 0 && (
+            <>
+              <h4 className="eko-room__group-h">🟫 Pick your floor</h4>
+              <div className="eko-room__swatches" aria-label="Floor styles">
+                {floorStyles.map((s) => (
+                  <StyleSwatch
+                    key={s.id}
+                    style={s}
+                    currentId={ownedFloorId}
+                    previewing={
+                      preview?.kind === "floor" && preview.id === s.id
+                    }
+                    onTap={() => tapStyle("floor", s)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="eko-room__cards">
+          {catalog
+            .filter((c) => buyTabFor(c) === activeTab)
+            .map((c) => {
+              const price = priceOf(c);
+              const ok = you.money >= price;
+              const short = Math.max(0, price - you.money);
+              const size = roomSizeFor(c);
+              const ownedCount = owned.filter(
+                (f) =>
+                  furnitureItemId(f).toLowerCase() ===
+                  String(c.id).toLowerCase()
+              ).length;
+              const isPending =
+                pendingBuy?.itemId === String(c.id).toLowerCase();
+              return (
+                <div
+                  key={c.id}
+                  className={`eko-room__card${
+                    ok ? "" : " eko-room__card--poor"
+                  }`}
+                >
+                  <div className="eko-room__card-top">
+                    <span
+                      className="eko-room__card-icon"
+                      aria-hidden="true"
+                    >
+                      {c.icon ?? "🪑"}
                     </span>
+                    <div className="eko-room__card-meta">
+                      <strong>
+                        {c.name}
+                        {ownedCount > 0 && ` ×${ownedCount}`}
+                      </strong>
+                      <span className="eko-room__card-sub">
+                        {size[0]}×{size[1]} ·{" "}
+                        {c.desc ?? c.effect ?? "Decor."}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="eko-room__card-foot">
+                    <span className="eko-room__price">{naira(price)}</span>
+                    <button
+                      type="button"
+                      className="eko-room__buy"
+                      disabled={!ok || !!pendingBuy}
+                      onClick={() => startBuy(c.id)}
+                      aria-label={
+                        ok
+                          ? `Buy ${c.name} for ${naira(price)}`
+                          : `Cannot afford ${c.name}: need ${naira(short)} more`
+                      }
+                    >
+                      {isPending
+                        ? "Placing…"
+                        : ok
+                          ? "Buy"
+                          : `Need ${naira(short)} more`}
+                    </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="eko-room__buy"
-                  disabled={!ok || !!pendingBuy}
-                  onClick={() => startBuy(c.id)}
-                  aria-label={
-                    ok
-                      ? `Buy ${c.name} for ${naira(price)}`
-                      : `Cannot afford ${c.name}: need ${naira(short)} more`
-                  }
-                >
-                  {isPending
-                    ? "Placing…"
-                    : ok
-                      ? `Buy · ${naira(price)}`
-                      : `Need ${naira(short)} more`}
-                </button>
-              </div>
-            );
-          })}
-      </div>
+              );
+            })}
+        </div>
+      )}
       {catalog.length === 0 && (
         <p className="eko-home__note">
           The furniture catalog hasn&apos;t arrived yet.

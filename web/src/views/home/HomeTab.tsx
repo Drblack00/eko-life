@@ -14,7 +14,6 @@ import {
 } from "../../game/types";
 import { Button, Card, Dialog, Sheet } from "../../components";
 import "./Home.css";
-import { HomeRoomSection } from "./HomeRoom";
 
 export type HomeFocus = "housing" | "bank" | null;
 
@@ -689,7 +688,6 @@ export function HomeTab({
       <BankSection you={you} config={config} sendAct={sendAct} />
       <VehicleSection you={you} config={config} sendAct={sendAct} />
       <BusinessSection you={you} config={config} sendAct={sendAct} />
-      <HomeRoomSection you={you} config={config} sendAct={sendAct} />
     </div>
   );
 }
