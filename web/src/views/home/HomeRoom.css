@@ -70,7 +70,6 @@
   font-size: 0.9rem;
 }
 
-.eko-room__placing-btns,
 .eko-room__popup-btns {
   display: flex;
   flex-wrap: wrap;
@@ -102,11 +101,6 @@
   background: #dc2626;
   border-color: #991b1b;
   color: #fff;
-}
-
-.eko-room__warn {
-  font-size: 0.8rem;
-  color: #b45309;
 }
 
 .eko-room__popup-head {
@@ -339,62 +333,270 @@
   color: var(--text-muted);
 }
 
-/* Free-preview banner over the canvas. */
+/* ---- M16: Buy bottom sheet over the room stage ---- */
 
-.eko-room__trybar {
+.eko-room__sheet {
   position: absolute;
-  left: var(--space-3);
-  right: var(--space-3);
-  top: var(--space-3);
-  background: rgba(255, 255, 255, 0.96);
-  border: 2px dashed var(--palm-500);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  background: rgba(13, 20, 38, 0.97);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: 0 -10px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  color: #eef3fa;
+  transition: height 0.22s ease;
+}
+
+.eko-room__sheet--dragging {
+  transition: none;
+}
+
+.eko-room__sheet--collapsed .eko-room__sheet-body {
+  display: none;
+}
+
+.eko-room__sheet-handle {
+  flex: 0 0 48px;
+  height: 48px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) 0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.eko-room__sheet-handle:active {
+  cursor: grabbing;
+}
+
+.eko-room__sheet-grip {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.eko-room__sheet-title {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.eko-room__sheet-balance {
+  margin-left: auto;
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--palm-400);
+  white-space: nowrap;
+}
+
+.eko-room__sheet-hide {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #eef3fa;
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.eko-room__sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: var(--space-1) var(--space-3) var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  font-size: 0.88rem;
-  z-index: 2;
 }
 
-.eko-room__trybar-btns {
-  display: flex;
-  gap: var(--space-2);
+/* Buy sheet content on the dark theme. */
+
+.eko-room__sheet .eko-room__tab {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  color: #e8edf7;
 }
 
-/* Placement d-pad (≥44px touch targets). */
-
-.eko-room__dpad {
-  display: grid;
-  grid-template-columns: repeat(3, 48px);
-  grid-template-rows: repeat(2, 48px);
-  gap: 4px;
-  justify-content: center;
-  align-content: center;
-}
-
-.eko-room__dpad-btn {
-  min-width: 48px;
-  min-height: 48px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: #fff;
-  border-radius: var(--radius-md);
-  font-size: 1.1rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.eko-room__dpad-btn:active {
+.eko-room__sheet .eko-room__tab--active {
   background: var(--palm-500);
+  border-color: var(--palm-600);
   color: #fff;
 }
 
-.eko-room__dpad-gap {
-  min-width: 48px;
-  min-height: 48px;
+.eko-room__sheet .eko-room__card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #eef3fa;
+}
+
+.eko-room__sheet .eko-room__card-sub,
+.eko-room__sheet .eko-room__group-h {
+  color: rgba(232, 237, 247, 0.72);
+}
+
+.eko-room__sheet .eko-room__swatch {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+  color: #eef3fa;
+}
+
+.eko-room__sheet .eko-room__swatch-sub {
+  color: rgba(232, 237, 247, 0.65);
+}
+
+.eko-room__sheet .eko-room__swatch--current {
+  border: 2px solid var(--palm-400);
+}
+
+.eko-room__sheet .eko-room__swatch--preview {
+  border: 2px dashed var(--palm-400);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18);
+}
+
+.eko-room__sheet .eko-room__buy:disabled {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(232, 237, 247, 0.55);
+}
+
+.eko-room__sheet .eko-room__note {
+  color: rgba(232, 237, 247, 0.72);
+}
+
+/* Reopen pill when the sheet is hidden. */
+
+.eko-room__sheet-fab {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: var(--space-3);
+  z-index: 5;
+  background: rgba(13, 20, 38, 0.94);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-4);
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- M16: compact placing toolbar (≤64px, translucent, bottom-docked) ---- */
+
+.eko-room__placing--compact {
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: var(--space-2);
+  z-index: 6;
+  max-height: 64px;
+  justify-content: center;
+  background: rgba(13, 20, 38, 0.9);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  color: #eef3fa;
+  padding: var(--space-1) var(--space-2);
+}
+
+.eko-room__placing-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+
+.eko-room__placing-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.eko-room__placing-btn {
+  flex: 0 0 auto;
+}
+
+.eko-room__placing--compact .eko-room__placing-warn {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(13, 20, 38, 0.94);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  color: #fbbf24;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Tapped-item popup floats above the sheet. */
+
+.eko-room__popup {
+  z-index: 6;
+}
+
+/* Free-preview banner: compact top-docked pill, never covering room center. */
+
+.eko-room__trybar {
+  position: absolute;
+  top: var(--space-2);
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  max-width: calc(100% - var(--space-3));
+  background: rgba(13, 20, 38, 0.92);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: #eef3fa;
+  border: 1px dashed var(--palm-400);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  z-index: 7;
+}
+
+.eko-room__trybar-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.eko-room__trybar .eko-room__btn {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  flex: 0 0 auto;
 }
 
 /* Tapped-item action rows. */

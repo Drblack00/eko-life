@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import * as THREE from "three";
 import { priceOf, type GameConfig } from "../../lib/api";
 import {
@@ -34,6 +34,26 @@ import {
   type BuyTabId,
   type HomeStyleEntry,
 } from "./catalogue";
+import {
+  DEFAULT_CAMERA,
+  ORBIT_SPEED,
+  cameraPosition,
+  clampPan,
+  clampPolar,
+  isDoubleTap,
+  isTap,
+  panBasis,
+  panDelta,
+  snapAzimuth90,
+  zoomDist,
+  type CameraRigState,
+} from "./cameraRig";
+import {
+  nearestSnap,
+  nextSnap,
+  sheetHeights,
+  type SheetSnap,
+} from "./buySheet";
 import "./HomeRoom.css";
 
 /* ============ Procedural models (original, primitives only) ============ */
@@ -708,6 +728,52 @@ function RoomCanvas({
 
       const renderOnce = () => renderer.render(scene, camera);
 
+      // ---- M16: orbit camera rig {azimuth, polar, dist, target} ----
+      // Gesture language matches CityMap: 1-finger drag orbits (horizontal =
+      // azimuth, vertical = polar clamped 25°–70°), pinch/wheel zooms, 2-finger
+      // drag pans the look target, double-tap resets to the default view.
+      // cam is the rendered state; camT is the damped target it chases.
+      const cam: CameraRigState = { ...DEFAULT_CAMERA };
+      const camT: CameraRigState = { ...DEFAULT_CAMERA };
+      // Inertial orbit velocities (rad/s), sampled during 1-finger drags.
+      let velA = 0;
+      let velP = 0;
+
+      const placeCamera = () => {
+        const p = cameraPosition(cam);
+        camera.position.set(p.x, p.y, p.z);
+        camera.lookAt(cam.tx, cam.ty, cam.tz);
+      };
+
+      /** Jump the rendered state to the targets (reduced-motion path). */
+      const snapRigNow = () => {
+        cam.azimuth = camT.azimuth;
+        cam.polar = camT.polar;
+        cam.dist = camT.dist;
+        cam.tx = camT.tx;
+        cam.ty = camT.ty;
+        cam.tz = camT.tz;
+        velA = 0;
+        velP = 0;
+        placeCamera();
+      };
+
+      const resetCamera = () => {
+        camT.azimuth = DEFAULT_CAMERA.azimuth;
+        camT.polar = DEFAULT_CAMERA.polar;
+        camT.dist = DEFAULT_CAMERA.dist;
+        camT.tx = DEFAULT_CAMERA.tx;
+        camT.ty = DEFAULT_CAMERA.ty;
+        camT.tz = DEFAULT_CAMERA.tz;
+        if (reducedMotion) {
+          snapRigNow();
+          renderOnce();
+        } else {
+          velA = 0;
+          velP = 0;
+        }
+      };
+
       function clearLayer(layer: THREE.Group) {
         for (const child of [...layer.children]) {
           layer.remove(child);
@@ -809,10 +875,10 @@ function RoomCanvas({
           placeAvatar(look, cell);
         },
         rotateCamera() {
-          quarter = (quarter + 1) % 4;
-          angleTarget = Math.PI / 4 + (quarter * Math.PI) / 2;
+          // "Turn the room": snap the azimuth to the nearest 90° view.
+          camT.azimuth = snapAzimuth90(camT.azimuth);
           if (reducedMotion) {
-            angle = angleTarget;
+            snapRigNow();
             renderOnce();
           }
         },
@@ -824,25 +890,24 @@ function RoomCanvas({
       api.setStyle(styleRef.current.wallHex, styleRef.current.floorHex);
       placeAvatar(avatarRef.current.look, avatarRef.current.cell);
 
-      // ---- Camera: isometric-style, 90° rotate steps + zoom, no pan ----
-      let quarter = 0;
-      let angle = Math.PI / 4;
-      let angleTarget = angle;
-      let viewDist = 9.5;
-      const placeCamera = () => {
-        camera.position.set(
-          Math.cos(angle) * viewDist,
-          viewDist * 0.9,
-          Math.sin(angle) * viewDist
-        );
-        camera.lookAt(0, 0.4, 0);
-      };
-
-      // ---- Tap (≤8px) vs pinch/wheel zoom ----
+      // ---- M16 gestures: tap / orbit / pinch-zoom / 2-finger pan ----
+      // The pointer cache distinguishes 1-finger vs 2-finger touches;
+      // taps (≤10px, <300ms) still select, and drags never move the ghost.
       const raycaster = new THREE.Raycaster();
       const pointerNdc = new THREE.Vector2();
-      const pointers = new Map<number, { x: number; y: number; sx: number; sy: number }>();
-      let pinchDist = 0;
+      interface RoomPtr {
+        x: number;
+        y: number;
+        sx: number;
+        sy: number;
+        t: number;
+        lt: number;
+      }
+      const pointers = new Map<number, RoomPtr>();
+      let gestureMulti = false; // a second finger joined this gesture
+      let pinchPrev = 0;
+      let midPrev: { x: number; y: number } | null = null;
+      let lastTap: { t: number; x: number; y: number } | null = null;
 
       function pick(clientX: number, clientY: number) {
         const rect = el.getBoundingClientRect();
@@ -879,51 +944,139 @@ function RoomCanvas({
         } catch {
           /* noop */
         }
+        const now = performance.now();
         pointers.set(e.pointerId, {
           x: e.clientX,
           y: e.clientY,
           sx: e.clientX,
           sy: e.clientY,
+          t: now,
+          lt: now,
         });
-        if (pointers.size === 2) {
-          const [a, b] = [...pointers.values()];
-          pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+        // Any new touch cancels orbit inertia.
+        velA = 0;
+        velP = 0;
+        if (pointers.size >= 2) {
+          gestureMulti = true;
+          const pts = [...pointers.values()];
+          pinchPrev = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          midPrev = {
+            x: (pts[0].x + pts[1].x) / 2,
+            y: (pts[0].y + pts[1].y) / 2,
+          };
+        } else {
+          gestureMulti = false;
         }
       };
       const onMove = (e: PointerEvent) => {
         const p = pointers.get(e.pointerId);
         if (!p) return;
+        const dx = e.clientX - p.x;
+        const dy = e.clientY - p.y;
         p.x = e.clientX;
         p.y = e.clientY;
-        if (pointers.size === 2) {
-          const [a, b] = [...pointers.values()];
-          const d = Math.hypot(a.x - b.x, a.y - b.y);
-          if (pinchDist > 0 && d > 0) {
-            viewDist = Math.min(15, Math.max(5, viewDist * (pinchDist / d)));
+        if (pointers.size === 1 && !gestureMulti) {
+          // 1-finger drag: horizontal → azimuth, vertical → polar (25°–70°).
+          const now = performance.now();
+          const dt = Math.max(1, now - p.lt) / 1000;
+          p.lt = now;
+          camT.azimuth += dx * ORBIT_SPEED;
+          camT.polar = clampPolar(camT.polar + dy * ORBIT_SPEED);
+          // Sample angular velocity for an inertial fling on release.
+          const w = 0.35;
+          velA = velA * (1 - w) + ((dx * ORBIT_SPEED) / dt) * w;
+          velP = velP * (1 - w) + ((dy * ORBIT_SPEED) / dt) * w;
+          if (reducedMotion) {
+            cam.azimuth = camT.azimuth;
+            cam.polar = camT.polar;
+            velA = 0;
+            velP = 0;
             placeCamera();
             renderOnce();
           }
-          pinchDist = d;
+        } else if (pointers.size === 2) {
+          const pts = [...pointers.values()];
+          // Pinch: zoom, keeping the M14 min/max distances (5–15).
+          const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          if (pinchPrev > 0 && d > 0) {
+            camT.dist = zoomDist(camT.dist, pinchPrev / d);
+          }
+          pinchPrev = d;
+          // 2-finger drag: pan the look target, clamped ±2.5 around center.
+          const mid = {
+            x: (pts[0].x + pts[1].x) / 2,
+            y: (pts[0].y + pts[1].y) / 2,
+          };
+          if (midPrev) {
+            const mdx = mid.x - midPrev.x;
+            const mdy = mid.y - midPrev.y;
+            if (mdx !== 0 || mdy !== 0) {
+              const { right, toCam } = panBasis(camT.azimuth);
+              const pd = panDelta(right, toCam, mdx, mdy, camT.dist);
+              camT.tx = clampPan(camT.tx + pd.x);
+              camT.tz = clampPan(camT.tz + pd.z);
+            }
+          }
+          midPrev = mid;
+          if (reducedMotion) {
+            cam.dist = camT.dist;
+            cam.tx = camT.tx;
+            cam.tz = camT.tz;
+            placeCamera();
+            renderOnce();
+          }
         }
       };
       const onUp = (e: PointerEvent) => {
         const p = pointers.get(e.pointerId);
+        const wasMulti = gestureMulti;
         pointers.delete(e.pointerId);
-        if (p && pointers.size === 0) {
-          const moved = Math.hypot(e.clientX - p.sx, e.clientY - p.sy);
-          if (moved <= 8) pick(e.clientX, e.clientY);
+        if (pointers.size === 0) {
+          gestureMulti = false;
+          pinchPrev = 0;
+          midPrev = null;
+          if (p && !wasMulti) {
+            const moved = Math.hypot(e.clientX - p.sx, e.clientY - p.sy);
+            const dur = performance.now() - p.t;
+            if (isTap(moved, dur)) {
+              // Tap selects (ghost tap-to-place keeps working); a double-tap
+              // also resets the camera to the default view.
+              velA = 0;
+              velP = 0;
+              const tap = { t: performance.now(), x: e.clientX, y: e.clientY };
+              const dbl = isDoubleTap(lastTap, tap);
+              lastTap = tap;
+              pick(e.clientX, e.clientY);
+              if (dbl) resetCamera();
+            }
+            // Drags keep their sampled velocities → inertial fling in tick.
+          } else {
+            velA = 0;
+            velP = 0;
+          }
+        } else if (pointers.size < 2) {
+          pinchPrev = 0;
+          midPrev = null;
         }
-        if (pointers.size < 2) pinchDist = 0;
       };
       const onCancel = (e: PointerEvent) => {
         pointers.delete(e.pointerId);
-        if (pointers.size < 2) pinchDist = 0;
+        velA = 0;
+        velP = 0;
+        if (pointers.size === 0) gestureMulti = false;
+        if (pointers.size < 2) {
+          pinchPrev = 0;
+          midPrev = null;
+        }
       };
       const onWheel = (e: WheelEvent) => {
         e.preventDefault();
-        viewDist = Math.min(15, Math.max(5, viewDist * (1 + e.deltaY * 0.001)));
-        placeCamera();
-        renderOnce();
+        camT.dist = zoomDist(camT.dist, 1 + e.deltaY * 0.001);
+        if (reducedMotion) {
+          cam.dist = camT.dist;
+          placeCamera();
+          renderOnce();
+        }
       };
       el.addEventListener("pointerdown", onDown);
       el.addEventListener("pointermove", onMove);
@@ -963,16 +1116,33 @@ function RoomCanvas({
           raf = requestAnimationFrame(tick);
           const dt = Math.min(clock.getDelta(), 0.05);
           elapsed += dt;
-          const diff = angleTarget - angle;
-          if (Math.abs(diff) > 0.0005) {
-            angle += diff * Math.min(1, dt * 5);
-          } else {
-            angle = angleTarget;
+          // Damped orbit: the rendered rig chases its targets (CityMap-style).
+          const k = 1 - Math.exp(-dt * 6);
+          cam.azimuth += (camT.azimuth - cam.azimuth) * k;
+          cam.polar += (camT.polar - cam.polar) * k;
+          cam.dist += (camT.dist - cam.dist) * k;
+          cam.tx += (camT.tx - cam.tx) * k;
+          cam.tz += (camT.tz - cam.tz) * k;
+          // Inertial fling after a 1-finger drag release (no inertia when
+          // fingers are down, and never under reduced motion).
+          if (pointers.size === 0 && (velA !== 0 || velP !== 0)) {
+            camT.azimuth += velA * dt;
+            camT.polar = clampPolar(camT.polar + velP * dt);
+            const decay = Math.exp(-dt * 3.5);
+            velA *= decay;
+            velP *= decay;
+            if (Math.abs(velA) < 0.02) velA = 0;
+            if (Math.abs(velP) < 0.02) velP = 0;
           }
           placeCamera();
           for (const s of spinners) s.rotation.z += dt * 5;
-          // M15: gentle idle bob for the avatar figure.
-          if (avatarGroup) avatarGroup.position.y = Math.sin(elapsed * 2.4) * 0.05;
+          // M16: drive the avatar's idle life (blink, breathing, sway) via the
+          // update hook stashed on group.userData by buildAvatarLook. The
+          // capsule fallback has no hook — guarded.
+          const avatarUpdate = avatarGroup?.userData?.update as
+            | ((t: number, dt: number) => void)
+            | undefined;
+          if (typeof avatarUpdate === "function") avatarUpdate(elapsed, dt);
           renderer.render(scene, camera);
         };
         tick();
@@ -1231,6 +1401,23 @@ export function HomeRoomSection({
   const [ghostCell, setGhostCell] = useState<GridCell | null>(null);
   const [ghostRot, setGhostRot] = useState<0 | 1 | 2 | 3>(0);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // M16: the Buy catalogue lives in a bottom sheet over the room stage.
+  const [sheetSnap, setSheetSnap] = useState<SheetSnap>("collapsed");
+  const [sheetHidden, setSheetHidden] = useState(false);
+  const prevSnapRef = useRef<SheetSnap>("collapsed");
+  const sheetSnapRef = useRef(sheetSnap);
+  sheetSnapRef.current = sheetSnap;
+  const sheetHiddenRef = useRef(sheetHidden);
+  sheetHiddenRef.current = sheetHidden;
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [dragH, setDragH] = useState<number | null>(null);
+  const sheetDragRef = useRef<{
+    startY: number;
+    lastY: number;
+    startH: number;
+    moved: boolean;
+  } | null>(null);
+  const justDraggedRef = useRef(false);
   // Buy-mode v2 tabs: design first (when styles exist), then non-empty item tabs.
   const tabs = useMemo(
     () => visibleBuyTabs(catalog, wallStyles.length + floorStyles.length > 0),
@@ -1252,6 +1439,23 @@ export function HomeRoomSection({
       .filter((p) => p.key !== excludeKey)
       .flatMap((p) => footprintCells(p.size, p.rot, p.x, p.z));
 
+  /** M16: first grid cell where a footprint fits without overlapping placed
+   *  items or the avatar — used to drop the placement ghost immediately. */
+  const firstFreeCellFor = (
+    size: Footprint,
+    rot: number,
+    excludeKey?: string
+  ): GridCell | null => {
+    const taken = takenCells(excludeKey);
+    if (avatarCell) taken.push(avatarCell);
+    for (let z = 0; z < ROOM_GRID; z++)
+      for (let x = 0; x < ROOM_GRID; x++) {
+        const cells = footprintCells(size, rot, x, z);
+        if (fitsInGrid(cells) && !overlaps(cells, taken)) return [x, z];
+      }
+    return null;
+  };
+
   // Free tile near the "door" (front row, biased to front-center) for the avatar.
   const avatarCell: GridCell | null = useMemo(() => {
     const taken = takenCells();
@@ -1271,16 +1475,68 @@ export function HomeRoomSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placed]);
 
-  // D-pad: nudge the ghost one tile (tap-tile-to-move also works via onTapCell).
-  const nudgeGhost = (dx: number, dz: number) => {
-    setGhostCell((prev) => {
-      const bx0 = prev ? prev[0] : 2;
-      const bz0 = prev ? prev[1] : 2;
-      return [
-        Math.min(ROOM_GRID - 1, Math.max(0, bx0 + dx)),
-        Math.min(ROOM_GRID - 1, Math.max(0, bz0 + dz)),
-      ];
-    });
+  // M16: compact placing toolbar — tap a tile to move the ghost (the M15
+  // d-pad was dropped; it couldn't fit the ≤64px toolbar).
+  const rotateGhost = () =>
+    setGhostRot((((ghostRot + 1) % 4) | 0) as 0 | 1 | 2 | 3);
+
+  /* ---------- M16: bottom-sheet handle drag / tap ---------- */
+
+  const stageH = () => stageRef.current?.clientHeight || 340;
+
+  const onSheetHandleDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* noop */
+    }
+    const heights = sheetHeights(stageH());
+    sheetDragRef.current = {
+      startY: e.clientY,
+      lastY: e.clientY,
+      startH: heights[sheetSnapRef.current],
+      moved: false,
+    };
+  };
+
+  const onSheetHandleMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = sheetDragRef.current;
+    if (!d) return;
+    d.lastY = e.clientY;
+    if (Math.abs(d.startY - e.clientY) > 6) d.moved = true;
+    const heights = sheetHeights(stageH());
+    setDragH(
+      Math.min(
+        heights.full,
+        Math.max(heights.collapsed, d.startH + (d.startY - e.clientY))
+      )
+    );
+  };
+
+  const onSheetHandleUp = () => {
+    const d = sheetDragRef.current;
+    sheetDragRef.current = null;
+    if (!d) return;
+    // A real drag swallows the click that follows it.
+    justDraggedRef.current = d.moved;
+    if (d.moved) {
+      const heights = sheetHeights(stageH());
+      const h = Math.min(
+        heights.full,
+        Math.max(heights.collapsed, d.startH + (d.startY - d.lastY))
+      );
+      setSheetSnap(nearestSnap(h, heights));
+    }
+    setDragH(null);
+  };
+
+  // Tap the handle cycles collapsed → half → full → collapsed.
+  const onSheetHandleTap = () => {
+    if (justDraggedRef.current) {
+      justDraggedRef.current = false;
+      return;
+    }
+    setSheetSnap(nextSnap(sheetSnapRef.current));
   };
 
   const placingSize: Footprint = useMemo(
@@ -1322,6 +1578,8 @@ export function HomeRoomSection({
   /* ---------- placing flow ---------- */
 
   const cancelPlacing = () => {
+    // Exiting placement restores the sheet snap from before it auto-collapsed.
+    if (placing && !sheetHiddenRef.current) setSheetSnap(prevSnapRef.current);
     setPlacing(null);
     setGhostCell(null);
   };
@@ -1329,11 +1587,16 @@ export function HomeRoomSection({
   const enterPlacing = (entry: FurnitureEntry) => {
     setSelectedKey(null);
     setConfirmSell(false);
-    setPlacing({
-      key: furnitureKey(entry),
-      itemId: furnitureItemId(entry).toLowerCase(),
-    });
-    setGhostCell(null);
+    // Placement gets the full room: auto-collapse the buy sheet.
+    prevSnapRef.current = sheetSnapRef.current;
+    setSheetSnap("collapsed");
+    const itemId = furnitureItemId(entry).toLowerCase();
+    const key = furnitureKey(entry);
+    setPlacing({ key, itemId });
+    // M16: drop the ghost on the first free tile immediately so the player
+    // sees it right away (falls back to tap-a-tile when the room is full).
+    const size = roomSizeFor(catalogById.get(itemId) ?? { id: itemId });
+    setGhostCell(firstFreeCellFor(size, 0, key));
     setGhostRot(0);
   };
 
@@ -1491,16 +1754,16 @@ export function HomeRoomSection({
             type="button"
             className="eko-room__btn"
             onClick={() => apiRef.current?.rotateCamera()}
-            aria-label="Rotate camera 90 degrees"
+            aria-label="Turn the room: snap the view to the nearest 90 degrees"
           >
-            ⟳ View
+            ⟳ Turn room
           </button>
           <span className="eko-room__hint">
-            Tap an item • pinch or scroll to zoom
+            Drag to orbit • pinch to zoom • double-tap to reset
           </span>
         </div>
 
-        <div className="eko-room__stage">
+        <div className="eko-room__stage" ref={stageRef}>
           <RoomCanvas
             placed={placed}
             ghost={ghost}
@@ -1516,78 +1779,56 @@ export function HomeRoomSection({
           />
           {preview && previewStyle && (
             <div className="eko-room__trybar" role="status">
-              <span>
+              <span className="eko-room__trybar-text">
                 Trying on <strong>{previewStyle.name}</strong> — nothing paid
-                yet.
+                yet
               </span>
-              <div className="eko-room__trybar-btns">
-                <button
-                  type="button"
-                  className="eko-room__btn eko-room__btn--primary"
-                  onClick={buyPreview}
-                >
-                  Buy · {naira(previewStyle.price)}
-                </button>
-                <button
-                  type="button"
-                  className="eko-room__btn"
-                  onClick={() => setPreview(null)}
-                >
-                  Cancel
-                </button>
-              </div>
+              <button
+                type="button"
+                className="eko-room__btn eko-room__btn--primary"
+                onClick={buyPreview}
+              >
+                Buy · {naira(previewStyle.price)}
+              </button>
+              <button
+                type="button"
+                className="eko-room__btn"
+                onClick={() => setPreview(null)}
+              >
+                Cancel
+              </button>
             </div>
           )}
           {placing && (
-            <div className="eko-room__placing" role="status">
-              <span>
-                Placing <strong>{placingName}</strong> — tap a tile to move the
-                ghost, tap it again or press ✓ to drop it.
-              </span>
-              <div
-                className="eko-room__dpad"
-                role="group"
-                aria-label="Nudge item position"
-              >
-                <span className="eko-room__dpad-gap" aria-hidden="true" />
+            <div
+              className="eko-room__placing eko-room__placing--compact"
+              role="status"
+            >
+              {(full || (ghostCell && !ghostValid)) && (
+                <span className="eko-room__placing-warn">
+                  {full
+                    ? "Room is full — store something first."
+                    : "Won't fit there — try another tile."}
+                </span>
+              )}
+              <div className="eko-room__placing-bar">
+                <span
+                  className="eko-room__placing-name"
+                  title="Tap a tile to move the ghost, tap it again to drop it."
+                >
+                  Placing <strong>{placingName}</strong>
+                </span>
                 <button
                   type="button"
-                  className="eko-room__dpad-btn"
-                  onClick={() => nudgeGhost(0, -1)}
-                  aria-label="Move up"
+                  className="eko-room__btn eko-room__placing-btn"
+                  onClick={rotateGhost}
+                  aria-label="Rotate item 90 degrees"
                 >
-                  ▲
-                </button>
-                <span className="eko-room__dpad-gap" aria-hidden="true" />
-                <button
-                  type="button"
-                  className="eko-room__dpad-btn"
-                  onClick={() => nudgeGhost(-1, 0)}
-                  aria-label="Move left"
-                >
-                  ◀
+                  ⟳
                 </button>
                 <button
                   type="button"
-                  className="eko-room__dpad-btn"
-                  onClick={() => nudgeGhost(0, 1)}
-                  aria-label="Move down"
-                >
-                  ▼
-                </button>
-                <button
-                  type="button"
-                  className="eko-room__dpad-btn"
-                  onClick={() => nudgeGhost(1, 0)}
-                  aria-label="Move right"
-                >
-                  ▶
-                </button>
-              </div>
-              <div className="eko-room__placing-btns">
-                <button
-                  type="button"
-                  className="eko-room__btn eko-room__btn--primary"
+                  className="eko-room__btn eko-room__btn--primary eko-room__placing-btn"
                   onClick={commitPlace}
                   disabled={!ghostValid}
                 >
@@ -1595,32 +1836,13 @@ export function HomeRoomSection({
                 </button>
                 <button
                   type="button"
-                  className="eko-room__btn"
-                  onClick={() =>
-                    setGhostRot((((ghostRot + 1) % 4) | 0) as 0 | 1 | 2 | 3)
-                  }
-                  aria-label="Rotate item 90 degrees"
-                >
-                  ⟳ Item
-                </button>
-                <button
-                  type="button"
-                  className="eko-room__btn"
+                  className="eko-room__btn eko-room__placing-btn"
                   onClick={cancelPlacing}
+                  aria-label="Cancel placing"
                 >
                   ✕
                 </button>
               </div>
-              {full && (
-                <span className="eko-room__warn">
-                  Room is full — store something first.
-                </span>
-              )}
-              {ghostCell && !ghostValid && !full && (
-                <span className="eko-room__warn">
-                  Won&apos;t fit there — try another tile.
-                </span>
-              )}
             </div>
           )}
           {selected && (
@@ -1700,6 +1922,192 @@ export function HomeRoomSection({
               </div>
             </div>
           )}
+          {/* M16: Buy catalogue as a bottom sheet over the room stage. */}
+          {!placing && !sheetHidden && (
+            <div
+              className={`eko-room__sheet eko-room__sheet--${sheetSnap}${
+                dragH != null ? " eko-room__sheet--dragging" : ""
+              }`}
+              style={{ height: dragH ?? sheetHeights(stageH())[sheetSnap] }}
+            >
+              <div
+                className="eko-room__sheet-handle"
+                role="button"
+                tabIndex={0}
+                aria-label={`Buy sheet, ${sheetSnap}. Drag the handle or tap to resize.`}
+                onPointerDown={onSheetHandleDown}
+                onPointerMove={onSheetHandleMove}
+                onPointerUp={onSheetHandleUp}
+                onPointerCancel={onSheetHandleUp}
+                onClick={onSheetHandleTap}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSheetHandleTap();
+                  }
+                }}
+              >
+                <span className="eko-room__sheet-grip" aria-hidden="true" />
+                <span className="eko-room__sheet-title">Buy 🛋️</span>
+                <span className="eko-room__sheet-balance">{naira(you.money)}</span>
+                {sheetSnap !== "collapsed" && (
+                  <button
+                    type="button"
+                    className="eko-room__sheet-hide"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSheetHidden(true);
+                    }}
+                    aria-label="Hide the buy sheet"
+                  >
+                    Hide ✕
+                  </button>
+                )}
+              </div>
+              <div className="eko-room__sheet-body">
+                <div
+                  className="eko-room__tabs"
+                  role="tablist"
+                  aria-label="Buy mode categories"
+                >
+                  {tabs.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === t.id}
+                      className={`eko-room__tab ${
+                        activeTab === t.id ? "eko-room__tab--active" : ""
+                      }`}
+                      onClick={() => setTab(t.id)}
+                    >
+                      <span aria-hidden="true">{t.emoji}</span> {t.label}
+                    </button>
+                  ))}
+                </div>
+                {activeTab === "design" ? (
+                  <div className="eko-room__design">
+                    {wallStyles.length > 0 && (
+                      <>
+                        <h4 className="eko-room__group-h">🎨 Paint it your way</h4>
+                        <div className="eko-room__swatches" aria-label="Wall paints">
+                          {wallStyles.map((s) => (
+                            <StyleSwatch
+                              key={s.id}
+                              style={s}
+                              currentId={ownedWallId}
+                              previewing={
+                                preview?.kind === "wall" && preview.id === s.id
+                              }
+                              onTap={() => tapStyle("wall", s)}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {floorStyles.length > 0 && (
+                      <>
+                        <h4 className="eko-room__group-h">🟫 Pick your floor</h4>
+                        <div className="eko-room__swatches" aria-label="Floor styles">
+                          {floorStyles.map((s) => (
+                            <StyleSwatch
+                              key={s.id}
+                              style={s}
+                              currentId={ownedFloorId}
+                              previewing={
+                                preview?.kind === "floor" && preview.id === s.id
+                              }
+                              onTap={() => tapStyle("floor", s)}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="eko-room__cards">
+                    {catalog
+                      .filter((c) => buyTabFor(c) === activeTab)
+                      .map((c) => {
+                        const price = priceOf(c);
+                        const ok = you.money >= price;
+                        const short = Math.max(0, price - you.money);
+                        const size = roomSizeFor(c);
+                        const ownedCount = owned.filter(
+                          (f) =>
+                            furnitureItemId(f).toLowerCase() ===
+                            String(c.id).toLowerCase()
+                        ).length;
+                        const isPending =
+                          pendingBuy?.itemId === String(c.id).toLowerCase();
+                        return (
+                          <div
+                            key={c.id}
+                            className={`eko-room__card${
+                              ok ? "" : " eko-room__card--poor"
+                            }`}
+                          >
+                            <div className="eko-room__card-top">
+                              <span
+                                className="eko-room__card-icon"
+                                aria-hidden="true"
+                              >
+                                {c.icon ?? "🪑"}
+                              </span>
+                              <div className="eko-room__card-meta">
+                                <strong>
+                                  {c.name}
+                                  {ownedCount > 0 && ` ×${ownedCount}`}
+                                </strong>
+                                <span className="eko-room__card-sub">
+                                  {size[0]}×{size[1]} ·{" "}
+                                  {c.desc ?? c.effect ?? "Decor."}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="eko-room__card-foot">
+                              <span className="eko-room__price">{naira(price)}</span>
+                              <button
+                                type="button"
+                                className="eko-room__buy"
+                                disabled={!ok || !!pendingBuy}
+                                onClick={() => startBuy(c.id)}
+                                aria-label={
+                                  ok
+                                    ? `Buy ${c.name} for ${naira(price)}`
+                                    : `Cannot afford ${c.name}: need ${naira(short)} more`
+                                }
+                              >
+                                {isPending
+                                  ? "Placing…"
+                                  : ok
+                                    ? "Buy"
+                                    : `Need ${naira(short)} more`}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+                {catalog.length === 0 && (
+                  <p className="eko-home__note">
+                    The furniture catalog hasn&apos;t arrived yet.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          {!placing && sheetHidden && (
+            <button
+              type="button"
+              className="eko-room__sheet-fab"
+              onClick={() => setSheetHidden(false)}
+              aria-label="Show the buy sheet"
+            >
+              Buy 🛋️
+            </button>
+          )}
         </div>
 
         {unplaced.length > 0 && (
@@ -1725,138 +2133,6 @@ export function HomeRoomSection({
           </div>
         )}
       </div>
-
-      <h3 className="eko-home__subh">Buy mode</h3>
-      <div
-        className="eko-room__tabs"
-        role="tablist"
-        aria-label="Buy mode categories"
-      >
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === t.id}
-            className={`eko-room__tab ${
-              activeTab === t.id ? "eko-room__tab--active" : ""
-            }`}
-            onClick={() => setTab(t.id)}
-          >
-            <span aria-hidden="true">{t.emoji}</span> {t.label}
-          </button>
-        ))}
-      </div>
-      {activeTab === "design" ? (
-        <div className="eko-room__design">
-          {wallStyles.length > 0 && (
-            <>
-              <h4 className="eko-room__group-h">🎨 Paint it your way</h4>
-              <div className="eko-room__swatches" aria-label="Wall paints">
-                {wallStyles.map((s) => (
-                  <StyleSwatch
-                    key={s.id}
-                    style={s}
-                    currentId={ownedWallId}
-                    previewing={
-                      preview?.kind === "wall" && preview.id === s.id
-                    }
-                    onTap={() => tapStyle("wall", s)}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-          {floorStyles.length > 0 && (
-            <>
-              <h4 className="eko-room__group-h">🟫 Pick your floor</h4>
-              <div className="eko-room__swatches" aria-label="Floor styles">
-                {floorStyles.map((s) => (
-                  <StyleSwatch
-                    key={s.id}
-                    style={s}
-                    currentId={ownedFloorId}
-                    previewing={
-                      preview?.kind === "floor" && preview.id === s.id
-                    }
-                    onTap={() => tapStyle("floor", s)}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="eko-room__cards">
-          {catalog
-            .filter((c) => buyTabFor(c) === activeTab)
-            .map((c) => {
-              const price = priceOf(c);
-              const ok = you.money >= price;
-              const short = Math.max(0, price - you.money);
-              const size = roomSizeFor(c);
-              const ownedCount = owned.filter(
-                (f) =>
-                  furnitureItemId(f).toLowerCase() ===
-                  String(c.id).toLowerCase()
-              ).length;
-              const isPending =
-                pendingBuy?.itemId === String(c.id).toLowerCase();
-              return (
-                <div
-                  key={c.id}
-                  className={`eko-room__card${
-                    ok ? "" : " eko-room__card--poor"
-                  }`}
-                >
-                  <div className="eko-room__card-top">
-                    <span
-                      className="eko-room__card-icon"
-                      aria-hidden="true"
-                    >
-                      {c.icon ?? "🪑"}
-                    </span>
-                    <div className="eko-room__card-meta">
-                      <strong>
-                        {c.name}
-                        {ownedCount > 0 && ` ×${ownedCount}`}
-                      </strong>
-                      <span className="eko-room__card-sub">
-                        {size[0]}×{size[1]} ·{" "}
-                        {c.desc ?? c.effect ?? "Decor."}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="eko-room__card-foot">
-                    <span className="eko-room__price">{naira(price)}</span>
-                    <button
-                      type="button"
-                      className="eko-room__buy"
-                      disabled={!ok || !!pendingBuy}
-                      onClick={() => startBuy(c.id)}
-                      aria-label={
-                        ok
-                          ? `Buy ${c.name} for ${naira(price)}`
-                          : `Cannot afford ${c.name}: need ${naira(short)} more`
-                      }
-                    >
-                      {isPending
-                        ? "Placing…"
-                        : ok
-                          ? "Buy"
-                          : `Need ${naira(short)} more`}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-        </div>
-      )}
-      {catalog.length === 0 && (
-        <p className="eko-home__note">
-          The furniture catalog hasn&apos;t arrived yet.
-        </p>
-      )}
     </section>
   );
 }
