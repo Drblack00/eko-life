@@ -1,0 +1,114 @@
+/* M9 Daily tab — mobile-first, own namespace (m9-), no external assets. */
+.m9-daily {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.m9-card { padding: 14px; }
+
+.m9-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.m9-card-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.m9-countdown {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 0.9rem;
+  background: var(--chip-bg, #f1f5f9);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.m9-stars {
+  font-weight: 800;
+  font-size: 1rem;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border-radius: 999px;
+  padding: 4px 12px;
+  color: #92400e;
+}
+
+.m9-muted { color: var(--muted, #64748b); font-size: 0.85rem; margin: 4px 0; }
+
+.m9-riddle {
+  font-size: 1.02rem;
+  font-style: italic;
+  line-height: 1.5;
+  margin: 8px 0;
+}
+
+.m9-found { font-weight: 700; color: #15803d; }
+
+.m9-cta { width: 100%; min-height: 48px; margin: 8px 0; }
+
+.m9-details { margin-top: 8px; font-size: 0.9rem; }
+.m9-details summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; }
+
+.m9-tiers { list-style: none; margin: 4px 0 0; padding: 0; }
+.m9-tiers li {
+  display: flex; justify-content: space-between;
+  padding: 6px 0; border-top: 1px solid var(--hairline, #e2e8f0);
+}
+
+.m9-leaders { margin-top: 10px; }
+.m9-leaders h3 { margin: 0 0 4px; font-size: 0.95rem; }
+.m9-leaders ol { list-style: none; margin: 0; padding: 0; }
+.m9-leaders li {
+  display: flex; gap: 10px; align-items: center;
+  padding: 6px 0; border-top: 1px solid var(--hairline, #e2e8f0);
+  font-size: 0.92rem;
+}
+.m9-place { font-weight: 800; min-width: 34px; color: #b45309; }
+.m9-who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.m9-missions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.m9-mission {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px; border: 1px solid var(--hairline, #e2e8f0); border-radius: 12px;
+}
+.m9-mission.is-claimed { opacity: 0.65; }
+.m9-mission-main { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.m9-mission-check { font-size: 1.25rem; }
+.m9-mission-label { margin: 0; font-weight: 600; font-size: 0.95rem; }
+.m9-mission .eko-btn { min-height: 44px; min-width: 72px; flex-shrink: 0; }
+
+.m9-perk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.m9-perk {
+  border: 1px solid var(--hairline, #e2e8f0);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  gap: 10px;
+}
+.m9-perk.is-owned { border-color: #fbbf24; background: #fffbeb; }
+.m9-perk-icon { font-size: 1.6rem; line-height: 1; }
+.m9-perk-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.m9-perk-name { margin: 0; font-weight: 700; font-size: 0.92rem; }
+.m9-perk-desc { margin: 0; font-size: 0.8rem; color: var(--muted, #64748b); line-height: 1.35; }
+.m9-perk-foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 6px; }
+.m9-perk-cost { font-weight: 800; color: #b45309; }
+.m9-perk-foot .eko-btn { min-height: 44px; }
+.m9-owned { font-weight: 700; color: #15803d; font-size: 0.85rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .m9-daily * { animation: none !important; transition: none !important; }
+}
