@@ -21,6 +21,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .eko-hud__avatar {
@@ -40,6 +42,7 @@
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .eko-hud__name {
@@ -55,9 +58,37 @@
   font-weight: 800;
   color: var(--palm-700);
   font-size: 1.1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Governor pill — must never paint over its neighbours. iOS Safari renders
+   a native-styled <button> wider than its flex slot (ignoring overflow and
+   max-width), so the native appearance is reset and the box is pinned with
+   flex:none + max-width. Higher specificity than Election.css on purpose. */
+.eko-hud .eko-hud__gov {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  min-width: 0;
+  max-width: 9.5rem;
+  border: 1px solid var(--danfo-500);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius-pill);
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 36px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .eko-hud__day {
+  flex: none;
   font-family: var(--font-display);
   font-weight: 800;
   background: var(--lagoon-100);
@@ -65,6 +96,34 @@
   border-radius: var(--radius-pill);
   padding: var(--space-2) var(--space-3);
   white-space: nowrap;
+}
+
+.eko-hud .m7-clock {
+  flex: none;
+  font-size: 0.95rem;
+}
+
+/* Narrow phones: tighten the HUD so avatar, money, governor pill, day and
+   clock all fit side by side without overlap. */
+@media (max-width: 400px) {
+  .eko-hud__row {
+    gap: var(--space-2);
+  }
+  .eko-hud .eko-hud__gov {
+    max-width: 6.5rem;
+    padding: 6px 8px;
+    font-size: 0.75rem;
+  }
+  .eko-hud__day {
+    padding: var(--space-2);
+    font-size: 0.85rem;
+  }
+  .eko-hud .m7-clock {
+    font-size: 0.82rem;
+  }
+  .eko-hud__money {
+    font-size: 1rem;
+  }
 }
 
 .eko-hud__stats {
