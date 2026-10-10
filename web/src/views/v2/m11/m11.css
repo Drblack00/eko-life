@@ -1,0 +1,181 @@
+/* Èkó Life — M11 governance UI (self-contained). Mobile-first. */
+
+.eko-m11__banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  background: linear-gradient(135deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--accent, #7c5cff);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.eko-m11__banner--empty {
+  border-style: dashed;
+  border-color: var(--text-muted);
+  background: var(--surface);
+}
+
+.eko-m11__banner-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.eko-m11__banner strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.eko-m11__banner p {
+  margin: var(--space-1) 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.eko-m11__tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  border: 1px solid var(--surface-2);
+  border-radius: 999px;
+  padding: 0 var(--space-2);
+  margin-left: var(--space-2);
+  vertical-align: middle;
+}
+
+.eko-m11__effect {
+  color: var(--text) !important;
+  font-weight: 700;
+}
+
+.eko-m11__h {
+  font-size: 0.9rem;
+  margin: 0 0 var(--space-2);
+  color: var(--text);
+}
+
+.eko-m11__note {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-3);
+}
+
+.eko-m11__policies {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.eko-m11__policy {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  color: var(--text);
+  cursor: pointer;
+  width: 100%;
+  font: inherit;
+}
+
+.eko-m11__policy:active {
+  transform: scale(0.99);
+}
+
+.eko-m11__policy-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.eko-m11__policy-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.eko-m11__policy-body span:last-child {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.eko-m11__cabinet {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-m11__seat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  min-height: 52px;
+}
+
+.eko-m11__seat-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.eko-m11__seat-body strong {
+  font-size: 0.88rem;
+}
+
+.eko-m11__seat-body span:last-child {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.eko-m11__dismiss {
+  min-width: 44px;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.eko-m11__appoint {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--surface);
+  border: 1px dashed var(--text-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+.eko-m11__appoint input,
+.eko-m11__appoint select {
+  min-height: 44px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eko-m11__policy:active {
+    transform: none;
+  }
+}
