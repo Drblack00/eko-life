@@ -127,6 +127,10 @@ export function createHub({ getDay }) {
       class: c.class,
       avatar: c.avatar,
       color: c.color,
+      // M15: avatar look (parsed JSON or null) + home style ids
+      avatar_look: (() => { try { return c.avatar_look ? JSON.parse(c.avatar_look) : null; } catch { return null; } })(),
+      home_wall: c.home_wall || null,
+      home_floor: c.home_floor || null,
       money: Number(c.money),
       energy: Number(c.energy),
       health: Number(c.health),
