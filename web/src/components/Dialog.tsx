@@ -33,7 +33,7 @@ export function Dialog({
     <div className="eko-dialog__scrim" onClick={onClose}>
       <div
         ref={dialogRef}
-        className="eko-dialog"
+        className="eko-dialog glass glass--strong"
         role="dialog"
         aria-modal="true"
         aria-label={title}

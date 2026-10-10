@@ -1,11 +1,14 @@
+/* Liquid Glass material comes from src/styles/glass.css (.glass). This file
+   keeps only layout — the tint below is theme-aware (day/night tokens). */
 .eko-card {
-  background: var(--surface);
-  border-radius: var(--radius-lg);
   padding: var(--space-5);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid rgb(28 24 20 / 0.06);
 }
 
-.eko-card--elevated {
-  box-shadow: var(--shadow-md);
+.eko-card.glass {
+  --glass-tint: color-mix(in srgb, var(--surface) 58%, transparent);
+  --glass-radius: var(--radius-lg);
+}
+
+.eko-card--elevated.glass {
+  --glass-shadow: var(--shadow-md);
 }

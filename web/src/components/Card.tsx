@@ -11,7 +11,7 @@ export function Card({
   elevated?: boolean;
 }) {
   return (
-    <div className={`eko-card ${elevated ? "eko-card--elevated" : ""} ${className}`}>
+    <div className={`eko-card glass ${elevated ? "eko-card--elevated" : ""} ${className}`}>
       {children}
     </div>
   );

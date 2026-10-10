@@ -36,7 +36,7 @@ export function Sheet({
     <div className="eko-sheet__scrim" onClick={onClose}>
       <div
         ref={panelRef}
-        className="eko-sheet"
+        className="eko-sheet glass glass--strong"
         role="dialog"
         aria-modal="true"
         aria-label={label}

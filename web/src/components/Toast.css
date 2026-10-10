@@ -12,15 +12,27 @@
 }
 
 .eko-toast {
-  background: var(--neutral-900);
+  /* Material (blur/tint/highlight/shadow) comes from .glass in
+     src/styles/glass.css. The dark tint (via --glass-tint indirection, so
+     the theme-aware value always wins) keeps white text legible over any
+     backdrop. Layout + accent edge only here. */
   color: #fff;
-  border-radius: var(--radius-pill);
   padding: var(--space-3) var(--space-4);
   font-size: 0.95rem;
   text-align: center;
-  box-shadow: var(--shadow-lg);
   animation: eko-toast-in 0.22s ease;
   border-left: 6px solid var(--lagoon-500);
+}
+
+.eko-toast.glass {
+  --glass-tint: var(--glass-tint-dark);
+  --glass-radius: var(--radius-pill);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .eko-toast.glass {
+    background: rgb(28 24 20 / 0.95);
+  }
 }
 
 .eko-toast--success {

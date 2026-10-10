@@ -16,11 +16,16 @@
   max-width: 460px;
   max-height: 86dvh;
   overflow-y: auto;
-  background: var(--surface);
-  border-radius: var(--radius-lg);
+  /* Material (blur/tint/highlight/shadow) comes from .glass in
+     src/styles/glass.css — layout only here. */
   padding: var(--space-6) var(--space-5) var(--space-5);
-  box-shadow: var(--shadow-lg);
   animation: eko-dialog-pop 0.2s ease;
+}
+
+/* Theme-aware frosted tint, denser for text legibility. */
+.eko-dialog.glass {
+  --glass-tint: color-mix(in srgb, var(--surface) 68%, transparent);
+  --glass-radius: var(--radius-lg);
 }
 
 .eko-dialog__title {

@@ -15,10 +15,16 @@
   max-width: 560px;
   max-height: 88dvh;
   overflow-y: auto;
-  background: var(--surface);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  /* Material (blur/tint/highlight/shadow) comes from .glass in
+     src/styles/glass.css — layout only here. */
   padding: var(--space-4) var(--space-5) calc(var(--space-6) + var(--sab));
   animation: eko-sheet-up 0.24s ease;
+}
+
+/* Theme-aware frosted tint; the silhouette stays a bottom sheet. */
+.eko-sheet.glass {
+  --glass-tint: color-mix(in srgb, var(--surface) 68%, transparent);
+  --glass-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .eko-sheet__grabber {
@@ -70,8 +76,10 @@
     padding: var(--space-6);
   }
   .eko-sheet {
-    border-radius: var(--radius-lg);
     max-height: 80dvh;
+  }
+  .eko-sheet.glass {
+    --glass-radius: var(--radius-lg);
   }
   .eko-sheet__grabber {
     display: none;

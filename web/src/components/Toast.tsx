@@ -41,7 +41,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="eko-toasts" role="status" aria-live="polite">
         {items.map((t) => (
-          <div key={t.id} className={`eko-toast eko-toast--${t.kind}`}>
+          <div key={t.id} className={`eko-toast eko-toast--${t.kind} glass`}>
             {t.text}
           </div>
         ))}
