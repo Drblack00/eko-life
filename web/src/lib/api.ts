@@ -131,6 +131,10 @@ export interface FurnitureInfo {
   effect?: string;
   desc?: string;
   icon?: string;
+  /** M14 buy-mode metadata (optional; the client falls back to its table). */
+  category?: string;
+  /** Footprint on the 6×6 room grid: [w, d], "2x1", or { w, d }. */
+  size?: [number, number] | string | { w?: number; d?: number } | null;
 }
 
 /** Price for any catalog entry (price | cost). */
