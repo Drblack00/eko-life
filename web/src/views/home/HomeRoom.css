@@ -174,6 +174,10 @@
   gap: var(--space-2);
   overflow-x: auto;
   padding-bottom: var(--space-1);
+  /* Workstream B: the tabs row is a scroll container (overflow-x), so its
+     automatic minimum size is 0 — without flex:none it shrinks to nothing
+     whenever the sheet body overflows, clipping every tab button. */
+  flex: none;
 }
 
 .eko-room__tab {
@@ -640,4 +644,117 @@
   margin: 0;
   font-size: 0.82rem;
   color: var(--text-muted);
+}
+
+/* ---- Workstream B: landscape side-panel sheet ---- */
+/* In landscape the Buy sheet docks to the stage's right edge as a side
+   panel (width snaps) so the room and the catalogue stay usable together
+   on short viewports. Portrait keeps the bottom-sheet behavior above. */
+
+.eko-room__sheet--side {
+  left: auto;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  border-top: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: -10px 0 32px rgba(0, 0, 0, 0.5);
+  transition: width 0.22s ease;
+}
+
+/* The handle spans the panel's top edge; drags run horizontally. */
+.eko-room__sheet--side .eko-room__sheet-handle {
+  cursor: ew-resize;
+}
+
+.eko-room__sheet--side .eko-room__sheet-grip {
+  display: none;
+}
+
+/* Collapsed rail: icon only, centered. */
+.eko-room__sheet-rail {
+  display: none;
+}
+
+.eko-room__sheet--side.eko-room__sheet--collapsed .eko-room__sheet-rail {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  font-size: 1.4rem;
+  line-height: 1;
+  padding-top: var(--space-2);
+}
+
+.eko-room__sheet--side.eko-room__sheet--collapsed .eko-room__sheet-title,
+.eko-room__sheet--side.eko-room__sheet--collapsed .eko-room__sheet-balance {
+  display: none;
+}
+
+.eko-room__sheet--side.eko-room__sheet--collapsed .eko-room__sheet-handle {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* One card column in the half panel; the grid opens up at full width. */
+.eko-room__sheet--side.eko-room__sheet--half .eko-room__cards {
+  grid-template-columns: 1fr;
+}
+
+/* Shorter stage in landscape: the room stays in view above the fold. */
+@media (orientation: landscape) {
+  .eko-room__canvas {
+    height: min(340px, 52dvh);
+  }
+}
+
+/* ---- Workstream B: buy-sheet loading placeholder ---- */
+/* Shown in the sheet body until the catalogue config arrives — never a
+   tall blank panel. Subtle and on-brand (dark theme). */
+
+.eko-room__loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-2) 0 var(--space-4);
+}
+
+.eko-room__shimmer {
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.05) 30%,
+    rgba(255, 255, 255, 0.13) 50%,
+    rgba(255, 255, 255, 0.05) 70%
+  );
+  background-size: 200% 100%;
+  animation: eko-room__shimmer 1.6s ease-in-out infinite;
+}
+
+.eko-room__shimmer--tabs {
+  height: 38px;
+  border-radius: var(--radius-pill);
+}
+
+.eko-room__shimmer--card {
+  height: 86px;
+}
+
+@keyframes eko-room__shimmer {
+  0% {
+    background-position: 180% 0;
+  }
+  100% {
+    background-position: -80% 0;
+  }
+}
+
+/* Reduced motion: static placeholder, no shimmer sweep. */
+@media (prefers-reduced-motion: reduce) {
+  .eko-room__shimmer {
+    animation: none;
+    background: rgba(255, 255, 255, 0.06);
+  }
 }

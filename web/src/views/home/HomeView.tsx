@@ -11,14 +11,22 @@ export function HomeView({
   you,
   config,
   sendAct,
+  onBuySheetOpen,
 }: {
   you: You;
   config: GameConfig;
   sendAct: (a: ActName, params?: Record<string, unknown>) => void;
+  /** Workstream B: fires when the Buy sheet opens/closes (half/full = open). */
+  onBuySheetOpen?: (open: boolean) => void;
 }) {
   return (
     <div className="eko-tabpad eko-home">
-      <HomeRoomSection you={you} config={config} sendAct={sendAct} />
+      <HomeRoomSection
+        you={you}
+        config={config}
+        sendAct={sendAct}
+        onBuySheetOpen={onBuySheetOpen}
+      />
     </div>
   );
 }

@@ -49,9 +49,12 @@ import {
   type CameraRigState,
 } from "./cameraRig";
 import {
+  buyDataReady,
+  isSheetOpen,
   nearestSnap,
   nextSnap,
   sheetHeights,
+  sheetWidths,
   type SheetSnap,
 } from "./buySheet";
 import "./HomeRoom.css";
@@ -1264,14 +1267,41 @@ function StyleSwatch({
 
 /* ============ Home room section (room + buy mode) ============ */
 
+/**
+ * Workstream B: true when the viewport is landscape. The Buy sheet docks to
+ * the stage's right edge as a side panel instead of a bottom sheet, so the
+ * room and the catalogue stay usable side by side on short viewports.
+ */
+function useLandscape(): boolean {
+  const [landscape, setLandscape] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(orientation: landscape)").matches
+  );
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(orientation: landscape)");
+    const onChange = () => setLandscape(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return landscape;
+}
+
 export function HomeRoomSection({
   you,
   config,
   sendAct,
+  onBuySheetOpen,
 }: {
   you: You;
   config: GameConfig;
   sendAct: (a: ActName, params?: Record<string, unknown>) => void;
+  /** Fires when the Buy sheet opens/closes (half/full = open). The Game
+   *  shell uses it to auto-dismiss the HUD hint banner so it can never
+   *  cover the sheet's interactive content. */
+  onBuySheetOpen?: (open: boolean) => void;
 }) {
   const owned: FurnitureEntry[] = useMemo(
     () => (Array.isArray(you.furniture) ? you.furniture : []),
@@ -1401,7 +1431,9 @@ export function HomeRoomSection({
   const [ghostCell, setGhostCell] = useState<GridCell | null>(null);
   const [ghostRot, setGhostRot] = useState<0 | 1 | 2 | 3>(0);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  // M16: the Buy catalogue lives in a bottom sheet over the room stage.
+  // M16: the Buy catalogue lives in a bottom sheet over the room stage
+  // (workstream B: a right-docked side panel in landscape).
+  const landscape = useLandscape();
   const [sheetSnap, setSheetSnap] = useState<SheetSnap>("collapsed");
   const [sheetHidden, setSheetHidden] = useState(false);
   const prevSnapRef = useRef<SheetSnap>("collapsed");
@@ -1411,10 +1443,14 @@ export function HomeRoomSection({
   sheetHiddenRef.current = sheetHidden;
   const stageRef = useRef<HTMLDivElement>(null);
   const [dragH, setDragH] = useState<number | null>(null);
+  const [dragW, setDragW] = useState<number | null>(null);
   const sheetDragRef = useRef<{
     startY: number;
     lastY: number;
+    startX: number;
+    lastX: number;
     startH: number;
+    startW: number;
     moved: boolean;
   } | null>(null);
   const justDraggedRef = useRef(false);
@@ -1423,6 +1459,9 @@ export function HomeRoomSection({
     () => visibleBuyTabs(catalog, wallStyles.length + floorStyles.length > 0),
     [catalog, wallStyles, floorStyles]
   );
+  // Workstream B: until the catalogue config arrives, the sheet body shows a
+  // loading placeholder — never a tall blank panel.
+  const dataReady = buyDataReady(config);
   const [tab, setTab] = useState<BuyTabId>("design");
   const activeTab: BuyTabId = tabs.some((t) => t.id === tab)
     ? tab
@@ -1480,9 +1519,20 @@ export function HomeRoomSection({
   const rotateGhost = () =>
     setGhostRot((((ghostRot + 1) % 4) | 0) as 0 | 1 | 2 | 3);
 
-  /* ---------- M16: bottom-sheet handle drag / tap ---------- */
+  /* ---------- M16: bottom-sheet handle drag / tap ----------
+   * Workstream B: in landscape the sheet is a right-docked side panel, so
+   * the drag runs horizontally (drag left to widen). */
 
   const stageH = () => stageRef.current?.clientHeight || 340;
+  const stageW = () => stageRef.current?.clientWidth || 480;
+
+  // The Game shell auto-dismisses the HUD hint banner while the sheet is
+  // open so the banner can never cover the sheet's interactive content.
+  const sheetOpen = isSheetOpen(sheetSnap, sheetHidden);
+  useEffect(() => {
+    onBuySheetOpen?.(sheetOpen);
+    return () => onBuySheetOpen?.(false);
+  }, [sheetOpen, onBuySheetOpen]);
 
   const onSheetHandleDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     try {
@@ -1490,11 +1540,13 @@ export function HomeRoomSection({
     } catch {
       /* noop */
     }
-    const heights = sheetHeights(stageH());
     sheetDragRef.current = {
       startY: e.clientY,
       lastY: e.clientY,
-      startH: heights[sheetSnapRef.current],
+      startX: e.clientX,
+      lastX: e.clientX,
+      startH: sheetHeights(stageH())[sheetSnapRef.current],
+      startW: sheetWidths(stageW())[sheetSnapRef.current],
       moved: false,
     };
   };
@@ -1503,14 +1555,30 @@ export function HomeRoomSection({
     const d = sheetDragRef.current;
     if (!d) return;
     d.lastY = e.clientY;
-    if (Math.abs(d.startY - e.clientY) > 6) d.moved = true;
-    const heights = sheetHeights(stageH());
-    setDragH(
-      Math.min(
-        heights.full,
-        Math.max(heights.collapsed, d.startH + (d.startY - e.clientY))
-      )
-    );
+    d.lastX = e.clientX;
+    if (
+      Math.abs(d.startY - e.clientY) > 6 ||
+      Math.abs(d.startX - e.clientX) > 6
+    )
+      d.moved = true;
+    if (landscape) {
+      // Side panel: dragging left widens the panel.
+      const widths = sheetWidths(stageW());
+      setDragW(
+        Math.min(
+          widths.full,
+          Math.max(widths.collapsed, d.startW + (d.startX - e.clientX))
+        )
+      );
+    } else {
+      const heights = sheetHeights(stageH());
+      setDragH(
+        Math.min(
+          heights.full,
+          Math.max(heights.collapsed, d.startH + (d.startY - e.clientY))
+        )
+      );
+    }
   };
 
   const onSheetHandleUp = () => {
@@ -1520,23 +1588,34 @@ export function HomeRoomSection({
     // A real drag swallows the click that follows it.
     justDraggedRef.current = d.moved;
     if (d.moved) {
-      const heights = sheetHeights(stageH());
-      const h = Math.min(
-        heights.full,
-        Math.max(heights.collapsed, d.startH + (d.startY - d.lastY))
-      );
-      setSheetSnap(nearestSnap(h, heights));
+      if (landscape) {
+        const widths = sheetWidths(stageW());
+        const w = Math.min(
+          widths.full,
+          Math.max(widths.collapsed, d.startW + (d.startX - d.lastX))
+        );
+        setSheetSnap(nearestSnap(w, widths));
+      } else {
+        const heights = sheetHeights(stageH());
+        const h = Math.min(
+          heights.full,
+          Math.max(heights.collapsed, d.startH + (d.startY - d.lastY))
+        );
+        setSheetSnap(nearestSnap(h, heights));
+      }
     }
     setDragH(null);
+    setDragW(null);
   };
 
   // Tap the handle cycles collapsed → half → full → collapsed.
+  // Functional update so rapid successive taps each advance one snap.
   const onSheetHandleTap = () => {
     if (justDraggedRef.current) {
       justDraggedRef.current = false;
       return;
     }
-    setSheetSnap(nextSnap(sheetSnapRef.current));
+    setSheetSnap((s) => nextSnap(s));
   };
 
   const placingSize: Footprint = useMemo(
@@ -1922,13 +2001,18 @@ export function HomeRoomSection({
               </div>
             </div>
           )}
-          {/* M16: Buy catalogue as a bottom sheet over the room stage. */}
+          {/* M16: Buy catalogue as a bottom sheet over the room stage
+              (workstream B: right-docked side panel in landscape). */}
           {!placing && !sheetHidden && (
             <div
               className={`eko-room__sheet eko-room__sheet--${sheetSnap}${
-                dragH != null ? " eko-room__sheet--dragging" : ""
-              }`}
-              style={{ height: dragH ?? sheetHeights(stageH())[sheetSnap] }}
+                landscape ? " eko-room__sheet--side" : ""
+              }${(landscape ? dragW : dragH) != null ? " eko-room__sheet--dragging" : ""}`}
+              style={
+                landscape
+                  ? { width: dragW ?? sheetWidths(stageW())[sheetSnap] }
+                  : { height: dragH ?? sheetHeights(stageH())[sheetSnap] }
+              }
             >
               <div
                 className="eko-room__sheet-handle"
@@ -1948,6 +2032,9 @@ export function HomeRoomSection({
                 }}
               >
                 <span className="eko-room__sheet-grip" aria-hidden="true" />
+                <span className="eko-room__sheet-rail" aria-hidden="true">
+                  🛋️
+                </span>
                 <span className="eko-room__sheet-title">Buy 🛋️</span>
                 <span className="eko-room__sheet-balance">{naira(you.money)}</span>
                 {sheetSnap !== "collapsed" && (
@@ -1965,11 +2052,36 @@ export function HomeRoomSection({
                 )}
               </div>
               <div className="eko-room__sheet-body">
-                <div
-                  className="eko-room__tabs"
-                  role="tablist"
-                  aria-label="Buy mode categories"
-                >
+                {!dataReady ? (
+                  <div
+                    className="eko-room__loading"
+                    role="status"
+                    aria-label="Loading buy catalogue"
+                  >
+                    <div
+                      className="eko-room__shimmer eko-room__shimmer--tabs"
+                      aria-hidden="true"
+                    />
+                    <div
+                      className="eko-room__shimmer eko-room__shimmer--card"
+                      aria-hidden="true"
+                    />
+                    <div
+                      className="eko-room__shimmer eko-room__shimmer--card"
+                      aria-hidden="true"
+                    />
+                    <div
+                      className="eko-room__shimmer eko-room__shimmer--card"
+                      aria-hidden="true"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      className="eko-room__tabs"
+                      role="tablist"
+                      aria-label="Buy mode categories"
+                    >
                   {tabs.map((t) => (
                     <button
                       key={t.id}
@@ -2094,6 +2206,8 @@ export function HomeRoomSection({
                   <p className="eko-home__note">
                     The furniture catalog hasn&apos;t arrived yet.
                   </p>
+                )}
+                  </>
                 )}
               </div>
             </div>
