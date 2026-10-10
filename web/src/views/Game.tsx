@@ -34,12 +34,16 @@ import {
   StatBar,
 } from "../components";
 import { ChatTab } from "./chat/ChatTab";
+import { FriendsPage } from "./Friends";
 import { ElectionSheet } from "./election/ElectionSheet";
 import { HomeTab, type HomeFocus } from "./home/HomeTab";
 import { HomeView } from "./home/HomeView";
 import { LedgerSheet } from "./home/LedgerSheet";
 import { AvatarEditButton } from "./avatar/AvatarEditButton";
 import { AdminView } from "./Admin";
+import { TabBar, TABS, type Tab } from "./TabBar";
+export { TABS };
+export type { Tab };
 import "./Admin.css";
 import "./Game.css";
 // V2 milestones: shifts (M7), needs (M8), daily (M9), economy (M10),
@@ -55,19 +59,6 @@ import { EconomyTab } from "./v2/m10";
 import "./v2/m10/m10.css";
 import { SkillsPanel, AcademyView } from "./v2/m12";
 import "./v2/m12/m12.css";
-
-type Tab = "home" | "city" | "jobs" | "needs" | "daily" | "market" | "chat" | "me";
-
-export const TABS: Array<{ id: Tab; label: string; icon: string }> = [
-  { id: "home", label: "Home", icon: "🏠" },
-  { id: "city", label: "City", icon: "🌆" },
-  { id: "jobs", label: "Jobs", icon: "💼" },
-  { id: "needs", label: "Needs", icon: "💚" },
-  { id: "daily", label: "Daily", icon: "🎯" },
-  { id: "market", label: "Market", icon: "💰" },
-  { id: "chat", label: "Chat", icon: "💬" },
-  { id: "me", label: "Me", icon: "🧑" },
-];
 
 /** HUD: money, day pill, governor pill, avatar — plus connection/offline state. */
 function Hud({
@@ -985,6 +976,7 @@ export function Game({
         )}
         {tab === "market" && <EconomyTab token={token} sock={sock} you={you} />}
         {tab === "chat" && <ChatTab sock={sock} you={you} />}
+        {tab === "friends" && <FriendsPage token={token} />}
         {tab === "me" && (
           <>
             <MeTab
@@ -1077,22 +1069,7 @@ export function Game({
         )}
       </Sheet>
 
-      <nav className="eko-tabs" aria-label="Game sections">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`eko-tabs__btn ${tab === t.id ? "eko-tabs__btn--active" : ""}`}
-            aria-current={tab === t.id ? "page" : undefined}
-            onClick={() => setTab(t.id)}
-          >
-            <span className="eko-tabs__icon" aria-hidden="true">
-              {t.icon}
-            </span>
-            <span className="eko-tabs__label">{t.label}</span>
-          </button>
-        ))}
-      </nav>
+      <TabBar tab={tab} onTab={setTab} />
         </>
       )}
     </div>

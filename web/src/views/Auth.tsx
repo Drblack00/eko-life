@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from "react";
-import { api, ApiError } from "../lib/api";
+import { useEffect, useState, type FormEvent } from "react";
+import { api, ApiError, friendsApi } from "../lib/api";
 import { saveSession } from "../lib/auth";
 import { Button, Card, useToast } from "../components";
 import type { AuthEntry } from "./Landing";
@@ -41,12 +41,15 @@ export function Auth({
   onDone,
   onBack,
   guestToken,
+  referralCode,
 }: {
   initialTab: AuthEntry;
   onDone: (username: string) => void;
   onBack: () => void;
   /** Guest session token to migrate in place (progress kept). Null = fresh signup. */
   guestToken?: string | null;
+  /** W3: referral code from a ?ref= invite link (landing page). */
+  referralCode?: string | null;
 }) {
   const { toast } = useToast();
   const [tab, setTab] = useState<AuthEntry>(initialTab);
@@ -67,6 +70,25 @@ export function Auth({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState("");
+
+  // W3: resolve the ?ref= invite code → "Invited by <username>".
+  // Invalid codes are ignored gracefully (no error screen).
+  const [inviter, setInviter] = useState<string | null>(null);
+  useEffect(() => {
+    if (!referralCode) return;
+    let live = true;
+    friendsApi
+      .resolveReferral(referralCode)
+      .then((r) => {
+        if (live && r?.username) setInviter(r.username);
+      })
+      .catch(() => {
+        /* unknown code — signup proceeds normally */
+      });
+    return () => {
+      live = false;
+    };
+  }, [referralCode]);
 
   const fail = (message: string) => {
     setFormError(message);
@@ -97,6 +119,8 @@ export function Auth({
         password,
         dob,
         guestToken: guestToken ?? undefined,
+        // W3: attribute the signup when the invite code resolved to a user.
+        ref: inviter ? referralCode ?? undefined : undefined,
       });
       saveSession(res.token, res.username);
       toast(`Welcome to the city, ${res.username}!`, "success");
@@ -200,6 +224,11 @@ export function Auth({
 
           {tab === "signup" && (
             <form onSubmit={handleSignup} noValidate>
+              {inviter && (
+                <p className="eko-auth__invite" role="note">
+                  🎉 Invited by <strong>@{inviter}</strong> — welcome to the city!
+                </p>
+              )}
               {guestToken && (
                 <p className="eko-auth__guest-blurb" role="note">
                   🎒 Keeping your guest progress — same character, same wallet,

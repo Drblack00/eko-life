@@ -183,3 +183,13 @@
   margin: 0;
   font-size: 0.95rem;
 }
+
+/* W3: referral invite banner on the signup screen. */
+.eko-auth__invite {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md, 12px);
+  background: var(--glass-tint-mint, rgb(217 246 231 / 0.85));
+  color: var(--text);
+  font-size: 0.95rem;
+}

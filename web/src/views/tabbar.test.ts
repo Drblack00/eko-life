@@ -5,14 +5,15 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Tab-bar contract tests. The vitest setup is node-only (no DOM), so these
- * verify the tab bar at the source level: the TABS structure in Game.tsx and
- * the .eko-tabs rules in Game.css. Real-browser screenshots are the visual
- * proof (see workstream A report).
+ * verify the tab bar at the source level: the TABS structure in TabBar.tsx
+ * and the .eko-tabs rules in Game.css. Real-browser screenshots are the
+ * visual proof (see workstream A report).
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
-const gameTsx = readFileSync(join(here, "Game.tsx"), "utf8");
+const gameTsx = readFileSync(join(here, "TabBar.tsx"), "utf8");
 const gameCss = readFileSync(join(here, "Game.css"), "utf8");
+const glassCss = readFileSync(join(here, "..", "styles", "glass.css"), "utf8");
 
 const EXPECTED_TABS = [
   { id: "home", label: "Home", icon: "🏠" },
@@ -22,6 +23,7 @@ const EXPECTED_TABS = [
   { id: "daily", label: "Daily", icon: "🎯" },
   { id: "market", label: "Market", icon: "💰" },
   { id: "chat", label: "Chat", icon: "💬" },
+  { id: "friends", label: "Friends", icon: "🤝" },
   { id: "me", label: "Me", icon: "🧑" },
 ];
 
@@ -44,7 +46,7 @@ function ruleBlock(css: string, selector: string): string {
 }
 
 describe("tab bar structure (Game.tsx)", () => {
-  it("has exactly the 8 tabs, in order, with unchanged labels and icons", () => {
+  it("has exactly the 9 tabs, in order, with unchanged labels and icons", () => {
     expect(parseTabs(gameTsx)).toEqual(EXPECTED_TABS);
   });
 
@@ -55,15 +57,42 @@ describe("tab bar structure (Game.tsx)", () => {
 });
 
 describe("tab bar styling (Game.css)", () => {
-  it("lays all 8 tabs out in a single row — repeat(8, 1fr), not 7", () => {
+  it("lays all 9 tabs out in a single row — repeat(9, 1fr), not 8", () => {
     const block = ruleBlock(gameCss, ".eko-tabs");
-    expect(block).toMatch(/grid-template-columns:\s*repeat\(\s*8\s*,\s*1fr\s*\)/);
-    expect(block).not.toMatch(/repeat\(\s*7\s*,/);
+    expect(block).toMatch(/grid-template-columns:\s*repeat\(\s*9\s*,\s*1fr\s*\)/);
+    expect(block).not.toMatch(/repeat\(\s*8\s*,/);
   });
 
-  it("marks the active tab with a solid pill background", () => {
+  it("renders the liquid active-tab pill inside the tab bar", () => {
+    // The pill is a single sliding indicator behind the buttons (FLIP
+    // animation lives in Game.tsx); it must exist in the nav exactly once.
+    const nav = gameTsx.match(/<nav className="eko-tabs"[\s\S]*?<\/nav>/);
+    expect(nav).not.toBeNull();
+    const pills = nav![0].match(/className="eko-tabs__pill"/g) ?? [];
+    expect(pills).toHaveLength(1);
+  });
+
+  it("marks the active tab with white text — the sliding pill carries the green identity", () => {
     const block = ruleBlock(gameCss, ".eko-tabs__btn--active");
-    expect(block).toMatch(/background:\s*var\(--success\)/);
+    expect(block).toMatch(/color:\s*#fff/);
+    // The button itself must not paint a background: the liquid pill sits
+    // behind it and would double-render.
+    expect(block).not.toMatch(/background:\s*var\(--success\)/);
+  });
+
+  it("positions the liquid pill absolutely behind the tab buttons", () => {
+    const pill = ruleBlock(gameCss, ".eko-tabs__pill");
+    expect(pill).toMatch(/position:\s*absolute/);
+    expect(pill).toMatch(/pointer-events:\s*none/);
+    const btn = ruleBlock(gameCss, ".eko-tabs__btn");
+    expect(btn).toMatch(/position:\s*relative/);
+    expect(btn).toMatch(/z-index:\s*1/);
+  });
+
+  it("gives the liquid pill the green glass material in glass.css", () => {
+    const m = glassCss.match(/\.eko-game\s+\.eko-tabs__pill\s*\{([^}]*)\}/s);
+    expect(m).not.toBeNull();
+    expect(m![1]).toMatch(/var\(--glass-tint-green\)/);
   });
 
   it("keeps active and inactive buttons the same size (no layout shift on switch)", () => {

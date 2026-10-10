@@ -1,0 +1,182 @@
+/* ---- W3: Friends page (dedicated tab) ---- */
+.eko-fpage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-4) calc(var(--space-4) + var(--sab));
+  overflow-y: auto;
+  flex: 1;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.eko-fpage__head {
+  margin-top: var(--space-2);
+}
+
+.eko-fpage__title {
+  font-size: 1.35rem;
+  margin: 0;
+  color: var(--text);
+}
+
+.eko-fpage__sub {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.eko-fpage__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-fpage__h {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.eko-fpage__badge {
+  background: var(--success);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 800;
+  min-width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+}
+
+.eko-fpage__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.eko-fpage__avatar {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 50%;
+  background: var(--lagoon-100, #d7f3ea);
+  color: var(--lagoon-700, #0d6e5f);
+  font-weight: 800;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eko-fpage__presence {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  border: 2px solid var(--surface);
+}
+
+.eko-fpage__presence--on {
+  background: var(--success);
+}
+
+.eko-fpage__who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.eko-fpage__who strong {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eko-fpage__meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.eko-fpage__acts {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.eko-fpage__add {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.eko-fpage__add .eko-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- invite section ---- */
+.eko-fpage__invite {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.eko-fpage__invite-text {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.eko-fpage__linkrow {
+  background: var(--surface-2, rgb(0 0 0 / 0.05));
+  border-radius: var(--radius-md, 12px);
+  padding: var(--space-3);
+  overflow-x: auto;
+}
+
+.eko-fpage__link {
+  font-size: 0.82rem;
+  color: var(--text);
+  word-break: break-all;
+  font-family: ui-monospace, monospace;
+}
+
+.eko-fpage__invite-acts {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.eko-fpage__joined {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.eko-fpage__joined strong {
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+@media (max-width: 420px) {
+  .eko-fpage__acts {
+    flex-direction: column;
+  }
+}

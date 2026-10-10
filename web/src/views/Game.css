@@ -509,16 +509,39 @@
 /* ---- Bottom tab bar: floating pill dock, icon-over-label buttons ---- */
 .eko-tabs {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  /* W3: 9 tabs (incl. Friends) in one row — compact buttons, same 52px
+     touch target. The liquid pill (eko-tabs__pill) sizes itself from the
+     active button's box, so it adapts automatically. */
+  grid-template-columns: repeat(9, 1fr);
   margin: 0 var(--space-2) calc(var(--space-2) + var(--sab));
   padding: var(--space-1);
   border-radius: var(--radius-pill);
   background: var(--surface);
   box-shadow: var(--shadow-md);
   z-index: 10;
+  /* Liquid-pill anchor: the indicator is absolutely positioned against the bar. */
+  position: relative;
+}
+
+/* Liquid active-tab indicator: a single green glass pill that FLIP-slides
+   between tab buttons (see the effect in Game.tsx). Material comes from
+   glass.css (.eko-game .eko-tabs__pill); this is geometry only. transform is
+   the only animated property — never layout. */
+.eko-tabs__pill {
+  position: absolute;
+  top: var(--space-1);
+  bottom: var(--space-1);
+  left: 0;
+  width: 48px; /* JS sets the exact width of the active button. */
+  border-radius: var(--radius-pill);
+  transform-origin: left center;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .eko-tabs__btn {
+  position: relative;
+  z-index: 1;
   min-height: 52px;
   min-width: 0;
   border: none;
@@ -529,16 +552,19 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 6px 2px;
+  /* W3: tighter padding for 9 tabs in one row. */
+  padding: 5px 1px;
   color: var(--text-muted);
   cursor: pointer;
 }
 
-/* Active tab: solid green pill behind icon+label. Same box metrics as the
-   inactive state, so switching tabs never shifts layout; the state is pure
-   colour, so it does not depend on animation (reduced-motion safe). */
+/* Active tab: the liquid pill carries the green identity (it slides behind
+   this button), so the button itself only needs contrast text. Same box
+   metrics as the inactive state — switching tabs never shifts layout.
+   Under prefers-reduced-motion the pill jumps instantly (Game.tsx), so the
+   state never depends on animation. */
 .eko-tabs__btn--active {
-  background: var(--success);
+  background: none;
   color: #fff;
 }
 
@@ -548,12 +574,13 @@
 }
 
 .eko-tabs__icon {
-  font-size: 1.25rem;
+  /* W3: slightly smaller so 9 tabs fit one row. */
+  font-size: 1.15rem;
   line-height: 1;
 }
 
 .eko-tabs__label {
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   font-weight: 700;
   line-height: 1.2;
   white-space: nowrap;
@@ -563,13 +590,13 @@
 @media (max-height: 540px) {
   .eko-tabs__btn {
     min-height: 44px;
-    padding: 4px 2px;
+    padding: 4px 1px;
   }
   .eko-tabs__icon {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
   }
   .eko-tabs__label {
-    font-size: 0.6rem;
+    font-size: 0.55rem;
   }
 }
 
