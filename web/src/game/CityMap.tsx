@@ -2,6 +2,10 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { PinLocation } from "./stubLocations";
+import {
+  drawBillboardCreative,
+  type BillboardCreative,
+} from "./billboardCanvas";
 import "./CityMap.css";
 
 /**
@@ -61,6 +65,70 @@ function makeLabelTexture(text: string): THREE.CanvasTexture {
   return tex;
 }
 
+/** Billboard record from GET /api/v2/m13/billboards (map coords 0–100). */
+export interface BillboardSpec extends BillboardCreative {
+  id: number;
+  x: number;
+  y: number;
+  scale: number;
+  active?: boolean;
+}
+
+function clampBillboardScale(s: unknown): number {
+  const n = Number(s);
+  if (!Number.isFinite(n)) return 1;
+  return Math.max(0.5, Math.min(3, n));
+}
+
+/**
+ * Fetch active billboards for the map. Any failure → []: billboards are
+ * decorative, so the city renders fine without them.
+ */
+async function fetchBillboards(): Promise<BillboardSpec[]> {
+  try {
+    const res = await fetch("/api/v2/m13/billboards");
+    if (!res.ok) return [];
+    const body = (await res.json()) as { billboards?: unknown };
+    const list = Array.isArray(body?.billboards) ? body.billboards : [];
+    return (list as Array<Partial<BillboardSpec>>)
+      .filter(
+        (b) =>
+          !!b &&
+          typeof b.headline === "string" &&
+          Number.isFinite(Number(b.x)) &&
+          Number.isFinite(Number(b.y))
+      )
+      .slice(0, 24)
+      .map((b, i) => ({
+        id: Number(b.id) || i,
+        headline: String(b.headline),
+        subtext: b.subtext ?? "",
+        bg: b.bg ?? "#0f172a",
+        fg: b.fg ?? "#ffffff",
+        accent: b.accent ?? "#22d3ee",
+        x: Number(b.x),
+        y: Number(b.y),
+        scale: clampBillboardScale(b.scale),
+        active: b.active !== false,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/** 512×256 runtime texture for one billboard creative (no external images). */
+function makeBillboardTexture(b: BillboardCreative): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 256;
+  const g = c.getContext("2d")!;
+  drawBillboardCreative(g, b, 512, 256);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
 export function CityMap({
   pins,
   onPinSelect,
@@ -80,11 +148,29 @@ export function CityMap({
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    // Non-null alias: TS narrowing of `host` does not survive into the
+    // nested buildScene() below, so keep a definitely-assigned reference.
+    const hostEl: HTMLDivElement = host;
 
     const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches;
 
+    let cancelled = false;
+    const cleanups: Array<() => void> = [];
+    const onCleanup = (fn: () => void) => {
+      cleanups.push(fn);
+    };
+
+    // M13 billboards load async; the scene builds once they resolve. A
+    // failed fetch just means no billboards — the city still renders.
+    void (async () => {
+      const billboards = await fetchBillboards();
+      if (!cancelled) return;
+      buildScene(billboards);
+    })();
+
+    function buildScene(billboards: BillboardSpec[]) {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xbfdbfe);
     scene.fog = new THREE.Fog(0xbfdbfe, 220, 420);
@@ -92,7 +178,7 @@ export function CityMap({
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    host.appendChild(renderer.domElement);
+    hostEl.appendChild(renderer.domElement);
 
     const camera = new THREE.PerspectiveCamera(42, 1, 1, 800);
     camera.position.set(0, 96, 104);
@@ -175,6 +261,16 @@ export function CityMap({
 
     const rand = mulberry32(20261009);
 
+    // M13: billboard footprints (map coords → world) so buildings keep clear.
+    const boardSpots = billboards.map((b) => {
+      const s = clampBillboardScale(b.scale);
+      return {
+        x: (Number(b.x) / 100) * 172 - 86,
+        z: (Number(b.y) / 100) * 172 - 86,
+        r: 9 * s,
+      };
+    });
+
     // Buildings — instanced white low-poly boxes on both masses
     const buildingGeo = new THREE.BoxGeometry(1, 1, 1);
     const buildingMat = new THREE.MeshStandardMaterial({
@@ -194,6 +290,9 @@ export function CityMap({
       const z = (rand() - 0.5) * (WORLD.z * 2 - 16);
       // keep clear of pin spots
       if (pinsRef.current.some((p) => Math.hypot(p.x - x, p.z - z) < 7))
+        continue;
+      // keep clear of billboard footprints
+      if (boardSpots.some((sp) => Math.hypot(sp.x - x, sp.z - z) < sp.r))
         continue;
       const w = 3 + rand() * 5;
       const d = 3 + rand() * 5;
@@ -321,17 +420,70 @@ export function CityMap({
     buildPins(pinsRef.current);
     rebuildRef.current = buildPins;
 
+    // ---- M13 billboards: two posts + a runtime-textured panel (static) ----
+    // Geometry is shared across billboards; each panel gets its own
+    // 512×256 CanvasTexture. No animation — safe for reduced-motion.
+    const bbGroup = new THREE.Group();
+    scene.add(bbGroup);
+    const bbPostGeo = new THREE.CylinderGeometry(0.45, 0.6, 1, 8);
+    const bbPostMat = new THREE.MeshStandardMaterial({
+      color: 0x475569,
+      roughness: 0.8,
+    });
+    const bbPanelGeo = new THREE.PlaneGeometry(1, 1);
+    const bbTextures: THREE.CanvasTexture[] = [];
+    const bbMaterials: THREE.MeshStandardMaterial[] = [];
+    for (const b of billboards) {
+      const s = clampBillboardScale(b.scale);
+      const wx = (Number(b.x) / 100) * 172 - 86;
+      const wz = (Number(b.y) / 100) * 172 - 86;
+      if (!Number.isFinite(wx) || !Number.isFinite(wz)) continue;
+      const panelW = 13 * s;
+      const panelH = 6.5 * s;
+      const panelY = 15 * s;
+      const postH = Math.max(1, panelY - panelH / 2);
+      const grp = new THREE.Group();
+      for (const off of [-4.4 * s, 4.4 * s]) {
+        const post = new THREE.Mesh(bbPostGeo, bbPostMat);
+        post.scale.set(1, postH, 1);
+        post.position.set(off, postH / 2, 0);
+        grp.add(post);
+      }
+      const tex = makeBillboardTexture(b);
+      bbTextures.push(tex);
+      const mat = new THREE.MeshStandardMaterial({
+        map: tex,
+        roughness: 0.65,
+        side: THREE.DoubleSide,
+      });
+      bbMaterials.push(mat);
+      const panel = new THREE.Mesh(bbPanelGeo, mat);
+      panel.scale.set(panelW, panelH, 1);
+      panel.position.set(0, panelY, 0);
+      grp.add(panel);
+      grp.position.set(wx, 0, wz);
+      bbGroup.add(grp);
+    }
+    onCleanup(() => {
+      scene.remove(bbGroup);
+      bbPostGeo.dispose();
+      bbPostMat.dispose();
+      bbPanelGeo.dispose();
+      for (const t of bbTextures) t.dispose();
+      for (const m of bbMaterials) m.dispose();
+    });
+
     // Resize
     const resize = () => {
-      const w = host.clientWidth || 1;
-      const h = host.clientHeight || 1;
+      const w = hostEl.clientWidth || 1;
+      const h = hostEl.clientHeight || 1;
       renderer.setSize(w, h);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
     };
     resize();
     const ro = new ResizeObserver(resize);
-    ro.observe(host);
+    ro.observe(hostEl);
 
     // Tooltip + hover/click
     const tooltip = tooltipRef.current;
@@ -422,16 +574,30 @@ export function CityMap({
       controls.addEventListener("change", onChange);
     }
 
+      onCleanup(() => cancelAnimationFrame(raf));
+      onCleanup(() => ro.disconnect());
+      onCleanup(() => {
+        el.removeEventListener("pointermove", onMove);
+        el.removeEventListener("pointerdown", onDown);
+        el.removeEventListener("pointerup", onUp);
+      });
+      onCleanup(() => controls.dispose());
+      onCleanup(() => {
+        renderer.dispose();
+        if (el.parentNode === hostEl) hostEl.removeChild(el);
+      });
+    }
+
     return () => {
-      cancelAnimationFrame(raf);
-      ro.disconnect();
+      cancelled = true;
       rebuildRef.current = null;
-      el.removeEventListener("pointermove", onMove);
-      el.removeEventListener("pointerdown", onDown);
-      el.removeEventListener("pointerup", onUp);
-      controls.dispose();
-      renderer.dispose();
-      host.removeChild(el);
+      for (const fn of cleanups.splice(0)) {
+        try {
+          fn();
+        } catch {
+          /* teardown errors are not user-visible */
+        }
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

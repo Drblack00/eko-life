@@ -37,6 +37,24 @@ export interface You {
   y?: number;
   is_admin: boolean;
   guest: boolean;
+  /* ---------------- V2 ---------------- */
+  /** M8: six needs (hunger is legacy). */
+  fun?: number;
+  social?: number;
+  hygiene?: number;
+  bladder?: number;
+  /** M8: active moodlets (pushed on the decay tick). */
+  moodlets?: Array<{ key: string; label: string; effects?: unknown; expires_at?: number }>;
+  /** M9: perk stars + owned perk ids. */
+  perk_stars?: number;
+  perks?: string[];
+  /** M10: rent-to-own flag. */
+  housing_owned?: boolean;
+  /** M7: active shift (null when not clocked in). */
+  shift?: { job: string; name: string; trackId?: string | null; startedAt?: number | null; endsAt: number; secondsLeft: number } | null;
+  /** M12: skills + academy progress (merged by the coordinator). */
+  skills?: Record<string, { level: number; xp: number }>;
+  academy?: { lessonsToday?: number; certs?: string[] } | null;
 }
 
 /** A server-side named reference — either a bare id or an expanded object. */
@@ -159,6 +177,14 @@ export interface ElectionState {
   running: boolean;
   /** Game days left in the race. */
   endsInDays?: number;
+  /** M11: the sitting governor's signed policy (if any). */
+  policy?: { id: string; name: string; desc: string; effectLine?: string } | null;
+  /** M11: pickable policies for the PolicyPicker. */
+  pickablePolicies?: Array<{ id: string; name: string; desc: string; icon: string }>;
+  /** M11: the governor's cabinet. */
+  commissioners?: Array<{ title: string; icon: string; holder: string | null }>;
+  /** M11: whether the 48h policy-pick window is still open. */
+  policyWindowOpen?: boolean;
 }
 
 export interface ElectionCandidate {
@@ -293,7 +319,35 @@ export type ActName =
   | "collect"
   | "run"
   | "vote"
-  | "gov_broadcast";
+  | "gov_broadcast"
+  /* ---------------- V2 ---------------- */
+  | "shift_start"
+  | "shift_leave"
+  | "shift_status"
+  | "moodlet_list"
+  | "hunt_claim"
+  | "hunt_status"
+  | "hustle_status"
+  | "hustle_claim"
+  | "perk_list"
+  | "perk_buy"
+  | "shop_create"
+  | "shop_stock"
+  | "shop_buy"
+  | "shop_rate"
+  | "shop_browse"
+  | "shop_mine"
+  | "buy_rental"
+  | "lapo_borrow"
+  | "lapo_status"
+  | "lapo_repay"
+  | "lapo_repay_all"
+  | "gov_policy"
+  | "gov_appoint"
+  | "gov_dismiss"
+  | "skill_train"
+  | "academy_lesson"
+  | "academy_quiz";
 
 /** Server → client message envelope (only fields we route). */
 export interface ServerMsg {
