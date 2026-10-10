@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { adminApi, ApiError, type AdminPlayer } from "../lib/api";
 import { naira } from "../game/types";
 import { Button, Card, Dialog, EmptyState, Loading, useToast } from "../components";
+import { BillboardsManager } from "./v2/m13/BillboardsAdmin";
+import "./v2/m13/m13.css";
 import "./Admin.css";
 
 type ConfirmKind = "ban" | "unban" | "makeAdmin";
@@ -152,6 +154,9 @@ export function AdminView({
           ↻ Refresh
         </Button>
       </header>
+
+      {/* M13: billboard management (text, colors, position) */}
+      <BillboardsManager token={token} />
 
       {loading ? (
         <div className="eko-admin__center">

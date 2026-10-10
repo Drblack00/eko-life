@@ -3,12 +3,12 @@ import { useGameSocket } from "../hooks/useGameSocket";
 import {
   api,
   asList,
+  authGet,
   normalizeConfig,
   travelFare,
   type FoodInfo,
   type FunInfo,
   type GameConfig,
-  type JobInfo,
 } from "../lib/api";
 import { CityMap } from "../game/CityMap";
 import { mapXYToWorld, toPin } from "../game/mapPins";
@@ -39,14 +39,28 @@ import { LedgerSheet } from "./home/LedgerSheet";
 import { AdminView } from "./Admin";
 import "./Admin.css";
 import "./Game.css";
+// V2 milestones: shifts (M7), needs (M8), daily (M9), economy (M10),
+// governance (M11), skills/academy (M12).
+import { Clock, JobsTab } from "./v2/m7";
+import type { ShiftTrackInfo } from "./v2/m7";
+import "./v2/m7/m7.css";
+import { NeedsPanel } from "./v2/m8/NeedsPanel";
+import "./v2/m8/NeedsPanel.css";
+import { DailyTab } from "./v2/m9";
+import "./v2/m9/DailyTab.css";
+import { EconomyTab } from "./v2/m10";
+import "./v2/m10/m10.css";
+import { SkillsPanel, AcademyView } from "./v2/m12";
+import "./v2/m12/m12.css";
 
-type Tab = "city" | "work" | "eat" | "home" | "chat" | "me";
+type Tab = "city" | "jobs" | "needs" | "daily" | "market" | "chat" | "me";
 
 const TABS: Array<{ id: Tab; label: string; icon: string }> = [
   { id: "city", label: "City", icon: "🌆" },
-  { id: "work", label: "Work", icon: "💼" },
-  { id: "eat", label: "Eat", icon: "🍲" },
-  { id: "home", label: "Home", icon: "🏠" },
+  { id: "jobs", label: "Jobs", icon: "💼" },
+  { id: "needs", label: "Needs", icon: "💚" },
+  { id: "daily", label: "Daily", icon: "🎯" },
+  { id: "market", label: "Market", icon: "💰" },
   { id: "chat", label: "Chat", icon: "💬" },
   { id: "me", label: "Me", icon: "🧑" },
 ];
@@ -99,6 +113,7 @@ function Hud({
         <span className="eko-hud__day" aria-label={`Day ${day}`}>
           Day {day}
         </span>
+        <Clock />
       </div>
       <div className="eko-hud__stats">
         <StatBar label="Energy" value={you.energy} icon="⚡" />
@@ -135,13 +150,13 @@ function Hud({
 function HintBar({ you, onGo }: { you: You; onGo: (t: Tab) => void }) {
   let hint: { text: string; tab: Tab } | null = null;
   if (you.hunger < 30)
-    hint = { text: "You're hungry — grab food at the nearest market.", tab: "eat" };
+    hint = { text: "You're hungry — grab food in Needs.", tab: "needs" };
   else if (you.energy < 30)
     hint = { text: "You're tired — rest or sleep it off.", tab: "me" };
   else if (you.money < 1000)
-    hint = { text: "Wallet's light — pick a hustle in Work.", tab: "work" };
+    hint = { text: "Wallet's light — clock in for a shift in Jobs.", tab: "jobs" };
   else if (you.happiness < 30)
-    hint = { text: "Low spirits — have some fun.", tab: "eat" };
+    hint = { text: "Low spirits — have some fun.", tab: "needs" };
   if (!hint) return null;
   return (
     <button type="button" className="eko-hint" onClick={() => onGo(hint!.tab)}>
@@ -269,10 +284,10 @@ function LocationActions({
     <div className="eko-pin__actions">
       {has("market") && (
         <div className="eko-pin__btnrow">
-          <Button size="md" variant="accent" onClick={() => onTab("work")}>
+          <Button size="md" variant="accent" onClick={() => onTab("jobs")}>
             💼 Find work
           </Button>
-          <Button size="md" variant="accent" onClick={() => onTab("eat")}>
+          <Button size="md" variant="accent" onClick={() => onTab("needs")}>
             🍲 Find food
           </Button>
         </div>
@@ -348,159 +363,6 @@ function LocationActions({
   );
 }
 
-function WorkTab({
-  you,
-  config,
-  sendWork,
-  travelTo,
-}: {
-  you: You;
-  config: GameConfig | null;
-  sendWork: (job: JobInfo) => void;
-  travelTo: (locationId: string) => void;
-}) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(t);
-  }, []);
-
-  const [cooldowns, setCooldowns] = useState<Record<string, number>>({});
-  const locName = useCallback(
-    (id: string) =>
-      asList(config?.locations).find((l) => l.id === id)?.name ?? "Lagos",
-    [config]
-  );
-  const campus = useMemo(
-    () =>
-      asList(config?.locations).find((l) => (l.tags ?? []).includes("campus")),
-    [config]
-  );
-
-  if (!config) {
-    return (
-      <div className="eko-tabpad" aria-label="Loading jobs">
-        <Skeleton height={96} rounded={16} />
-        <Skeleton height={96} rounded={16} />
-        <Skeleton height={96} rounded={16} />
-      </div>
-    );
-  }
-
-  const jobs = asList(config.jobs);
-  if (jobs.length === 0) {
-    return (
-      <div className="eko-tabpad">
-        <EmptyState
-          emoji="💼"
-          title="No hustles posted yet"
-          body="The job board is empty right now. Check back after the next day breaks."
-        />
-      </div>
-    );
-  }
-
-  // Group jobs by their server-defined career path (market / transport /
-  // campus / corporate …); jobs without a path land in a fallback group.
-  const groups = useMemo(() => {
-    const map = new Map<string, JobInfo[]>();
-    for (const j of jobs) {
-      const key = j.path?.trim() || "all";
-      const arr = map.get(key);
-      if (arr) arr.push(j);
-      else map.set(key, [j]);
-    }
-    return [...map.entries()].map(([path, pathJobs]) => ({
-      path,
-      label:
-        path === "all"
-          ? "All hustles"
-          : path.charAt(0).toUpperCase() + path.slice(1),
-      jobs: pathJobs,
-    }));
-  }, [jobs]);
-
-  return (
-    <div className="eko-tabpad eko-work">
-      {groups.map(({ path, label, jobs: pathJobs }) => (
-        <div key={path} className="eko-work__group">
-          <h2 className="eko-work__path">{label}</h2>
-          {pathJobs.map((job) => {
-            const cdUntil = cooldowns[job.id] ?? 0;
-            const certLocked = !!job.certRequired && !you.cert;
-            let disabled = false;
-            let reason = "Start shift";
-            if (cdUntil > now) {
-              disabled = true;
-              reason = `Available in ${Math.ceil((cdUntil - now) / 1000)}s`;
-            } else if (you.locationId !== job.locationId) {
-              disabled = true;
-              reason = `Go to ${locName(job.locationId)}`;
-            } else if (you.energy < job.energyCost) {
-              disabled = true;
-              reason = `Need ${job.energyCost} energy`;
-            } else if (certLocked) {
-              disabled = true;
-              reason = "Needs certificate";
-            }
-            return (
-              <Card key={job.id} className="eko-job">
-                <div className="eko-job__head">
-                  <span className="eko-job__icon" aria-hidden="true">
-                    {job.icon}
-                  </span>
-                  <div className="eko-job__meta">
-                    <strong className="eko-job__name">{job.name}</strong>
-                    <span className="eko-job__loc">📍 {locName(job.locationId)}</span>
-                  </div>
-                  <span className="eko-job__pay">{naira(job.pay)}</span>
-                </div>
-                <div className="eko-job__foot">
-                  <span className="eko-job__cost">
-                    ⚡ {job.energyCost} energy
-                    {job.cooldownSec > 0 && ` · ${job.cooldownSec}s cooldown`}
-                  </span>
-                  <Button
-                    size="md"
-                    disabled={disabled}
-                    onClick={() => {
-                      sendWork(job);
-                      // Optimistic display only — the server is authoritative and
-                      // confirms via `you` + note (or rejects with an err toast).
-                      if (job.cooldownSec > 0) {
-                        setCooldowns((p) => ({
-                          ...p,
-                          [job.id]: Date.now() + job.cooldownSec * 1000,
-                        }));
-                      }
-                    }}
-                    aria-label={disabled ? `${job.name}: ${reason}` : `${job.name}: ${reason}`}
-                  >
-                    {reason}
-                  </Button>
-                </div>
-                {certLocked && campus && (
-                  <Button
-                    size="md"
-                    variant="accent"
-                    className="eko-job__study"
-                    onClick={() => travelTo(campus.id)}
-                    disabled={you.locationId === campus.id}
-                  >
-                    🎓 Needs certificate — study at {campus.name}
-                  </Button>
-                )}
-              </Card>
-            );
-          })}
-        </div>
-      ))}
-      <p className="eko-work__note">
-        Pay lands straight in your wallet. Tired? Rest before your next shift.
-      </p>
-    </div>
-  );
-}
 
 function EatTab({
   you,
@@ -966,7 +828,7 @@ export function Game({
   const focusHome = useCallback((s: Exclude<HomeFocus, null>) => {
     setPinSheet(null);
     setHomeFocus(s);
-    setTab("home");
+    setTab("me"); // Home lives under the Me tab in v2
   }, []);
 
   if (!sock.you) {
@@ -1061,45 +923,68 @@ export function Game({
             onPinSelect={handlePinSelect}
           />
         )}
-        {tab === "work" && (
-          <WorkTab
+        {tab === "jobs" && (
+          <div className="eko-tabpad">
+            <JobsTab
+              you={you}
+              send={(msg) => {
+                const { a, ...rest } = msg as { t?: string; a: ActName } & Record<string, unknown>;
+                sock.sendAct(a, rest);
+              }}
+              careerTracks={(config as unknown as { careerTracks?: ShiftTrackInfo[] } | null)?.careerTracks}
+              skillLabels={(config as unknown as { skillLabels?: Record<string, string> } | null)?.skillLabels}
+              locationName={(id: string) => asList(config?.locations).find((l) => l.id === id)?.name ?? id}
+            />
+            <SkillsPanel you={you} send={(a: string, params?: Record<string, unknown>) => sock.sendAct(a as ActName, params)} />
+            <AcademyView you={you} send={(a: string, params?: Record<string, unknown>) => sock.sendAct(a as ActName, params)} />
+          </div>
+        )}
+        {tab === "needs" && (
+          <div className="eko-tabpad">
+            <NeedsPanel you={you} sock={sock} />
+            <EatTab
+              you={you}
+              config={config}
+              onEat={(f) => sock.sendAct("eat", { item: f.id })}
+              onFun={(f) => sock.sendAct("fun", { what: f.id })}
+              onStudy={() => sock.sendAct("study")}
+            />
+          </div>
+        )}
+        {tab === "daily" && (
+          <DailyTab
             you={you}
-            config={config}
-            sendWork={(job) => sock.sendAct("work", { job: job.id })}
-            travelTo={travelTo}
+            send={(a: string, params?: Record<string, unknown>) => sock.sendAct(a as ActName, params)}
+            api={{
+              get: (path: string) => authGet(path, token),
+            }}
           />
         )}
-        {tab === "eat" && (
-          <EatTab
-            you={you}
-            config={config}
-            onEat={(f) => sock.sendAct("eat", { item: f.id })}
-            onFun={(f) => sock.sendAct("fun", { what: f.id })}
-            onStudy={() => sock.sendAct("study")}
-          />
-        )}
-        {tab === "home" && config && (
-          <HomeTab
-            you={you}
-            config={config}
-            sendAct={sock.sendAct}
-            travelTo={travelTo}
-            focus={homeFocus}
-            onClearFocus={() => setHomeFocus(null)}
-          />
-        )}
+        {tab === "market" && <EconomyTab token={token} sock={sock} you={you} />}
         {tab === "chat" && <ChatTab sock={sock} you={you} />}
         {tab === "me" && (
-          <MeTab
-            you={you}
-            config={config}
-            token={token}
-            onSleep={() => sock.sendAct("sleep")}
-            onRest={() => sock.sendAct("rest")}
-            onSignOut={onSignOut}
-            onUpgrade={onUpgrade}
-            onOpenAdmin={() => setAdminOpen(true)}
-          />
+          <>
+            <MeTab
+              you={you}
+              config={config}
+              token={token}
+              onSleep={() => sock.sendAct("sleep")}
+              onRest={() => sock.sendAct("rest")}
+              onSignOut={onSignOut}
+              onUpgrade={onUpgrade}
+              onOpenAdmin={() => setAdminOpen(true)}
+            />
+            {config && (
+              <HomeTab
+                you={you}
+                config={config}
+                sendAct={sock.sendAct}
+                travelTo={travelTo}
+                focus={homeFocus}
+                onClearFocus={() => setHomeFocus(null)}
+              />
+            )}
+          </>
         )}
       </main>
 

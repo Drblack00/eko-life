@@ -420,7 +420,7 @@
 /* ---- Bottom tabs ---- */
 .eko-tabs {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--surface-2);
   padding-bottom: var(--sab);
