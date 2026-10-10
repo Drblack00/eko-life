@@ -370,7 +370,7 @@ export interface AdminPlayer {
 }
 
 /** Bearer-auth GET helper. */
-async function authGet<T>(path: string, token: string): Promise<T> {
+export async function authGet<T>(path: string, token: string): Promise<T> {
   return request<T>(path, {
     headers: {
       "Content-Type": "application/json",
