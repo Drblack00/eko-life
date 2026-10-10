@@ -1,0 +1,156 @@
+/* M12 — Skills + Academy. Mobile-first, self-contained. */
+
+.m12-wrap {
+  padding: calc(12px + env(safe-area-inset-top)) 12px calc(24px + env(safe-area-inset-bottom));
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.m12-head { margin-bottom: 12px; }
+
+.m12-title {
+  margin: 0 0 4px;
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.m12-sub {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.75;
+  line-height: 1.45;
+}
+
+.m12-warn {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.m12-skill-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.m12-skill-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+}
+
+.m12-skill-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.m12-skill-icon { font-size: 1.6rem; }
+
+.m12-skill-name {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.95rem;
+}
+
+.m12-skill-lvl { font-size: 0.75rem; opacity: 0.7; }
+
+.m12-eff { color: #34d399; font-weight: 600; }
+.m12-cert { font-size: 0.9rem; }
+
+.m12-xpbar { margin: 2px 0; }
+
+.m12-skill-xp { font-size: 0.72rem; opacity: 0.65; }
+
+.m12-rust {
+  font-size: 0.75rem;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+  border-radius: 8px;
+  padding: 4px 6px;
+}
+
+.m12-train-hint { font-size: 0.72rem; opacity: 0.65; line-height: 1.4; }
+
+.m12-train-btn { min-height: 44px; margin-top: auto; }
+
+.m12-empty { padding: 20px; text-align: center; opacity: 0.7; }
+
+.m12-course-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .m12-course-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.m12-course-card { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+
+.m12-course-head { display: flex; align-items: center; gap: 10px; }
+
+.m12-course-icon { font-size: 1.8rem; }
+
+.m12-course-skill { font-size: 0.75rem; opacity: 0.7; }
+
+.m12-cert-badge {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #34d399;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.m12-course-desc { margin: 0; font-size: 0.85rem; line-height: 1.45; opacity: 0.85; }
+
+.m12-course-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.m12-course-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+.m12-course-actions > * { min-height: 44px; flex: 1 1 auto; }
+
+.m12-quiz { display: flex; flex-direction: column; gap: 14px; }
+
+.m12-quiz-rule { margin: 0; font-size: 0.82rem; opacity: 0.75; }
+
+.m12-quiz-q { display: flex; flex-direction: column; gap: 8px; }
+
+.m12-quiz-text { margin: 0; font-size: 0.92rem; line-height: 1.4; }
+
+.m12-quiz-opts { display: flex; flex-direction: column; gap: 6px; }
+
+.m12-quiz-opt {
+  min-height: 44px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.m12-quiz-opt--sel {
+  border-color: #34d399;
+  background: rgba(52, 211, 153, 0.12);
+}
+
+.m12-quiz-submit { min-height: 48px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .m12-wrap * { transition: none !important; animation: none !important; }
+}
