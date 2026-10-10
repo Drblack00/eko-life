@@ -497,39 +497,71 @@
 }
 
 /* ---- Bottom tabs ---- */
+/* ---- Bottom tab bar: floating pill dock, icon-over-label buttons ---- */
 .eko-tabs {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(8, 1fr);
+  margin: 0 var(--space-2) calc(var(--space-2) + var(--sab));
+  padding: var(--space-1);
+  border-radius: var(--radius-pill);
   background: var(--surface);
-  border-top: 1px solid var(--surface-2);
-  padding-bottom: var(--sab);
+  box-shadow: var(--shadow-md);
   z-index: 10;
 }
 
 .eko-tabs__btn {
-  min-height: 60px;
+  min-height: 52px;
+  min-width: 0;
   border: none;
+  border-radius: var(--radius-pill);
   background: none;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
+  padding: 6px 2px;
   color: var(--text-muted);
+  cursor: pointer;
 }
 
+/* Active tab: solid green pill behind icon+label. Same box metrics as the
+   inactive state, so switching tabs never shifts layout; the state is pure
+   colour, so it does not depend on animation (reduced-motion safe). */
 .eko-tabs__btn--active {
-  color: var(--primary);
+  background: var(--success);
+  color: #fff;
+}
+
+.eko-tabs__btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 .eko-tabs__icon {
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   line-height: 1;
 }
 
 .eko-tabs__label {
-  font-size: 0.75rem;
+  font-size: 0.62rem;
   font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* Short viewports (e.g. landscape phones): slim the bar but keep >=44px targets. */
+@media (max-height: 540px) {
+  .eko-tabs__btn {
+    min-height: 44px;
+    padding: 4px 2px;
+  }
+  .eko-tabs__icon {
+    font-size: 1.1rem;
+  }
+  .eko-tabs__label {
+    font-size: 0.6rem;
+  }
 }
 
 /* ---- Work tab: path groups ---- */
@@ -663,5 +695,37 @@
 @media (min-width: 720px) {
   .eko-hud__stats {
     grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ---- Workstream B: landscape chrome compaction ----
+   Short viewports (phone landscape): tighten the HUD and the hint banner
+   so the game content below keeps usable room. Portrait is untouched.
+   (Tab-bar rules below/above belong to the sibling workstream — not edited.) */
+@media (orientation: landscape) {
+  .eko-hud {
+    padding: var(--space-2) var(--space-4);
+    padding-top: calc(var(--space-2) + var(--sat));
+  }
+  .eko-hud__avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 1.25rem;
+  }
+  .eko-hud__name {
+    font-size: 0.95rem;
+  }
+  .eko-hud__money {
+    font-size: 1rem;
+  }
+  .eko-hud__stats {
+    margin-top: var(--space-2);
+    gap: var(--space-2);
+  }
+  .eko-hint {
+    margin: var(--space-2) var(--space-4) 0;
+    padding: var(--space-2) var(--space-3);
+    min-height: 40px;
+    font-size: 0.85rem;
   }
 }

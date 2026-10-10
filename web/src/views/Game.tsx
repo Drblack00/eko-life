@@ -58,7 +58,7 @@ import "./v2/m12/m12.css";
 
 type Tab = "home" | "city" | "jobs" | "needs" | "daily" | "market" | "chat" | "me";
 
-const TABS: Array<{ id: Tab; label: string; icon: string }> = [
+export const TABS: Array<{ id: Tab; label: string; icon: string }> = [
   { id: "home", label: "Home", icon: "🏠" },
   { id: "city", label: "City", icon: "🌆" },
   { id: "jobs", label: "Jobs", icon: "💼" },
@@ -765,6 +765,10 @@ export function Game({
   const [restConfig, setRestConfig] = useState<GameConfig | null>(null);
   const [slow, setSlow] = useState(false);
   const [homeFocus, setHomeFocus] = useState<HomeFocus>(null);
+  // Workstream B: the HUD hint banner auto-dismisses while the Home Buy
+  // sheet is open (half/full), so it can never cover the sheet's
+  // interactive content. It returns as soon as the sheet closes.
+  const [buySheetOpen, setBuySheetOpen] = useState(false);
   const prevDay = useRef<number | null>(null);
 
   // Gov results banner: auto-dismiss after 10s (the hook also toasts).
@@ -912,7 +916,7 @@ export function Game({
         </div>
       )}
 
-      <HintBar you={you} onGo={setTab} />
+      {!buySheetOpen && <HintBar you={you} onGo={setTab} />}
 
       <ElectionSheet
         open={electionOpen}
@@ -927,7 +931,12 @@ export function Game({
         <>
           <main className="eko-main">
         {tab === "home" && config && (
-          <HomeView you={you} config={config} sendAct={sock.sendAct} />
+          <HomeView
+            you={you}
+            config={config}
+            sendAct={sock.sendAct}
+            onBuySheetOpen={setBuySheetOpen}
+          />
         )}
         {tab === "city" && (
           <CityTab
