@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { PinLocation } from "./stubLocations";
 import {
   drawBillboardCreative,
@@ -10,12 +11,16 @@ import "./CityMap.css";
 
 /**
  * Original procedural toy-Lagos: green Mainland (left), blue lagoon (center),
- * green Island (right). Instanced low-poly buildings, emoji pins, boats,
- * region labels. Drag to pan, wheel/pinch to zoom.
+ * green Island (right). Instanced houses with pyramid roofs, mid-rise blocks
+ * and glass towers, roads with dashes, bridges over the lagoon, landmarks
+ * (stadium, hospital, school, market), sailboats, palms + leafy trees, emoji
+ * pins, region labels. One finger pans, pinch zooms, two fingers tilt and
+ * turn, tap a pin to select it.
  */
 
 const WORLD = { x: 90, z: 90 };
 const LAGOON_HALF = 13;
+const ROAD_X = 36; // avenue center on each land mass (|x|)
 
 function mulberry32(seed: number) {
   return () => {
@@ -60,6 +65,20 @@ function makeLabelTexture(text: string): THREE.CanvasTexture {
   g.strokeText(text, 256, 48);
   g.fillStyle = "rgba(12,74,110,0.9)";
   g.fillText(text, 256, 48);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** Red/white striped awning texture for market stalls (original canvas art). */
+function makeStripeTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#f8fafc";
+  g.fillRect(0, 0, 128, 128);
+  g.fillStyle = "#dc2626";
+  for (let x = 0; x < 128; x += 32) g.fillRect(x, 0, 16, 128);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -129,6 +148,35 @@ function makeBillboardTexture(b: BillboardCreative): THREE.CanvasTexture {
   return tex;
 }
 
+/** Fill a geometry with a solid vertex color (for merged landmark meshes). */
+function paint(geo: THREE.BufferGeometry, hex: number): THREE.BufferGeometry {
+  const c = new THREE.Color(hex);
+  const n = geo.attributes.position.count;
+  const arr = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    arr[i * 3] = c.r;
+    arr[i * 3 + 1] = c.g;
+    arr[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(arr, 3));
+  return geo;
+}
+
+/** Scale then translate a geometry (for merged landmark meshes). */
+function xg(
+  geo: THREE.BufferGeometry,
+  x: number,
+  y: number,
+  z: number,
+  sx = 1,
+  sy = 1,
+  sz = 1
+): THREE.BufferGeometry {
+  geo.scale(sx, sy, sz);
+  geo.translate(x, y, z);
+  return geo;
+}
+
 export function CityMap({
   pins,
   onPinSelect,
@@ -166,7 +214,7 @@ export function CityMap({
     // failed fetch just means no billboards — the city still renders.
     void (async () => {
       const billboards = await fetchBillboards();
-      if (!cancelled) return;
+      if (cancelled) return;
       buildScene(billboards);
     })();
 
@@ -175,7 +223,27 @@ export function CityMap({
     scene.background = new THREE.Color(0xbfdbfe);
     scene.fog = new THREE.Fog(0xbfdbfe, 220, 420);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch {
+      // No WebGL on this device/browser — show a friendly note instead of a
+      // blank box, with a retry in case it was transient.
+      const note = document.createElement("div");
+      note.className = "eko-citymap__nogl";
+      note.innerHTML =
+        '<p>🗺️ The 3D city needs WebGL, which this browser blocked.</p>' +
+        '<button type="button">Try again</button>';
+      note.querySelector("button")?.addEventListener("click", () => {
+        note.remove();
+        buildScene(billboards);
+      });
+      hostEl.appendChild(note);
+      onCleanup(() => {
+        if (note.parentNode === hostEl) hostEl.removeChild(note);
+      });
+      return;
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     hostEl.appendChild(renderer.domElement);
@@ -185,17 +253,23 @@ export function CityMap({
     camera.lookAt(0, 0, 6);
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableRotate = false;
+    // Pan with one finger (mouse: left-drag), tilt + turn with two fingers
+    // (mouse: right-drag), zoom with pinch or wheel.
+    controls.enableRotate = true;
+    controls.enablePan = true;
     controls.enableDamping = !reducedMotion;
     controls.dampingFactor = 0.08;
     controls.minDistance = 55;
     controls.maxDistance = 230;
+    // Tilt range: allow near-top-down views, never dip below the horizon.
+    controls.minPolarAngle = Math.PI * 0.12;
+    controls.maxPolarAngle = Math.PI * 0.46;
     controls.mouseButtons = {
       LEFT: THREE.MOUSE.PAN,
       MIDDLE: THREE.MOUSE.DOLLY,
-      RIGHT: THREE.MOUSE.PAN,
+      RIGHT: THREE.MOUSE.ROTATE,
     };
-    controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
+    controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
     controls.screenSpacePanning = false;
 
     // Lights
@@ -271,47 +345,297 @@ export function CityMap({
       };
     });
 
-    // Buildings — instanced white low-poly boxes on both masses
-    const buildingGeo = new THREE.BoxGeometry(1, 1, 1);
-    const buildingMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.9,
-    });
-    const COUNT = 150;
-    const buildings = new THREE.InstancedMesh(buildingGeo, buildingMat, COUNT);
+    // Landmark footprints (world coords) — buildings/trees/roads keep clear.
+    const landmarkSpots = [
+      { x: -55, z: 0, r: 16 }, // stadium
+      { x: 52, z: 8, r: 8 }, // hospital
+      { x: -58, z: -44, r: 6 }, // school
+      { x: 28, z: 41, r: 13 }, // market row
+    ];
+
+    /** True when a spot of radius `pad` is free of pins, billboards, roads, landmarks. */
+    function spotClear(x: number, z: number, pad: number): boolean {
+      if (pinsRef.current.some((p) => Math.hypot(p.x - x, p.z - z) < pad + 7))
+        return false;
+      if (boardSpots.some((sp) => Math.hypot(sp.x - x, sp.z - z) < pad + sp.r))
+        return false;
+      if (Math.abs(Math.abs(x) - ROAD_X) < pad + 4) return false;
+      if (
+        landmarkSpots.some((sp) => Math.hypot(sp.x - x, sp.z - z) < pad + sp.r)
+      )
+        return false;
+      return true;
+    }
+    function scatterX(side: number): number {
+      return side * (LAGOON_HALF + 6 + rand() * (WORLD.x - LAGOON_HALF - 12));
+    }
+    function scatterZ(margin: number): number {
+      return (rand() - 0.5) * (WORLD.z * 2 - margin);
+    }
+
     const dummy = new THREE.Object3D();
     const col = new THREE.Color();
-    let placed = 0;
-    let guard = 0;
-    while (placed < COUNT && guard++ < 4000) {
-      const side = rand() < 0.5 ? -1 : 1;
-      const x =
-        side * (LAGOON_HALF + 6 + rand() * (WORLD.x - LAGOON_HALF - 12));
-      const z = (rand() - 0.5) * (WORLD.z * 2 - 16);
-      // keep clear of pin spots
-      if (pinsRef.current.some((p) => Math.hypot(p.x - x, p.z - z) < 7))
-        continue;
-      // keep clear of billboard footprints
-      if (boardSpots.some((sp) => Math.hypot(sp.x - x, sp.z - z) < sp.r))
-        continue;
-      const w = 3 + rand() * 5;
-      const d = 3 + rand() * 5;
-      const h = 2 + rand() * (rand() < 0.12 ? 16 : 7);
-      dummy.position.set(x, 2 + h / 2, z);
-      dummy.scale.set(w, h, d);
-      dummy.rotation.y = (rand() - 0.5) * 0.3;
-      dummy.updateMatrix();
-      buildings.setMatrixAt(placed, dummy.matrix);
-      col.setHSL(0.12, 0.08, 0.88 + rand() * 0.1);
-      if (rand() < 0.08) col.setHSL(0.11, 0.75, 0.55); // danfo-yellow accents
-      buildings.setColorAt(placed, col);
-      placed++;
+    function finalizeInstances(mesh: THREE.InstancedMesh, placed: number) {
+      mesh.count = placed;
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      scene.add(mesh);
     }
-    buildings.instanceMatrix.needsUpdate = true;
-    if (buildings.instanceColor) buildings.instanceColor.needsUpdate = true;
-    scene.add(buildings);
 
-    // Palm trees — instanced cones
+    // ---- Buildings: warm houses with pyramid roofs ----
+    const HOUSE_N = 90;
+    const houseGeo = new THREE.BoxGeometry(1, 1, 1);
+    const houseMat = new THREE.MeshStandardMaterial({ roughness: 0.95 });
+    const houses = new THREE.InstancedMesh(houseGeo, houseMat, HOUSE_N);
+    const roofGeo = new THREE.ConeGeometry(1, 1, 4);
+    roofGeo.rotateY(Math.PI / 4); // square pyramid, edges axis-aligned
+    const roofMat = new THREE.MeshStandardMaterial({ roughness: 0.95 });
+    const roofs = new THREE.InstancedMesh(roofGeo, roofMat, HOUSE_N);
+    const housePalette = [0xe8cf9f, 0xc97b4e, 0xf6ecd9, 0xd9a05b, 0xe4b183];
+    const roofPalette = [0xb4502e, 0x8f4a2f, 0x6e4423, 0xa85b32];
+    let hp = 0;
+    let guard = 0;
+    while (hp < HOUSE_N && guard++ < 6000) {
+      const side = rand() < 0.5 ? -1 : 1;
+      const x = scatterX(side);
+      const z = scatterZ(16);
+      if (!spotClear(x, z, 3.5)) continue;
+      const w = 3.5 + rand() * 2.5;
+      const d = 3.5 + rand() * 2.5;
+      const h = 2.5 + rand() * 2;
+      const rot = (rand() - 0.5) * 0.3;
+      dummy.position.set(x, 3 + h / 2, z);
+      dummy.scale.set(w, h, d);
+      dummy.rotation.set(0, rot, 0);
+      dummy.updateMatrix();
+      houses.setMatrixAt(hp, dummy.matrix);
+      col.setHex(housePalette[(rand() * housePalette.length) | 0]);
+      houses.setColorAt(hp, col);
+      const rh = 1.4 + rand() * 1;
+      dummy.position.set(x, 3 + h + rh / 2 - 0.05, z);
+      dummy.scale.set(w * 0.84, rh, d * 0.84);
+      dummy.updateMatrix();
+      roofs.setMatrixAt(hp, dummy.matrix);
+      col.setHex(roofPalette[(rand() * roofPalette.length) | 0]);
+      roofs.setColorAt(hp, col);
+      hp++;
+    }
+    dummy.rotation.set(0, 0, 0);
+    finalizeInstances(houses, hp);
+    finalizeInstances(roofs, hp);
+
+    // ---- Mid-rise blocks (pale, subtle variation) ----
+    const MID_N = 60;
+    const mids = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ roughness: 0.9 }),
+      MID_N
+    );
+    const midPalette = [0xf8fafc, 0xe9eef3, 0xf3e9d7, 0xdfe8f2, 0xf5e6c4];
+    let mp = 0;
+    guard = 0;
+    while (mp < MID_N && guard++ < 6000) {
+      const side = rand() < 0.5 ? -1 : 1;
+      const x = scatterX(side);
+      const z = scatterZ(18);
+      if (!spotClear(x, z, 5)) continue;
+      const w = 5 + rand() * 4;
+      const d = 5 + rand() * 4;
+      const h = 5 + rand() * 5;
+      dummy.position.set(x, 3 + h / 2, z);
+      dummy.scale.set(w, h, d);
+      dummy.rotation.set(0, (rand() - 0.5) * 0.25, 0);
+      dummy.updateMatrix();
+      mids.setMatrixAt(mp, dummy.matrix);
+      col.setHex(midPalette[(rand() * midPalette.length) | 0]);
+      if (rand() < 0.07) col.setHex(0xf5b301); // danfo-yellow accent
+      mids.setColorAt(mp, col);
+      mp++;
+    }
+    dummy.rotation.set(0, 0, 0);
+    finalizeInstances(mids, mp);
+
+    // ---- Glass towers (island skyline) ----
+    const TOWER_N = 8;
+    const towers = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({
+        metalness: 0.35,
+        roughness: 0.35,
+      }),
+      TOWER_N
+    );
+    const towerPalette = [0x7dd3fc, 0x38bdf8, 0xa5d8ff, 0x5eb3e8];
+    let twp = 0;
+    guard = 0;
+    while (twp < TOWER_N && guard++ < 2000) {
+      const x = scatterX(1); // island only
+      const z = scatterZ(24);
+      if (!spotClear(x, z, 5.5)) continue;
+      const w = 6 + rand() * 3;
+      const d = 6 + rand() * 3;
+      const h = 13 + rand() * 6;
+      dummy.position.set(x, 3 + h / 2, z);
+      dummy.scale.set(w, h, d);
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      towers.setMatrixAt(twp, dummy.matrix);
+      col.setHex(towerPalette[(rand() * towerPalette.length) | 0]);
+      towers.setColorAt(twp, col);
+      twp++;
+    }
+    finalizeInstances(towers, twp);
+
+    // ---- Roads: gray avenues with dashed center lines ----
+    const roadMat = new THREE.MeshStandardMaterial({
+      color: 0x6b7280,
+      roughness: 1,
+    });
+    const roadGeo = new THREE.BoxGeometry(7, 0.6, WORLD.z * 2 - 24);
+    for (const side of [-1, 1] as const) {
+      const road = new THREE.Mesh(roadGeo, roadMat);
+      road.position.set(side * ROAD_X, 3.05, 0);
+      scene.add(road);
+    }
+    const dashGeo = new THREE.BoxGeometry(0.5, 0.14, 2.6);
+    const dashMat = new THREE.MeshStandardMaterial({
+      color: 0xf8fafc,
+      roughness: 0.9,
+    });
+    const dashPositions: Array<[number, number]> = [];
+    for (const side of [-1, 1] as const)
+      for (let z = -77; z <= 77; z += 7) dashPositions.push([side * ROAD_X, z]);
+    const dashes = new THREE.InstancedMesh(dashGeo, dashMat, dashPositions.length);
+    dashPositions.forEach(([x, z], i) => {
+      dummy.position.set(x, 3.42, z);
+      dummy.scale.set(1, 1, 1);
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      dashes.setMatrixAt(i, dummy.matrix);
+    });
+    finalizeInstances(dashes, dashPositions.length);
+
+    // ---- Bridges over the lagoon (merged deck + rails + pillars) ----
+    const bridgeMat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.8,
+    });
+    function buildBridge(z: number) {
+      const parts: THREE.BufferGeometry[] = [
+        paint(xg(new THREE.BoxGeometry(40, 1.4, 8), 0, 5.2, 0), 0x6b7280),
+        paint(xg(new THREE.BoxGeometry(40, 0.9, 0.35), 0, 6.35, 3.8), 0xf8fafc),
+        paint(xg(new THREE.BoxGeometry(40, 0.9, 0.35), 0, 6.35, -3.8), 0xf8fafc),
+      ];
+      for (const px of [-15, -7, 7, 15])
+        parts.push(
+          paint(xg(new THREE.CylinderGeometry(1.1, 1.4, 5.2, 8), px, 2.2, 0), 0x94a3b8)
+        );
+      const geo = mergeGeometries(parts, false)!;
+      const mesh = new THREE.Mesh(geo, bridgeMat);
+      mesh.position.z = z;
+      scene.add(mesh);
+    }
+    buildBridge(-40);
+    buildBridge(40);
+
+    // ---- Landmarks (each merged to a single draw call) ----
+    const landmarkMat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.9,
+    });
+
+    // Stadium: white oval ring + green pitch
+    {
+      const ring = new THREE.TorusGeometry(9, 2, 8, 28);
+      ring.rotateX(-Math.PI / 2);
+      const parts = [
+        paint(xg(ring, -55, 5, 0, 1.3, 1, 1), 0xf1f5f9),
+        paint(
+          xg(
+            new THREE.CircleGeometry(8.2, 24).rotateX(-Math.PI / 2),
+            -55,
+            3.12,
+            0,
+            1.28,
+            1,
+            1
+          ),
+          0x22c55e
+        ),
+      ];
+      scene.add(new THREE.Mesh(mergeGeometries(parts, false)!, landmarkMat));
+    }
+    // Hospital: white block + red cross sign
+    {
+      const parts = [
+        paint(xg(new THREE.BoxGeometry(9, 7, 8), 52, 6.5, 8), 0xffffff),
+        paint(xg(new THREE.BoxGeometry(9.6, 0.5, 8.6), 52, 10.25, 8), 0xcbd5e1),
+        paint(xg(new THREE.BoxGeometry(2.4, 0.8, 0.25), 52, 7.5, 3.9), 0xef4444),
+        paint(xg(new THREE.BoxGeometry(0.8, 2.4, 0.25), 52, 7.5, 3.9), 0xef4444),
+      ];
+      scene.add(new THREE.Mesh(mergeGeometries(parts, false)!, landmarkMat));
+    }
+    // School: sand block + pyramid roof + flag pole
+    {
+      const roof = new THREE.ConeGeometry(1, 1, 4);
+      roof.rotateY(Math.PI / 4);
+      const parts = [
+        paint(xg(new THREE.BoxGeometry(10, 4.5, 7), -58, 5.25, -44), 0xf5d78e),
+        paint(xg(roof, -58, 8.7, -44, 8.4, 2.4, 6.4), 0xb4502e),
+        paint(
+          xg(new THREE.CylinderGeometry(0.1, 0.1, 6, 6), -50.5, 6, -44),
+          0x9ca3af
+        ),
+        paint(xg(new THREE.BoxGeometry(1.7, 1, 0.08), -49.5, 8.4, -44), 0x16a34a),
+      ];
+      scene.add(new THREE.Mesh(mergeGeometries(parts, false)!, landmarkMat));
+    }
+    // Market: 4 stalls — instanced counters + posts + striped awnings
+    {
+      const stallZ = [32, 38, 44, 50];
+      const counters = new THREE.InstancedMesh(
+        new THREE.BoxGeometry(3, 1.1, 1.8),
+        new THREE.MeshStandardMaterial({ roughness: 0.95 }),
+        stallZ.length
+      );
+      const posts = new THREE.InstancedMesh(
+        new THREE.CylinderGeometry(0.1, 0.1, 2.6, 6),
+        new THREE.MeshStandardMaterial({ roughness: 0.95 }),
+        stallZ.length * 4
+      );
+      const awnings = new THREE.InstancedMesh(
+        new THREE.BoxGeometry(3.8, 0.22, 2.8),
+        new THREE.MeshStandardMaterial({ map: makeStripeTexture(), roughness: 0.9 }),
+        stallZ.length
+      );
+      stallZ.forEach((z, i) => {
+        dummy.rotation.set(0, 0, 0);
+        dummy.position.set(28, 3.55, z);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        counters.setMatrixAt(i, dummy.matrix);
+        col.setHex(0xb07a45).offsetHSL(0, 0, (rand() - 0.5) * 0.06);
+        counters.setColorAt(i, col);
+        dummy.position.set(28, 5.9, z);
+        dummy.rotation.set(-0.12, 0, 0);
+        dummy.updateMatrix();
+        awnings.setMatrixAt(i, dummy.matrix);
+        for (let k = 0; k < 4; k++) {
+          dummy.rotation.set(0, 0, 0);
+          dummy.position.set(28 + (k < 2 ? -1.6 : 1.6), 4.3, z + (k % 2 ? -1.1 : 1.1));
+          dummy.updateMatrix();
+          posts.setMatrixAt(i * 4 + k, dummy.matrix);
+          col.setHex(0x7c4a2d);
+          posts.setColorAt(i * 4 + k, col);
+        }
+      });
+      dummy.rotation.set(0, 0, 0);
+      finalizeInstances(counters, stallZ.length);
+      finalizeInstances(posts, stallZ.length * 4);
+      finalizeInstances(awnings, stallZ.length);
+    }
+
+    // Palm trees — instanced cones (existing look)
     const treeGeo = new THREE.ConeGeometry(1.6, 5, 6);
     const treeMat = new THREE.MeshStandardMaterial({
       color: 0x16a34a,
@@ -321,13 +645,11 @@ export function CityMap({
     const trees = new THREE.InstancedMesh(treeGeo, treeMat, TREES);
     let tp = 0;
     guard = 0;
-    while (tp < TREES && guard++ < 2000) {
+    while (tp < TREES && guard++ < 3000) {
       const side = rand() < 0.5 ? -1 : 1;
-      const x =
-        side * (LAGOON_HALF + 4 + rand() * (WORLD.x - LAGOON_HALF - 10));
-      const z = (rand() - 0.5) * (WORLD.z * 2 - 12);
-      if (pinsRef.current.some((p) => Math.hypot(p.x - x, p.z - z) < 6))
-        continue;
+      const x = scatterX(side);
+      const z = scatterZ(12);
+      if (!spotClear(x, z, 1.5)) continue;
       const s = 0.7 + rand() * 0.9;
       dummy.position.set(x, 3 + 2.2 * s, z);
       dummy.scale.setScalar(s);
@@ -336,8 +658,44 @@ export function CityMap({
       trees.setMatrixAt(tp, dummy.matrix);
       tp++;
     }
-    trees.instanceMatrix.needsUpdate = true;
-    scene.add(trees);
+    finalizeInstances(trees, tp);
+
+    // Leafy trees — instanced trunks + icosahedron canopies
+    const LEAFY = 55;
+    const trunkGeo = new THREE.CylinderGeometry(0.35, 0.55, 2.6, 6);
+    const trunkMat = new THREE.MeshStandardMaterial({ roughness: 1 });
+    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, LEAFY);
+    const canopyGeo = new THREE.IcosahedronGeometry(2.4, 0);
+    const canopyMat = new THREE.MeshStandardMaterial({ roughness: 1 });
+    const canopies = new THREE.InstancedMesh(canopyGeo, canopyMat, LEAFY);
+    const leafPalette = [0x16a34a, 0x22c55e, 0x15803d, 0x4ade80];
+    let lp = 0;
+    guard = 0;
+    while (lp < LEAFY && guard++ < 3000) {
+      const side = rand() < 0.5 ? -1 : 1;
+      const x = scatterX(side);
+      const z = scatterZ(12);
+      if (!spotClear(x, z, 1.5)) continue;
+      const s = 0.75 + rand() * 0.8;
+      dummy.rotation.set(0, 0, 0);
+      dummy.position.set(x, 3 + 1.3 * s, z);
+      dummy.scale.setScalar(s);
+      dummy.updateMatrix();
+      trunks.setMatrixAt(lp, dummy.matrix);
+      col.setHex(0x8b5a2b);
+      trunks.setColorAt(lp, col);
+      dummy.position.set(x, 3 + (2.6 + 1.2) * s, z);
+      dummy.scale.set(s, s * 0.9, s);
+      dummy.rotation.set(0, rand() * Math.PI, 0);
+      dummy.updateMatrix();
+      canopies.setMatrixAt(lp, dummy.matrix);
+      col.setHex(leafPalette[(rand() * leafPalette.length) | 0]);
+      canopies.setColorAt(lp, col);
+      lp++;
+    }
+    dummy.rotation.set(0, 0, 0);
+    finalizeInstances(trunks, lp);
+    finalizeInstances(canopies, lp);
 
     // Region labels
     const labelData: Array<[string, number, number]> = [
@@ -354,35 +712,50 @@ export function CityMap({
       spr.position.set(x, 9, z);
       scene.add(spr);
     }
+    // Landmark labels
+    const landmarkLabels: Array<[string, number, number, number]> = [
+      ["STADIUM", -55, 13.5, 0],
+      ["HOSPITAL", 52, 14.5, 8],
+      ["SCHOOL", -58, 13, -44],
+      ["MARKET", 28, 11.5, 41],
+    ];
+    for (const [text, x, y, z] of landmarkLabels) {
+      const tex = makeLabelTexture(text);
+      const spr = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false })
+      );
+      spr.scale.set(19, 3.6, 1);
+      spr.position.set(x, y, z);
+      scene.add(spr);
+    }
 
-    // Boats drifting on the lagoon
+    // Sailboats on the lagoon — merged hull + mast + triangular sail each
     const boats: THREE.Mesh[] = [];
-    const hullMat = new THREE.MeshStandardMaterial({
-      color: 0xf59e0b,
+    const boatMat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
       roughness: 0.8,
-    });
-    const sailMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.9,
       side: THREE.DoubleSide,
     });
-    for (let i = 0; i < 3; i++) {
-      const boat = new THREE.Group();
-      const hull = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1, 1.4), hullMat);
-      const sail = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.6, 2.2),
-        sailMat
-      );
-      sail.position.set(0, 1.8, 0);
-      boat.add(hull, sail);
-      boat.position.set(
-        (rand() - 0.5) * (LAGOON_HALF * 1.4),
-        1.1,
-        -60 + i * 55
-      );
+    const sailShape = new THREE.Shape();
+    sailShape.moveTo(0, 0);
+    sailShape.lineTo(0, 2.6);
+    sailShape.lineTo(1.8, 0.4);
+    sailShape.closePath();
+    const hullPalette = [0xef4444, 0x3b82f6, 0x22c55e, 0xf59e0b, 0xf8fafc, 0xf97316];
+    const boatZ = [-62, -32, -14, 10, 28, 58];
+    boatZ.forEach((z0, i) => {
+      const parts = [
+        paint(xg(new THREE.BoxGeometry(3.6, 1.1, 1.6), 0, 0.55, 0), hullPalette[i]),
+        paint(xg(new THREE.CylinderGeometry(0.09, 0.12, 3.2, 6), 0.3, 2.7, 0), 0x8b5a2b),
+        paint(xg(new THREE.ShapeGeometry(sailShape), 0.3, 1.6, 0), 0xfff7e6),
+      ];
+      const boat = new THREE.Mesh(mergeGeometries(parts, false)!, boatMat);
+      boat.position.set((rand() - 0.5) * 16, 0.7, z0);
+      boat.userData.z0 = z0;
+      boat.userData.phase = rand() * Math.PI * 2;
       scene.add(boat);
-      boats.push(boat as unknown as THREE.Mesh);
-    }
+      boats.push(boat);
+    });
 
     // Pins
     const pinGroup = new THREE.Group();
@@ -558,10 +931,13 @@ export function CityMap({
         for (const s of pinSprites) {
           s.position.y = 10 + Math.sin(t * 2 + s.userData.phase) * 0.7;
         }
-        // Boats drift
+        // Sailboats drift and bob
         boats.forEach((b, i) => {
-          b.position.z += Math.sin(t * 0.3 + i * 2) * 0.008;
-          b.rotation.z = Math.sin(t * 1.2 + i) * 0.06;
+          const ph = b.userData.phase as number;
+          b.position.z = (b.userData.z0 as number) + Math.sin(t * 0.25 + ph) * 2.2;
+          b.position.y = 0.7 + Math.sin(t * 1.3 + ph) * 0.15;
+          b.rotation.z = Math.sin(t * 1.1 + i) * 0.05;
+          b.rotation.y = Math.sin(t * 0.2 + ph) * 0.3;
         });
         controls.update();
       }
