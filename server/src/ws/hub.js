@@ -155,7 +155,8 @@ export function createHub({ getDay }) {
       y: conn.pos.lng,
       lat: conn.pos.lat,
       lng: conn.pos.lng,
-      furniture: (conn.furniture || []).map(r => ({ id: r.id, item: r.item, placed: !!Number(r.placed) })),
+      furniture: (conn.furniture || []).map(r => ({ id: r.id, item: r.item, placed: !!Number(r.placed),
+        x: r.x == null ? null : Number(r.x), z: r.z == null ? null : Number(r.z), rot: r.rot == null ? null : Number(r.rot) })),
       is_admin: !!Number(conn.user.is_admin),
       guest: !!Number(conn.user.is_guest),
     };
@@ -402,7 +403,7 @@ export function createHub({ getDay }) {
   }
 
   // ---- M3: offline day economy — business income, savings/loan interest and
-  // placed-generator happiness are DB-credited for players who are offline.
+  // placed-furniture day-hook happiness are DB-credited for players who are offline.
   // Online players get the same treatment live via settleDayEconomy.
   async function settleOfflineEconomy() {
     let chars;
@@ -411,13 +412,19 @@ export function createHub({ getDay }) {
     } catch (e) { console.error('[economy] listCharacters:', e.message); return; }
     let furn = [];
     try { furn = await listAllPlacedFurniture(); } catch (e) { console.error('[economy] furniture:', e.message); }
-    const genOwners = new Set(furn.filter(f => f.item === 'gen').map(f => Number(f.owner_id)));
+    // placed furniture day hooks (gen/drum/mirror, ...) apply per owner
+    const placedByOwner = new Map();
+    for (const f of furn) {
+      const k = Number(f.owner_id);
+      if (!placedByOwner.has(k)) placedByOwner.set(k, []);
+      placedByOwner.get(k).push(f.item);
+    }
     for (const ch of chars) {
       const userId = Number(ch.user_id);
       if (online.has(userId)) continue; // handled live
       const bizDef = (ch.biz && BIZ[ch.biz]) || null;
       const propDef = (ch.property && PROPERTIES[ch.property]) || null;
-      const placed = genOwners.has(userId) ? ['gen'] : [];
+      const placed = placedByOwner.get(userId) || [];
       const res = applyDayEconomy(ch, { bizDef, propDef, placed });
       if (!res.dirty) continue;
       try {
