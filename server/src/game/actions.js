@@ -19,9 +19,29 @@ import {
   playerElectionState,
 } from './elections.js';
 import {
-  addTransaction, saveCharacter,
+  addTransaction, saveCharacter, getMeta,
   addFurniture, listFurniture, getFurnitureById, setFurniturePlaced, countPlacedFurniture,
 } from '../db.js';
+// V2 milestones: delegated intent modules (M7 shifts, M8 needs, M9 daily,
+// M10 economy, M11 governance, M12 skills). Wired into handleAct below.
+import { INTENTS as M7_INTENTS } from './v2/m7.js';
+import { INTENTS as M8_INTENTS, triggerMoodlet } from './v2/m8.js';
+import { INTENTS as M9_INTENTS } from './v2/m9.js';
+import * as m10 from './v2/m10.js';
+import { INTENTS as M11_INTENTS } from './v2/m11.js';
+import { INTENTS as M12_INTENTS, m12YouSnapshot } from './v2/m12.js';
+// M8: modest fun restoration per food item (FOOD table untouched).
+const M8_FOOD_FUN = { mama_put: 4, agege_bread: 3, suya: 6, ofada: 5, shawarma: 8 };
+const M8_EAT_MOODLET = { suya: 'suya_spice_rush', ofada: 'food_coma', shawarma: 'shawarma_charge' };
+const M8_FUN_MOODLET = { beach_day: 'beach_bliss', owambe: 'owambe_euphoria', arcade: 'arcade_in_the_zone', cinema: 'movie_afterglow', club_night: 'club_hangover' };
+
+// M11: governor market policy multiplier (1 = no-op).
+async function marketMult() {
+  try {
+    const v = Number(await getMeta('market_mult'));
+    return v > 0 && v <= 10 ? v : 1;
+  } catch { return 1; }
+}
 
 const naira = (n) => '₦' + Number(n).toLocaleString('en-NG');
 
@@ -43,9 +63,16 @@ function harden(c) {
   c.health = clamp(c.health, 0, 100);
   c.happiness = clamp(c.happiness, 0, 100);
   c.hunger = clamp(c.hunger, 0, 100);
+  c.fun = clamp(c.fun, 0, 100); // M8
+  c.social = clamp(c.social, 0, 100); // M8
+  c.hygiene = clamp(c.hygiene, 0, 100); // M8
+  c.bladder = clamp(c.bladder, 0, 100); // M8
   c.savings = Math.max(0, Math.floor(Number(c.savings) || 0));
   c.loan = Math.max(0, Math.floor(Number(c.loan) || 0));
   c.loan_free = Number(c.loan_free) ? 1 : 0;
+  c.perk_stars = Math.max(0, Math.floor(Number(c.perk_stars) || 0)); // M9
+  c.housing_owned = Number(c.housing_owned) ? 1 : 0; // M10
+  // M7 shift fields: keep as-is (validated on read); M12 skills JSON untouched.
 }
 
 async function refreshFurniture(conn) {
@@ -94,7 +121,10 @@ export async function handleAct(ctx, msg) {
       await addTransaction(conn.user.id, kind, Math.floor(amount), c.money, meta);
     }
     await saveCharacter(c);
-    const out = { t: 'you', you: youSnapshot(conn) };
+    // M12: merge skills/academy snapshot (defensive — never breaks the push).
+    let extra = {};
+    try { extra = await m12YouSnapshot(conn); } catch { extra = {}; }
+    const out = { t: 'you', you: { ...youSnapshot(conn), ...extra } };
     if (note) out.note = note;
     send(conn, out);
   };
@@ -102,30 +132,24 @@ export async function handleAct(ctx, msg) {
   const a = msg && typeof msg.a === 'string' ? msg.a : null;
   if (!a) { err('Unknown action.'); return; }
 
-  // ---------- work ----------
+  // ---------- M7: shifts (shift_start / shift_leave / shift_status) ----------
+  if (M7_INTENTS[a]) {
+    await M7_INTENTS[a]({ conn, send, broadcast, youSnapshot, err, commit, now, getDay: ctx.getDay }, msg);
+    return;
+  }
+
+  // ---------- work (M7: instant work retired — shifts only) ----------
+  // The old instant-pay `work` is replaced by 1-hour shifts (see v2/m7.js).
+  // Mapping work→shift_start was rejected: silently starting a 1-hour
+  // commitment from a tap that used to pay instantly would confuse
+  // players; the error points them at the new flow instead.
   if (a === 'work') {
-    const job = JOBS.find(j => j.id === String(msg.job));
-    if (!job) { err('Unknown job.'); return; }
-    if (c.location_id !== job.locationId) {
-      err(`Go to ${locName(job.locationId)} to work as ${job.name}.`); return;
-    }
-    if (job.certRequired && !Number(c.cert)) {
-      err('You need a certificate for this job. Study first.'); return;
-    }
-    const left = cdLeft('work:' + job.id);
-    if (left) { err(`Rest small — ${job.name} available in ${left}s.`); return; }
-    if (Number(c.energy) < job.energyCost) { err('Too tired. Eat or sleep first.'); return; }
-    const mult = (CLASSES[c.class] || CLASSES.street_smart).payMult || 1;
-    const pay = Math.floor(job.pay * mult);
-    conn.cds['work:' + job.id] = now + job.cooldownSec * 1000;
-    c.energy = clamp(Number(c.energy) - job.energyCost, 0, 100);
-    c.money = Math.floor(Number(c.money)) + pay;
-    console.log(`[act] ${conn.user.username} worked ${job.id} → +${naira(pay)} (mult ${mult})`);
-    await commit({ kind: 'work_pay', amount: pay, meta: { job: job.id }, note: `+${naira(pay)} — ${job.name} shift done 💪` });
+    err('Work is now 1-hour shifts — clock in from the Jobs tab. Pay lands when your shift completes.');
     return;
   }
 
   // ---------- eat (fridge hook: +15 hunger) ----------
+  // M8: tasty food also restores fun; signature dishes trigger moodlets.
   if (a === 'eat') {
     const f = FOOD.find(x => x.id === String(msg.item));
     if (!f) { err('Unknown food.'); return; }
@@ -135,12 +159,15 @@ export async function handleAct(ctx, msg) {
     c.hunger = clamp(Number(c.hunger) + f.hunger + fx.eat.hunger, 0, 100);
     c.energy = clamp(Number(c.energy) + f.energy, 0, 100);
     c.happiness = clamp(Number(c.happiness) + f.happy + fx.eat.happiness, 0, 100);
+    c.fun = clamp(Number(c.fun) + (M8_FOOD_FUN[f.id] || 0), 0, 100); // M8
     console.log(`[act] ${conn.user.username} ate ${f.id} (−${naira(f.cost)})`);
-    await commit({ kind: 'food', amount: -f.cost, meta: { item: f.id }, note: `${f.icon} ${f.name} devoured.` });
+    const m8note = await triggerMoodlet(conn.user.id, M8_EAT_MOODLET[f.id]); // M8
+    await commit({ kind: 'food', amount: -f.cost, meta: { item: f.id }, note: `${f.icon} ${f.name} devoured.${m8note ? ' ' + m8note : ''}` });
     return;
   }
 
   // ---------- fun (tv/sofa hooks: +happiness) ----------
+  // M8: also restores the fun need; owambe parties restore social too.
   if (a === 'fun') {
     const f = FUN.find(x => x.id === String(msg.what));
     if (!f) { err('Unknown fun.'); return; }
@@ -153,12 +180,16 @@ export async function handleAct(ctx, msg) {
     c.money = Math.floor(Number(c.money)) - f.cost;
     c.happiness = clamp(Number(c.happiness) + f.happy + fx.fun.happiness, 0, 100);
     c.energy = clamp(Number(c.energy) + f.energyDelta, 0, 100);
+    c.fun = clamp(Number(c.fun) + f.happy, 0, 100); // M8: fun outings restore the fun need
+    if (f.id === 'owambe') c.social = clamp(Number(c.social) + 25, 0, 100); // M8: parties are social
     console.log(`[act] ${conn.user.username} did ${f.id} (−${naira(f.cost)})`);
-    await commit({ kind: 'fun', amount: -f.cost, meta: { what: f.id }, note: `${f.icon} ${f.name} — vibes restored ✨` });
+    const m8note = await triggerMoodlet(conn.user.id, M8_FUN_MOODLET[f.id]); // M8
+    await commit({ kind: 'fun', amount: -f.cost, meta: { what: f.id }, note: `${f.icon} ${f.name} — vibes restored ✨${m8note ? ' ' + m8note : ''}` });
     return;
   }
 
   // ---------- sleep (bed hook: +20 health, AC hook: +10 happiness) ----------
+  // M8: energy full; bladder −20, hygiene −5 (sleeping in clothes…).
   if (a === 'sleep') {
     const left = cdLeft('sleep');
     if (left) { err(`You just slept. Try again in ${left}s.`); return; }
@@ -168,18 +199,23 @@ export async function handleAct(ctx, msg) {
     c.hunger = clamp(Number(c.hunger) - 15, 0, 100);
     c.health = clamp(Number(c.health) + 10 + fx.sleep.health, 0, 100);
     c.happiness = clamp(Number(c.happiness) + fx.sleep.happiness, 0, 100);
+    c.bladder = clamp(Number(c.bladder) - 20, 0, 100); // M8
+    c.hygiene = clamp(Number(c.hygiene) - 5, 0, 100); // M8
     console.log(`[act] ${conn.user.username} slept (energy → 100)`);
-    await commit({ note: '😴 Fully rested.' });
+    const m8note = await triggerMoodlet(conn.user.id, 'home_sweet_home'); // M8
+    await commit({ note: `😴 Fully rested.${m8note ? ' ' + m8note : ''}` });
     return;
   }
 
   // ---------- rest ----------
+  // M8: also restores a little fun.
   if (a === 'rest') {
     const left = cdLeft('rest'); // 30s soft anti-spam cooldown
     if (left) { err(`Catch your breath — rest again in ${left}s.`); return; }
     conn.cds.rest = now + 30 * 1000;
     c.energy = clamp(Number(c.energy) + 15, 0, 100);
-    await commit({ note: '😌 Rested a little. (+15 energy)' });
+    c.fun = clamp(Number(c.fun) + 10, 0, 100); // M8
+    await commit({ note: '😌 Rested a little. (+15 energy, +10 fun)' });
     return;
   }
 
@@ -198,11 +234,13 @@ export async function handleAct(ctx, msg) {
     conn.pos = { lat: loc.x, lng: loc.y }; // M1 wire convention: lat=x, lng=y
     conn.lastMove = { x: loc.x, y: loc.y, t: Date.now() }; // anti-cheat baseline
     console.log(`[act] ${conn.user.username} traveled → ${loc.id} (fare ${naira(fare)})`);
+    const m8travelNote = await triggerMoodlet(conn.user.id, 'road_trip'); // M8
+    const travelNote = `🗺️ Traveled to ${loc.name}${fare > 0 ? ` (${naira(fare)} fare)` : ''}.${m8travelNote ? ' ' + m8travelNote : ''}`;
     await commit({
       kind: fare > 0 ? 'travel' : null,
       amount: fare > 0 ? -fare : 0,
       meta: fare > 0 ? { from: fromId, to: loc.id } : null,
-      note: `🗺️ Traveled to ${loc.name}${fare > 0 ? ` (${naira(fare)} fare)` : ''}.`,
+      note: travelNote,
     });
     broadcast({ t: 'mv', id: conn.user.id, lat: loc.x, lng: loc.y });
     return;
@@ -234,6 +272,7 @@ export async function handleAct(ctx, msg) {
     }
     if (c.housing === h.id) { err('You already live there.'); return; }
     c.housing = h.id;
+    c.housing_owned = 0; // M10: moving forfeits rent-to-own status
     c.rent_misses = 0;
     console.log(`[act] ${conn.user.username} rented ${h.id}`);
     await commit({ note: `🏠 Lease signed: ${h.name} — ${naira(h.rent)}/day rent.` });
@@ -245,12 +284,13 @@ export async function handleAct(ctx, msg) {
     const p = PROPERTIES[String(msg.property)];
     if (!p) { err('Unknown property.'); return; }
     if (c.property === p.id) { err('You already own this property.'); return; }
-    if (Number(c.money) < p.price) { err(`You need ${naira(p.price)} for the ${p.name}.`); return; }
-    c.money = Math.floor(Number(c.money)) - p.price;
+    const price = Math.ceil(p.price * await marketMult()); // M11: Market Boom policy
+    if (Number(c.money) < price) { err(`You need ${naira(price)} for the ${p.name}.`); return; }
+    c.money = Math.floor(Number(c.money)) - price;
     c.property = p.id;
-    console.log(`[act] ${conn.user.username} bought property ${p.id} (−${naira(p.price)})`);
+    console.log(`[act] ${conn.user.username} bought property ${p.id} (−${naira(price)})`);
     await commit({
-      kind: 'buy_property', amount: -p.price, meta: { property: p.id },
+      kind: 'buy_property', amount: -price, meta: { property: p.id },
       note: `${p.icon} You now own the ${p.name}! +${p.happy} happiness every day.`,
     });
     return;
@@ -261,12 +301,13 @@ export async function handleAct(ctx, msg) {
     const b = BIZ[String(msg.biz)];
     if (!b) { err('Unknown business.'); return; }
     if (c.biz) { err('You already own a business. One empire at a time!'); return; }
-    if (Number(c.money) < b.cost) { err(`You need ${naira(b.cost)} to open this.`); return; }
-    c.money = Math.floor(Number(c.money)) - b.cost;
+    const cost = Math.ceil(b.cost * await marketMult()); // M11: Market Boom policy
+    if (Number(c.money) < cost) { err(`You need ${naira(cost)} to open this.`); return; }
+    c.money = Math.floor(Number(c.money)) - cost;
     c.biz = b.id;
-    console.log(`[act] ${conn.user.username} bought biz ${b.id} (−${naira(b.cost)})`);
+    console.log(`[act] ${conn.user.username} bought biz ${b.id} (−${naira(cost)})`);
     await commit({
-      kind: 'buy_biz', amount: -b.cost, meta: { biz: b.id },
+      kind: 'buy_biz', amount: -cost, meta: { biz: b.id },
       note: `${b.icon} You now own a ${b.name}! Income lands every game day.`,
     });
     return;
@@ -277,12 +318,13 @@ export async function handleAct(ctx, msg) {
     const v = VEHICLES[String(msg.v)];
     if (!v || v.id === 'none') { err('Unknown vehicle.'); return; }
     if (c.vehicle === v.id) { err('You already own this.'); return; }
-    if (Number(c.money) < v.cost) { err(`You need ${naira(v.cost)}.`); return; }
-    c.money = Math.floor(Number(c.money)) - v.cost;
+    const cost = Math.ceil(v.cost * await marketMult()); // M11: Market Boom policy
+    if (Number(c.money) < cost) { err(`You need ${naira(cost)}.`); return; }
+    c.money = Math.floor(Number(c.money)) - cost;
     c.vehicle = v.id;
-    console.log(`[act] ${conn.user.username} bought vehicle ${v.id} (−${naira(v.cost)})`);
+    console.log(`[act] ${conn.user.username} bought vehicle ${v.id} (−${naira(cost)})`);
     await commit({
-      kind: 'buy_vehicle', amount: -v.cost, meta: { vehicle: v.id },
+      kind: 'buy_vehicle', amount: -cost, meta: { vehicle: v.id },
       note: `${v.icon} ${v.name} acquired! You move ${v.mult}x faster.`,
     });
     return;
@@ -297,7 +339,8 @@ export async function handleAct(ctx, msg) {
       c.money = Math.floor(Number(c.money)) - amt;
       c.savings = Math.floor(Number(c.savings)) + amt;
       console.log(`[act] ${conn.user.username} deposited ${naira(amt)}`);
-      await commit({ kind: 'deposit', amount: -amt, meta: { op: 'deposit', savings: c.savings }, note: `🏦 Deposited ${naira(amt)}. Savings earn 2%/day.` });
+      const m8saveNote = await triggerMoodlet(conn.user.id, 'saving_discipline'); // M8
+      await commit({ kind: 'deposit', amount: -amt, meta: { op: 'deposit', savings: c.savings }, note: `🏦 Deposited ${naira(amt)}. Savings earn 2%/day.${m8saveNote ? ' ' + m8saveNote : ''}` });
       return;
     }
     if (msg.op === 'withdraw') {
@@ -339,7 +382,8 @@ export async function handleAct(ctx, msg) {
     c.loan_free = 0; // normal loans always carry 10%/day interest
     c.money = Math.floor(Number(c.money)) + amt;
     console.log(`[act] ${conn.user.username} took loan ${naira(amt)}`);
-    await commit({ kind: 'loan', amount: amt, meta: { rate: BANK.loanRate }, note: `🏦 Loan of ${naira(amt)} approved. 10% daily interest — repay fast!` });
+    const m8loanNote = await triggerMoodlet(conn.user.id, 'debt_dread'); // M8
+    await commit({ kind: 'loan', amount: amt, meta: { rate: BANK.loanRate }, note: `🏦 Loan of ${naira(amt)} approved. 10% daily interest — repay fast!${m8loanNote ? ' ' + m8loanNote : ''}` });
     return;
   }
 
@@ -354,9 +398,10 @@ export async function handleAct(ctx, msg) {
     c.loan = Math.floor(Number(c.loan)) - pay;
     if (c.loan <= 0) c.loan_free = 0; // no outstanding loan → the 0% flag lapses
     console.log(`[act] ${conn.user.username} repaid ${naira(pay)}`);
+    const m8repayNote = c.loan <= 0 ? await triggerMoodlet(conn.user.id, 'debt_free') : null; // M8
     await commit({
       kind: 'repay', amount: -pay, meta: { remaining: c.loan },
-      note: c.loan > 0 ? `Repaid ${naira(pay)}. ${naira(c.loan)} left.` : '🎉 Loan fully repaid!',
+      note: c.loan > 0 ? `Repaid ${naira(pay)}. ${naira(c.loan)} left.` : `🎉 Loan fully repaid!${m8repayNote ? ' ' + m8repayNote : ''}`,
     });
     return;
   }
@@ -365,13 +410,14 @@ export async function handleAct(ctx, msg) {
   if (a === 'buy_furniture') {
     const item = FURN[String(msg.item)];
     if (!item) { err('Unknown furniture.'); return; }
-    if (Number(c.money) < item.price) { err(`You need ${naira(item.price)} for the ${item.name}.`); return; }
-    c.money = Math.floor(Number(c.money)) - item.price;
+    const price = Math.ceil(item.price * await marketMult()); // M11: Market Boom policy
+    if (Number(c.money) < price) { err(`You need ${naira(price)} for the ${item.name}.`); return; }
+    c.money = Math.floor(Number(c.money)) - price;
     const fid = await addFurniture(conn.user.id, item.id);
     await refreshFurniture(conn);
-    console.log(`[act] ${conn.user.username} bought furniture ${item.id} (−${naira(item.price)})`);
+    console.log(`[act] ${conn.user.username} bought furniture ${item.id} (−${naira(price)})`);
     await commit({
-      kind: 'buy_furniture', amount: -item.price, meta: { item: item.id, furniture_id: fid },
+      kind: 'buy_furniture', amount: -price, meta: { item: item.id, furniture_id: fid },
       note: `${item.icon} ${item.name} added to your inventory. Place it at home!`,
     });
     return;
@@ -490,6 +536,36 @@ export async function handleAct(ctx, msg) {
     return;
   }
 
+  // ---------- V2 milestones: delegated intents ----------
+  // M8 (moodlets), M9 (hunt/hustle/perks), M10 (economy), M11 (governance),
+  // M12 (skills/academy). Modules own their tables and intents per the
+  // v2/README contract; delegation order only matters for logging.
+  {
+    const v2api = {
+      conn, send, broadcast, youSnapshot, err, commit, now,
+      getDay: ctx.getDay,
+      getGovernorId: ctx.getGovernorId,
+      pushNews: ctx.pushNews,
+      pushElectionAll: ctx.pushElectionAll,
+      pushTo: ctx.pushYou, // M10 alias
+      pushYou: ctx.pushYou,
+      social: ctx.social,
+    };
+    const bundles = [M8_INTENTS, M9_INTENTS, M11_INTENTS, M12_INTENTS];
+    let handled = false;
+    for (const bundle of bundles) {
+      if (bundle[a]) { await bundle[a](v2api, msg); handled = true; break; }
+    }
+    if (!handled && m10.INTENTS[a]) {
+      await m10.INTENTS[a](v2api, msg);
+      for (const uid of m10.takePendingOwnerRefresh()) {
+        try { await v2api.pushYou(uid); } catch (e) { console.error('[m10] pushYou:', e.message); }
+      }
+      handled = true;
+    }
+    if (handled) return;
+  }
+
   err('Unknown action.');
 }
 
@@ -539,6 +615,13 @@ export async function collectSpawn(ctx, spawnId) {
 export async function settleDayRent(ctx, conn) {
   const { send, youSnapshot } = ctx;
   const c = conn.character;
+  if (Number(c.housing_owned) === 1) {
+    // M10 rent-to-own: owned housing pays no rent.
+    await saveCharacter(c);
+    send(conn, { t: 'you', you: youSnapshot(conn) });
+    console.log(`[rent] ${conn.user.username}: owned (housing=${c.housing}) — no rent`);
+    return { ok: true, owned: true };
+  }
   const res = chargeRent(c, HOUSING);
   const h = HOUSING[c.housing] || HOUSING.face_me;
 

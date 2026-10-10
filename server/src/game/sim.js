@@ -11,19 +11,13 @@ export function clamp(n, lo, hi) {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
-// ---- Needs decay (runs once per 60s tick) ----
-// hunger −3 per tick; when hunger hits 0 the character is starving:
-// energy −5, happiness −5, health −2 per tick. All stats clamp 0–100.
-export function decayTick(char) {
-  char.hunger = clamp(char.hunger - 3, 0, 100);
-  const starving = Number(char.hunger) <= 0;
-  if (starving) {
-    char.energy = clamp(char.energy - 5, 0, 100);
-    char.happiness = clamp(char.happiness - 5, 0, 100);
-    char.health = clamp(char.health - 2, 0, 100);
-  }
-  return { starving };
-}
+// ---- Needs decay (runs once per 60s tick) — M8: six needs ----
+// Canonical implementation lives in v2/m8.js (decayTick + DECAY_RATES +
+// collectEffects + decayMultiplier). New signature: decayTick(char, mods)
+// with mods = { moodlets: [], perks: [] } honoring the M8↔M9 effect contract
+// (decay_slow / decay_all / stat_boost / stat_drain; malformed ignored).
+// Returns { starving, desperate, grimy, lonely, bored }.
+export { decayTick, DECAY_RATES } from './v2/m8.js';
 
 // ---- Daily rent settlement (runs once per game day) ----
 // Pure: deducts rent from char.money when affordable, otherwise tracks
