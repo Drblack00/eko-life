@@ -25,6 +25,15 @@ export function App() {
   const [gateError, setGateError] = useState("");
   /** Guest session token to migrate when a guest upgrades to a full account. */
   const [upgradeToken, setUpgradeToken] = useState<string | null>(null);
+  /** W3: referral code from a ?ref= invite link — read once at boot. */
+  const [referralCode] = useState<string | null>(() => {
+    try {
+      const c = new URLSearchParams(window.location.search).get("ref")?.trim();
+      return c || null;
+    } catch {
+      return null;
+    }
+  });
 
   const go = (v: View) => {
     setView(v);
@@ -108,6 +117,7 @@ export function App() {
         <Auth
           initialTab={authTab}
           guestToken={upgradeToken}
+          referralCode={referralCode}
           onBack={() => {
             setUpgradeToken(null);
             go(upgradeToken ? "game" : "landing");
