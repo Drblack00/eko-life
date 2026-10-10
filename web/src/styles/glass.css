@@ -167,8 +167,10 @@
   box-shadow: var(--glass-shadow), var(--glass-inset);
 }
 
-/* Active tab: keeps the green pill identity, now with a glass sheen. */
-.eko-game .eko-tabs__btn--active {
+/* Liquid active-tab indicator: the green glass pill that FLIP-slides
+   between tab buttons (geometry + animation in Game.css / Game.tsx).
+   Buttons themselves stay transparent; this pill sits behind the active one. */
+.eko-game .eko-tabs__pill {
   background:
     linear-gradient(180deg, rgb(255 255 255 / 0.30), transparent 50%),
     var(--glass-tint-green);
@@ -277,7 +279,7 @@
   }
   .glass--tint-green,
   .eko-btn.eko-btn--primary,
-  .eko-game .eko-tabs__btn--active {
+  .eko-game .eko-tabs__pill {
     background: var(--palm-600);
     color: #fff;
     -webkit-backdrop-filter: none;
@@ -304,5 +306,114 @@
   [data-theme="night"] .eko-game .eko-hint {
     background: #2a2113;
     color: #fde68a;
+  }
+}
+
+/* ============ Interactive Liquid Glass (touch responsiveness) ============
+ * Original motion language for the frosted materials above:
+ *  - Press states: every glass button/pill scales down slightly, brightens
+ *    its specular highlight and deepens its blur while held, then springs
+ *    back with an overshoot easing — iOS-style tactile feedback.
+ *  - Liquid tab pill: the active-tab indicator is a single pill that
+ *    FLIP-slides between tabs with a mid-flight liquid stretch
+ *    (see Game.tsx — WAAPI, transform-only). will-change is set on the
+ *    pill by JS only while it is animating, never statically.
+ * All motion is transform/filter only (no layout thrash); blur bumps are
+ * transient press states. prefers-reduced-motion disables the spring and
+ * the pill slide — state changes become instant.
+ */
+
+/* Spring release for every tactile glass control. These selectors outrank
+   the component stylesheets (glass.css loads first) so the press language
+   is consistent across buttons, tabs, handles and pills. */
+.eko-btn.eko-btn,
+.eko-tabs .eko-tabs__btn,
+.eko-room__tabs .eko-room__tab,
+.eko-room__sheet .eko-room__sheet-handle,
+button.glass,
+a.glass,
+[role="button"].glass,
+.eko-hud__gov,
+.eko-hint {
+  transition:
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease;
+}
+
+/* Press: held state — scale down, brighten specular, deepen blur. */
+.eko-btn.eko-btn:active:not(:disabled) {
+  transform: scale(0.96);
+  filter: brightness(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+}
+
+.eko-tabs .eko-tabs__btn:active {
+  transform: scale(0.96);
+  filter: brightness(1.06);
+}
+
+/* Category tabs: press brightens the specular sheen through the shared var
+   and adds a whisper of blur (base is 0 — these are small repeating
+   controls, so the bump stays subtle). Scoped under .eko-room__sheet to
+   outrank the generic button.glass press rule below. */
+.eko-room__sheet .eko-room__tabs .eko-room__tab:active {
+  --glass-sheen: rgb(255 255 255 / 0.40);
+  --glass-blur: 8px;
+  transform: scale(0.94);
+  filter: brightness(1.06);
+}
+
+/* Generic glass interactives (e.g. the Buy sheet's Hide pill). */
+button.glass:active:not(:disabled),
+a.glass:active,
+[role="button"].glass:active,
+.eko-hud__gov:active,
+.eko-hint:active {
+  --glass-sheen: rgb(255 255 255 / 0.40);
+  --glass-blur: 20px;
+  transform: scale(0.96);
+  filter: brightness(1.05);
+}
+
+/* Buy sheet handle: subtle tactile press — the grip brightens while held.
+   Kept at scale(0.98): the handle is also a drag surface, so the press
+   must read as feedback, not as movement. */
+.eko-room__sheet .eko-room__sheet-handle:active {
+  transform: scale(0.98);
+}
+.eko-room__sheet .eko-room__sheet-handle:active .eko-room__sheet-grip {
+  background: rgb(255 255 255 / 0.65);
+  box-shadow: 0 0 8px rgb(255 255 255 / 0.35);
+}
+
+/* Night theme: the specular bump is smaller so the press glow doesn't
+   blow out against dark surfaces. */
+[data-theme="night"] .eko-room__tabs .eko-room__tab:active,
+[data-theme="night"] button.glass:active:not(:disabled),
+[data-theme="night"] a.glass:active,
+[data-theme="night"] [role="button"].glass:active,
+[data-theme="night"] .eko-hud__gov:active,
+[data-theme="night"] .eko-hint:active {
+  --glass-sheen: rgb(255 255 255 / 0.24);
+  --glass-blur: 22px;
+}
+
+/* Reduced motion: instant state changes everywhere — no spring, and the
+   tab pill jumps instead of sliding (Game.tsx checks the same query). */
+@media (prefers-reduced-motion: reduce) {
+  .eko-btn.eko-btn,
+  .eko-tabs .eko-tabs__btn,
+  .eko-room__tabs .eko-room__tab,
+  .eko-room__sheet .eko-room__sheet-handle,
+  button.glass,
+  a.glass,
+  [role="button"].glass,
+  .eko-hud__gov,
+  .eko-hint,
+  .eko-tabs__pill {
+    transition: none;
   }
 }
