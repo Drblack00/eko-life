@@ -108,14 +108,27 @@ CREATE TABLE IF NOT EXISTS votes (
   PRIMARY KEY (election_id, voter_id)
 );
 -- M5: social graph
+-- W3 (friends page + referrals): updated_ts tracks the last status change;
+-- idx_friendships_unordered_pair enforces one row per unordered user pair
+-- (no duplicates in either direction); no-self-add is enforced app-level.
 CREATE TABLE IF NOT EXISTS friendships (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   requester_id INTEGER NOT NULL,
   addressee_id INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
-  created_ts INTEGER NOT NULL
+  created_ts INTEGER NOT NULL,
+  updated_ts INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_friendships_pair ON friendships(requester_id, addressee_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_friendships_unordered_pair
+  ON friendships (min(requester_id, addressee_id), max(requester_id, addressee_id));
+-- W3: referral attribution (data-only — no rewards, no payouts, ever).
+CREATE TABLE IF NOT EXISTS referrals (
+  referrer_id INTEGER NOT NULL,
+  referred_id INTEGER NOT NULL UNIQUE,
+  created_ts INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id);
 -- M5: topic rooms
 CREATE TABLE IF NOT EXISTS rooms (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -435,14 +448,27 @@ CREATE TABLE IF NOT EXISTS votes (
   PRIMARY KEY (election_id, voter_id)
 );
 -- M5: social graph
+-- W3 (friends page + referrals): updated_ts tracks the last status change;
+-- idx_friendships_unordered_pair enforces one row per unordered user pair
+-- (no duplicates in either direction); no-self-add is enforced app-level.
 CREATE TABLE IF NOT EXISTS friendships (
   id SERIAL PRIMARY KEY,
   requester_id INTEGER NOT NULL,
   addressee_id INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
-  created_ts BIGINT NOT NULL
+  created_ts BIGINT NOT NULL,
+  updated_ts BIGINT NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_friendships_pair ON friendships(requester_id, addressee_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_friendships_unordered_pair
+  ON friendships (LEAST(requester_id, addressee_id), GREATEST(requester_id, addressee_id));
+-- W3: referral attribution (data-only — no rewards, no payouts, ever).
+CREATE TABLE IF NOT EXISTS referrals (
+  referrer_id INTEGER NOT NULL,
+  referred_id INTEGER NOT NULL UNIQUE,
+  created_ts BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id);
 -- M5: topic rooms
 CREATE TABLE IF NOT EXISTS rooms (
   id SERIAL PRIMARY KEY,
@@ -760,6 +786,8 @@ export async function initDb() {
     await ensureColumn('characters', 'avatar_look', 'TEXT', 'TEXT');
     await ensureColumn('characters', 'home_wall', 'TEXT', 'TEXT');
     await ensureColumn('characters', 'home_floor', 'TEXT', 'TEXT');
+    // W3: friends page — status-change timestamp on friendships (no-op on fresh DBs)
+    await ensureColumn('friendships', 'updated_ts', 'INTEGER NOT NULL DEFAULT 0', 'BIGINT NOT NULL DEFAULT 0');
     console.log('[db] PostgreSQL connected');
   } else {
     const dbPath = process.env.EKO_DB_PATH || path.join(__dirname, 'eko-life.db');
@@ -799,6 +827,8 @@ export async function initDb() {
     await ensureColumn('characters', 'avatar_look', 'TEXT', '');
     await ensureColumn('characters', 'home_wall', 'TEXT', '');
     await ensureColumn('characters', 'home_floor', 'TEXT', '');
+    // W3: friends page — status-change timestamp on friendships (no-op on fresh DBs)
+    await ensureColumn('friendships', 'updated_ts', 'INTEGER NOT NULL DEFAULT 0', '');
     console.log(`[db] SQLite connected (${dbPath === ':memory:' ? 'in-memory' : 'local file'})`);
   }
 }
@@ -1212,28 +1242,41 @@ export async function lastWinner() {
 }
 
 // ============================================================
-// M5 — friends
+// M5 — friends (W3: extended with updated_ts + REST helpers)
 // ============================================================
 // Returns 'self' | 'exists' | 'accepted' (mutual auto-accept) | 'ok'.
+// Idempotent: a duplicate pending/accepted pair returns 'exists' with no new
+// row (also enforced by idx_friendships_unordered_pair). A past 'declined'
+// is not a block — it restarts as a fresh request.
 export async function addFriendRequest(requesterId, addresseeId) {
   if (Number(requesterId) === Number(addresseeId)) return 'self';
-  const existing = await getOne(
+  let existing = await getOne(
     'SELECT * FROM friendships WHERE (requester_id=? AND addressee_id=?) OR (requester_id=? AND addressee_id=?)',
     'SELECT * FROM friendships WHERE (requester_id=$1 AND addressee_id=$2) OR (requester_id=$3 AND addressee_id=$4)',
     [requesterId, addresseeId, addresseeId, requesterId]);
+  if (existing && existing.status === 'declined') {
+    await deleteFriendshipById(existing.id);
+    existing = null;
+  }
   if (existing) {
     // They already requested us → mutual interest, auto-accept.
     if (existing.status === 'pending' && Number(existing.requester_id) === Number(addresseeId)) {
-      await runQ('UPDATE friendships SET status=? WHERE id=?',
-        'UPDATE friendships SET status=$1 WHERE id=$2', ['accepted', existing.id]);
+      await runQ('UPDATE friendships SET status=?, updated_ts=? WHERE id=?',
+        'UPDATE friendships SET status=$1, updated_ts=$2 WHERE id=$3', ['accepted', Date.now(), existing.id]);
       return 'accepted';
     }
     return 'exists';
   }
-  await runQ(
-    'INSERT INTO friendships (requester_id, addressee_id, status, created_ts) VALUES (?,?,?,?)',
-    'INSERT INTO friendships (requester_id, addressee_id, status, created_ts) VALUES ($1,$2,$3,$4)',
-    [requesterId, addresseeId, 'pending', Date.now()]);
+  const now = Date.now();
+  try {
+    await runQ(
+      'INSERT INTO friendships (requester_id, addressee_id, status, created_ts, updated_ts) VALUES (?,?,?,?,?)',
+      'INSERT INTO friendships (requester_id, addressee_id, status, created_ts, updated_ts) VALUES ($1,$2,$3,$4,$5)',
+      [requesterId, addresseeId, 'pending', now, now]);
+  } catch (e) {
+    if (/unique|duplicate/i.test(e.message)) return 'exists'; // raced insert
+    throw e;
+  }
   return 'ok';
 }
 
@@ -1243,10 +1286,24 @@ export async function respondFriendRequest(addresseeId, requesterId, accept) {
     'SELECT * FROM friendships WHERE requester_id=$1 AND addressee_id=$2 AND status=$3',
     [requesterId, addresseeId, 'pending']);
   if (!r) return false;
-  await runQ('UPDATE friendships SET status=? WHERE id=?',
-    'UPDATE friendships SET status=$1 WHERE id=$2',
-    [accept ? 'accepted' : 'declined', r.id]);
+  await runQ('UPDATE friendships SET status=?, updated_ts=? WHERE id=?',
+    'UPDATE friendships SET status=$1, updated_ts=$2 WHERE id=$3',
+    [accept ? 'accepted' : 'declined', Date.now(), r.id]);
   return true;
+}
+
+/** W3: single friendship row by id (REST authz checks). */
+export async function friendshipById(id) {
+  return getOne(
+    'SELECT * FROM friendships WHERE id=?',
+    'SELECT * FROM friendships WHERE id=$1',
+    [id]);
+}
+
+/** W3: delete one friendship row by id (cancel request / unfriend). */
+export async function deleteFriendshipById(id) {
+  await runQ('DELETE FROM friendships WHERE id=?',
+    'DELETE FROM friendships WHERE id=$1', [id]);
 }
 
 export async function removeFriend(a, b) {
@@ -1256,15 +1313,18 @@ export async function removeFriend(a, b) {
     [a, b, b, a]);
 }
 
-// Pending + accepted rows for a player, with the other side's username.
+// Pending + accepted rows for a player, with the other side's username
+// and last_seen (W3: last_seen powers the friends-page presence display).
 export async function listFriendships(playerId) {
   const rows = await getAll(
-    `SELECT f.id, f.requester_id, f.addressee_id, f.status, f.created_ts, u.username AS other_username
+    `SELECT f.id, f.requester_id, f.addressee_id, f.status, f.created_ts, f.updated_ts,
+            u.username AS other_username, u.last_seen AS other_last_seen
      FROM friendships f JOIN users u
        ON u.id = CASE WHEN f.requester_id=? THEN f.addressee_id ELSE f.requester_id END
      WHERE (f.requester_id=? OR f.addressee_id=?) AND f.status IN ('pending','accepted')
      ORDER BY f.created_ts DESC`,
-    `SELECT f.id, f.requester_id, f.addressee_id, f.status, f.created_ts, u.username AS other_username
+    `SELECT f.id, f.requester_id, f.addressee_id, f.status, f.created_ts, f.updated_ts,
+            u.username AS other_username, u.last_seen AS other_last_seen
      FROM friendships f JOIN users u
        ON u.id = CASE WHEN f.requester_id=$1 THEN f.addressee_id ELSE f.requester_id END
      WHERE (f.requester_id=$2 OR f.addressee_id=$3) AND f.status IN ('pending','accepted')
@@ -1277,6 +1337,8 @@ export async function listFriendships(playerId) {
     status: r.status,
     incoming: r.status === 'pending' && Number(r.addressee_id) === Number(playerId),
     created_ts: Number(r.created_ts),
+    updated_ts: Number(r.updated_ts) || 0,
+    other_last_seen: r.other_last_seen == null ? null : Number(r.other_last_seen),
   }));
 }
 
@@ -1288,6 +1350,117 @@ export async function areFriends(a, b) {
      ((requester_id=$1 AND addressee_id=$2) OR (requester_id=$3 AND addressee_id=$4))`,
     [a, b, b, a]);
   return !!r;
+}
+
+// ============================================================
+// W3 — referral codes + attribution (data-only; no rewards)
+// ============================================================
+// Every user gets a unique, URL-safe referral code derived
+// deterministically from their user id. The mapping is a bijection
+// over 64 bits (multiply by an odd constant mod 2^64, then base62),
+// so codes are unique by construction — collisions are impossible,
+// no DB column needed, and resolution needs no lookup table.
+const B62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+const REF_MULT = 6364136223846793005n;
+const REF_ADD = 1442695040888963407n;
+const REF_MOD = 1n << 64n;
+const REF_CODE_LEN = 11; // 62^11 > 2^64, fixed length keeps decode exact
+const REF_CODE_RE = /^[0-9A-Za-z]{11}$/;
+// Modular inverse of REF_MULT mod 2^64 (odd → invertible), via Newton
+// iteration. Each step is normalized to [0, 2^64) because BigInt % keeps
+// the dividend's sign.
+const REF_INV = (() => {
+  let inv = 1n;
+  for (let i = 0; i < 6; i++) {
+    inv = (inv * (2n - REF_MULT * inv)) % REF_MOD;
+    if (inv < 0n) inv += REF_MOD;
+  }
+  return inv;
+})();
+
+function base62Encode11(x) {
+  let s = '';
+  for (let i = 0; i < REF_CODE_LEN; i++) {
+    s = B62[Number(x % 62n)] + s;
+    x = x / 62n;
+  }
+  return s;
+}
+
+function base62Decode11(code) {
+  let x = 0n;
+  for (const ch of code) {
+    const d = B62.indexOf(ch);
+    if (d < 0) return null;
+    x = x * 62n + BigInt(d);
+  }
+  return x;
+}
+
+/** Deterministic, unique, URL-safe referral code for a user id. */
+export function encodeReferralCode(userId) {
+  const id = BigInt(Number(userId));
+  if (id <= 0n) throw new Error('encodeReferralCode: invalid user id');
+  return base62Encode11((id * REF_MULT + REF_ADD) % REF_MOD);
+}
+
+/** Decode a code back to a user id, or null when malformed. */
+export function decodeReferralCode(code) {
+  if (typeof code !== 'string' || !REF_CODE_RE.test(code)) return null;
+  const x = base62Decode11(code);
+  if (x == null) return null;
+  const id = ((x - REF_ADD + REF_MOD) % REF_MOD * REF_INV) % REF_MOD;
+  return id > 0n && id <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(id) : null;
+}
+
+/** Resolve a referral code to its user row, or null (invalid/unknown). */
+export async function resolveReferralCode(code) {
+  const id = decodeReferralCode(code);
+  if (!id) return null;
+  return getUserById(id);
+}
+
+/**
+ * Attribute a signup to a referrer. Returns true when recorded.
+ * No self-referral, one attribution per referred user, referrer must exist.
+ */
+export async function recordReferral(referrerId, referredId) {
+  referrerId = Number(referrerId);
+  referredId = Number(referredId);
+  if (!referrerId || !referredId || referrerId === referredId) return false;
+  const [referrer, existing] = await Promise.all([
+    getUserById(referrerId),
+    getOne('SELECT referred_id FROM referrals WHERE referred_id=?',
+      'SELECT referred_id FROM referrals WHERE referred_id=$1', [referredId]),
+  ]);
+  if (!referrer || existing) return false;
+  try {
+    await runQ(
+      'INSERT INTO referrals (referrer_id, referred_id, created_ts) VALUES (?,?,?)',
+      'INSERT INTO referrals (referrer_id, referred_id, created_ts) VALUES ($1,$2,$3)',
+      [referrerId, referredId, Date.now()]);
+  } catch (e) {
+    if (/unique|duplicate/i.test(e.message)) return false; // raced insert
+    throw e;
+  }
+  return true;
+}
+
+/** How many users signed up via this referrer's link. */
+export async function countReferrals(referrerId) {
+  const r = await getOne(
+    'SELECT COUNT(*) AS c FROM referrals WHERE referrer_id=?',
+    'SELECT COUNT(*) AS c FROM referrals WHERE referrer_id=$1',
+    [Number(referrerId)]);
+  return Number(r?.c) || 0;
+}
+
+/** Attribution row for a referred user (null when none). */
+export async function getReferralFor(referredId) {
+  return getOne(
+    'SELECT * FROM referrals WHERE referred_id=?',
+    'SELECT * FROM referrals WHERE referred_id=$1',
+    [Number(referredId)]);
 }
 
 // ============================================================

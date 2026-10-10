@@ -8,6 +8,7 @@ import { Router } from 'express';
 import {
   getUserByName, getUserById, createUser, migrateGuestToAccount,
   getCharacter, saveCharacter, countAdmins, setAdmin,
+  resolveReferralCode, recordReferral,
 } from './db.js';
 import { AVATARS, COLORS } from './game/data.js';
 
@@ -113,6 +114,18 @@ export function authMiddleware(req, res, next) {
   next();
 }
 
+// W3: referral attribution (data-only — no rewards, no payouts).
+// Invalid codes are ignored gracefully; self-referral is rejected
+// by recordReferral. Called after a successful /register.
+async function attributeReferral(refCode, newUserId) {
+  const code = String(refCode || '').trim();
+  if (!code) return;
+  try {
+    const referrer = await resolveReferralCode(code);
+    if (referrer) await recordReferral(referrer.id, newUserId);
+  } catch (e) { console.error('[auth] referral attribution:', e.message); }
+}
+
 // ---------------- routes ----------------
 export function createAuthRouter() {
   const router = Router();
@@ -174,6 +187,7 @@ export function createAuthRouter() {
       const isAdmin = await maybeFirstAdmin(guest.id);
       const fresh = await getUserById(guest.id);
       console.log(`[auth] guest ${guest.id} migrated → ${username}`);
+      await attributeReferral(req.body.ref, guest.id);
       return res.json({ token: signToken(guest.id), username, is_admin: isAdmin || !!Number(fresh.is_admin) });
     }
 
@@ -186,6 +200,7 @@ export function createAuthRouter() {
     if (ch) { ch.avatar = avatar; ch.color = color; await saveCharacter(ch); }
     const isAdmin = await maybeFirstAdmin(id);
     console.log(`[auth] registered: ${username} (id ${id})`);
+    await attributeReferral(req.body.ref, id);
     res.json({ token: signToken(id), username, is_admin: isAdmin });
   });
 
