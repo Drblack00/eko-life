@@ -2,36 +2,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { clamp, decayTick, chargeRent, applyDayEconomy, furnitureEffects, distUnits } = await import('../src/game/sim.js');
+const { clamp, decayTick, chargeRent, applyDayEconomy, furnitureEffects, distUnits, DECAY_RATES } = await import('../src/game/sim.js');
 const { HOUSING, FURN_EFFECTS, DEFAULT_CHARACTER } = await import('../src/game/data.js');
 
 function freshChar() {
   return { hunger: 100, energy: 100, happiness: 100, health: 100, money: 0, housing: 'face_me', rent_misses: 0 };
 }
 
-test('decayTick: hunger −3 per tick', () => {
-  const c = freshChar();
+test('decayTick (M8): decays six needs at their rates', () => {
+  const c = { hunger: 100, energy: 100, fun: 100, social: 100, hygiene: 100, bladder: 100, happiness: 100, health: 100 };
   const res = decayTick(c);
-  assert.equal(c.hunger, 97);
+  assert.equal(c.hunger, 100 - DECAY_RATES.hunger);
+  assert.equal(c.energy, 100 - DECAY_RATES.energy);
+  assert.equal(c.fun, 100 - DECAY_RATES.fun);
+  assert.equal(c.social, 100 - DECAY_RATES.social);
+  assert.equal(c.hygiene, 100 - DECAY_RATES.hygiene);
+  assert.equal(c.bladder, 100 - DECAY_RATES.bladder);
   assert.equal(res.starving, false);
-  // stats untouched while fed
-  assert.equal(c.energy, 100);
-  assert.equal(c.health, 100);
+  assert.equal(res.desperate, false);
+  // stats untouched while needs are healthy
+  assert.equal(c.energy, 100 - DECAY_RATES.energy);
 });
 
-test('decayTick: starving (hunger 0) drains energy/happiness/health', () => {
-  const c = freshChar();
-  c.hunger = 3;
-  decayTick(c);
+test('decayTick (M8): starving (hunger 0) drains energy/happiness/health', () => {
+  const c = { hunger: DECAY_RATES.hunger, energy: 100, happiness: 100, health: 100, fun: 100, social: 100, hygiene: 100, bladder: 100 };
+  const res = decayTick(c);
   assert.equal(c.hunger, 0);
-  assert.equal(c.energy, 95);
-  assert.equal(c.happiness, 95);
-  assert.equal(c.health, 98);
+  assert.equal(res.starving, true);
+  assert.equal(c.energy, 100 - DECAY_RATES.energy - 5); // decay + starving drain
+  assert.equal(c.happiness, 100 - 5);
+  assert.equal(c.health, 100 - 2);
 });
 
-test('decayTick: stats clamp at 0, hunger never negative', () => {
-  const c = freshChar();
-  c.hunger = 1; c.energy = 2; c.happiness = 3; c.health = 1;
+test('decayTick (M8): starving clamps; hunger never negative', () => {
+  const c = { hunger: 1, energy: 2, happiness: 3, health: 1, fun: 100, social: 100, hygiene: 100, bladder: 100 };
   decayTick(c);
   assert.equal(c.hunger, 0);
   assert.equal(c.energy, 0);

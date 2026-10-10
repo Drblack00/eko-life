@@ -313,10 +313,10 @@ test('study: campus-only, costs ₦5,000, grants cert', async () => {
   const you = await waitFor(msgs2, m => m.t === 'you' && m.you.cert === 1);
   assert.equal(you.you.money, 5000);
 
-  // cert unlocks cert-gated jobs
-  act(ws2, { a: 'work', job: 'campus_tutor' });
-  const worked = await waitFor(msgs2, m => m.t === 'you' && /Campus Tutor/.test(m.note || ''));
-  assert.ok(worked);
+  // cert unlocks cert-gated jobs (M7: clock in for a shift instead of instant work)
+  act(ws2, { a: 'shift_start', job: 'campus_tutor' });
+  const clocked = await waitFor(msgs2, m => m.t === 'you' && /Clocked in as Campus Tutor/.test(m.note || ''));
+  assert.ok(clocked);
   ws.close(); ws2.close();
 });
 
@@ -401,8 +401,8 @@ test('GET /api/transactions: newest-first ledger rows', async () => {
   const A = await seedGuest('street_smart');
   await setChar(A.userId, { money: 60000, location_id: 'tejuosho', energy: 100 });
   const { ws, msgs } = await connectAs(A);
-  act(ws, { a: 'work', job: 'market_porter' });
-  await waitFor(msgs, m => m.t === 'you' && m.note && /Market Porter/.test(m.note));
+  act(ws, { a: 'shift_start', job: 'market_porter' });
+  await waitFor(msgs, m => m.t === 'you' && m.note && /Clocked in as Market Porter/.test(m.note));
   act(ws, { a: 'buy_biz', biz: 'mamaput' });
   await waitFor(msgs, m => m.t === 'you' && m.you.biz === 'mamaput');
 

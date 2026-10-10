@@ -158,86 +158,49 @@ test('character creation: validation', async () => {
 });
 
 // ---------------- work ----------------
-test('work: street_smart pays 10% hustle bonus, ledger row written', async () => {
+test('work: legacy instant work retired — points to 1-hour shifts', async () => {
   const A = await guestWithCharacter('street_smart');
-  const { ws, msgs, init } = await connectAs(A);
-  assert.ok(Number.isFinite(init.you.x));
-  assert.ok(Number.isFinite(init.you.y));
-  assert.equal(init.you.locationId, 'ojuelegba');
-
-  await act(msgs, ws, { a: 'travel', locationId: 'tejuosho' });
-  const traveled = await waitFor(msgs, m => m.t === 'you' && m.you.locationId === 'tejuosho');
-  assert.equal(traveled.you.energy, 95); // travel costs 5 energy
-  assert.equal(traveled.you.x, 28);      // tejuosho coords in snapshot
-
+  const { ws, msgs } = await connectAs(A);
   await act(msgs, ws, { a: 'work', job: 'market_porter' });
-  const worked = await waitFor(msgs, m => m.t === 'you' && m.you.money === 7750);
-  assert.equal(worked.you.money, 5000 + Math.floor(2500 * 1.1)); // +2750
-  assert.equal(worked.you.energy, 70);   // 95 − 25
-  assert.match(worked.note, /2,750/);
-
+  const err = await waitFor(msgs, m => m.t === 'err' && /1-hour shifts/.test(m.text));
+  assert.ok(err);
+  // no money moved, no ledger row
+  const c = await db.getCharacter(A.userId);
+  assert.equal(Number(c.money), 5000);
   const tx = await db.listTransactions(A.userId);
-  const pay = tx.find(t => t.kind === 'work_pay');
-  assert.ok(pay);
-  assert.equal(pay.amount, 2750);
-  assert.equal(pay.balance_after, 7750);
+  assert.ok(!tx.find(t => t.kind === 'work_pay'));
   ws.close();
 });
 
-test('work: blocked at wrong location', async () => {
-  const A = await guestWithCharacter('street_smart');
-  const { ws, msgs } = await connectAs(A);
-  await act(msgs, ws, { a: 'work', job: 'market_porter' }); // at ojuelegba, job at tejuosho
-  const err = await waitFor(msgs, m => m.t === 'err' && /Tejuosho/.test(m.text));
-  assert.ok(err);
-  ws.close();
-});
-
-test('work: blocked by per-job cooldown', async () => {
+test('shifts: clock in -> status shows countdown -> leave forfeits (M7)', async () => {
   const A = await guestWithCharacter('street_smart');
   const { ws, msgs } = await connectAs(A);
   await act(msgs, ws, { a: 'travel', locationId: 'tejuosho' });
   await waitFor(msgs, m => m.t === 'you' && m.you.locationId === 'tejuosho');
-  await act(msgs, ws, { a: 'work', job: 'market_porter' });
-  await waitFor(msgs, m => m.t === 'you' && /Market Porter/.test(m.note || ''));
-  await act(msgs, ws, { a: 'work', job: 'market_porter' });
-  const err = await waitFor(msgs, m => m.t === 'err' && /available in \d+s/.test(m.text));
-  assert.ok(err);
-  ws.close();
-});
 
-test('work: blocked by low energy', async () => {
-  const A = await guestWithCharacter('street_smart');
-  await setChar(A.userId, { energy: 10, location_id: 'tejuosho' });
-  const { ws, msgs } = await connectAs(A);
-  await act(msgs, ws, { a: 'work', job: 'market_porter' });
-  const err = await waitFor(msgs, m => m.t === 'err' && /Too tired/.test(m.text));
-  assert.ok(err);
-  ws.close();
-});
+  await act(msgs, ws, { a: 'shift_start', job: 'market_porter' });
+  const started = await waitFor(msgs, m => m.t === 'you' && m.you.shift && m.you.shift.job === 'market_porter');
+  assert.ok(started.you.shift.endsAt > Date.now());
+  assert.equal(started.you.shift.name, 'Market Porter');
 
-test('work: silver_spoon pays 10% less (soft-life tax)', async () => {
-  const B = await guestWithCharacter('silver_spoon');
-  const { ws, msgs } = await connectAs(B);
-  await act(msgs, ws, { a: 'travel', locationId: 'tejuosho' });
-  await waitFor(msgs, m => m.t === 'you' && m.you.locationId === 'tejuosho');
-  await act(msgs, ws, { a: 'work', job: 'market_porter' });
-  const worked = await waitFor(msgs, m => m.t === 'you' && m.you.money === 52250);
-  assert.equal(worked.you.money, 50000 + Math.floor(2500 * 0.9)); // +2250
-  ws.close();
-});
+  await act(msgs, ws, { a: 'shift_status' });
+  const status = await waitFor(msgs, m => m.t === 'shift_status' && m.shift);
+  assert.ok(status.shift.endsAt > Date.now());
 
-test('work: cert-required job rejects without certificate; unknown job → err', async () => {
-  const A = await guestWithCharacter('street_smart');
-  const { ws, msgs } = await connectAs(A);
-  await act(msgs, ws, { a: 'travel', locationId: 'ikoyi' });
-  await waitFor(msgs, m => m.t === 'you' && m.you.locationId === 'ikoyi');
-  await act(msgs, ws, { a: 'work', job: 'junior_dev' });
-  const certErr = await waitFor(msgs, m => m.t === 'err' && /certificate/i.test(m.text));
-  assert.ok(certErr);
-  await act(msgs, ws, { a: 'work', job: 'astronaut' });
-  const unknownErr = await waitFor(msgs, m => m.t === 'err' && /Unknown job/.test(m.text));
-  assert.ok(unknownErr);
+  // double clock-in is rejected
+  await act(msgs, ws, { a: 'shift_start', job: 'market_porter' });
+  const dbl = await waitFor(msgs, m => m.t === 'err' && /already/.test(m.text));
+  assert.ok(dbl);
+
+  // leave mid-shift: forfeited, no pay
+  const before = Number((await db.getCharacter(A.userId)).money);
+  await act(msgs, ws, { a: 'shift_leave' });
+  const left = await waitFor(msgs, m => m.t === 'you' && !m.you.shift && /earn nothing/i.test(m.note || ''));
+  assert.ok(left);
+  const after = Number((await db.getCharacter(A.userId)).money);
+  assert.equal(after, before); // no prorata pay
+  const tx = await db.listTransactions(A.userId);
+  assert.ok(!tx.find(t => t.kind === 'shift_pay'));
   ws.close();
 });
 
@@ -464,8 +427,9 @@ test('guest → register → create-character → WS act full flow', async () =>
   assert.equal(init.you.money, 5000);
   await act(msgs, ws, { a: 'travel', locationId: 'oshodi' });
   await waitFor(msgs, m => m.t === 'you' && m.you.locationId === 'oshodi');
-  await act(msgs, ws, { a: 'work', job: 'danfo_conductor' });
-  const worked = await waitFor(msgs, m => m.t === 'you' && m.note && /Danfo Conductor/.test(m.note));
-  assert.equal(worked.you.money, 5000 + Math.floor(3200 * 1.1)); // +3520
+  await act(msgs, ws, { a: 'shift_start', job: 'danfo_conductor' });
+  const clocked = await waitFor(msgs, m => m.t === 'you' && m.note && /Clocked in as Danfo Conductor/.test(m.note));
+  assert.ok(clocked.you.shift);
+  assert.equal(clocked.you.shift.job, 'danfo_conductor');
   ws.close();
 });
