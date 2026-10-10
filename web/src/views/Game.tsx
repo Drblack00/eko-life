@@ -911,7 +911,7 @@ export function Game({
       )}
 
       {dayBanner !== null && (
-        <div className="eko-daybanner" role="status">
+        <div className="eko-daybanner glass" role="status">
           ☀️ Day {dayBanner} — the city wakes up.
         </div>
       )}

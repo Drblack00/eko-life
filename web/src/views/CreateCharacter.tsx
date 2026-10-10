@@ -240,7 +240,7 @@ export function CreateCharacter({
                     type="button"
                     role="radio"
                     aria-checked={classId === c.id}
-                    className={`eko-create__class ${classId === c.id ? "eko-create__class--active" : ""}`}
+                    className={`eko-create__class glass ${classId === c.id ? "eko-create__class--active" : ""}`}
                     onClick={() => setClassId(c.id)}
                   >
                     <span className="eko-create__class-icon" aria-hidden="true">
@@ -270,7 +270,7 @@ export function CreateCharacter({
               <h2 id="cc-look" className="eko-create__h2">
                 Your look
               </h2>
-              <div className="eko-create__preview">
+              <div className="eko-create__preview glass">
                 <span
                   className="eko-create__preview-dot"
                   style={{ backgroundColor: color }}
