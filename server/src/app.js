@@ -24,6 +24,11 @@ import { ensureSchema as m12Schema } from './game/v2/m12.js';
 import { ensureSchema as m13Schema } from './game/v2/m13.js';
 // Fintech foundation (M5/M6a): chart of accounts + fee policy v1 seeding.
 import { ensureChartOfAccounts, ensureFeePolicyV1 } from './fintech/seed.js';
+// Fintech cash-wallet routes (Milestones 5-9): every route sits behind
+// requireCashOps, so all return 403 while CASH_OPS_ENABLED is off.
+import { createCashWalletRouter } from './routes/cashWallet.js';
+import { createCashFlowsRouter } from './routes/cashFlows.js';
+import { createCashAdminRouter } from './routes/cashAdmin.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -86,6 +91,11 @@ export async function createApp() {
 
   // ---- API ----
   app.use('/api', createApiRouter({ hub, getDay }));
+
+  // ---- Cash wallet (fintech): inert 403s while CASH_OPS_ENABLED is off ----
+  app.use('/api/cash-wallet', createCashWalletRouter());
+  app.use('/api/cash-wallet', createCashFlowsRouter());
+  app.use('/api/admin/cash', createCashAdminRouter());
 
   // ---- static client (web/dist) + SPA fallback ----
   const dist = path.join(__dirname, '../../web/dist');
