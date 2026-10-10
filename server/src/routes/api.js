@@ -15,6 +15,37 @@ import {
   AVATARS, COLORS, PROPERTIES, BIZ, VEHICLES, FURN, HOME_SLOTS,
   BANK, TRAVEL_FARES, STUDY_COST,
 } from '../game/data.js';
+// V2 milestones: REST_SPECS + CONFIG_DATA + clock helper, mounted below.
+import { REST_SPEC as M7_REST, CONFIG_DATA as M7_CONFIG, lagosNow } from '../game/v2/m7.js';
+import { REST_SPEC as M8_REST, CONFIG_DATA as M8_CONFIG } from '../game/v2/m8.js';
+import { REST_SPEC as M9_REST } from '../game/v2/m9.js';
+import { REST_SPEC as M10_REST, CONFIG_DATA as M10_CONFIG } from '../game/v2/m10.js';
+import { CONFIG_DATA as M12_CONFIG } from '../game/v2/m12.js'; // M12 has no REST_SPEC — all WS intents
+import { REST_SPEC as M13_REST } from '../game/v2/m13.js';
+
+// Mount a v2 module's REST_SPEC on the router. Entries declare
+// {method, path, auth}; auth:true handlers read req.userId (authMiddleware
+// convention, matching existing api.js routes). Module paths carry the
+// `/api` prefix; the router already sits under `/api`, so strip it.
+function mountV2Spec(router, spec) {
+  for (const r of spec || []) {
+    const method = (r.method || 'GET').toLowerCase();
+    const path = String(r.path || '').replace(/^\/api(?=\/)/, '') || '/';
+    const chain = [];
+    if (r.auth) {
+      chain.push(authMiddleware);
+      // v2 modules are split on convention (req.userId vs req.user) — provide both.
+      chain.push((req, _res, next) => {
+        if (req.userId && !req.user) req.user = { id: req.userId };
+        next();
+      });
+    }
+    chain.push(async (req, res, next) => {
+      try { await r.handler(req, res); } catch (e) { next(e); }
+    });
+    router[method](path, ...chain);
+  }
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let VERSION = '0.1.0';
@@ -37,6 +68,17 @@ function characterBody(user, c, day) {
     health: Number(c.health),
     happiness: Number(c.happiness),
     hunger: Number(c.hunger),
+    // V2: six needs (M8), shifts (M7), perks (M9), rent-to-own (M10)
+    fun: Number(c.fun),
+    social: Number(c.social),
+    hygiene: Number(c.hygiene),
+    bladder: Number(c.bladder),
+    perk_stars: Math.max(0, Math.floor(Number(c.perk_stars) || 0)),
+    perks: (() => { try { return JSON.parse(c.perks || '[]'); } catch { return []; } })(),
+    housing_owned: !!Number(c.housing_owned),
+    shift_job: c.shift_job || null,
+    shift_started_at: c.shift_started_at == null ? null : Number(c.shift_started_at),
+    shift_ends_at: c.shift_ends_at == null ? null : Number(c.shift_ends_at),
     housing: c.housing,
     property: c.property,
     biz: c.biz || null,
@@ -58,6 +100,10 @@ function characterBody(user, c, day) {
     health: body.health,
     happiness: body.happiness,
     hunger: body.hunger,
+    fun: body.fun,
+    social: body.social,
+    hygiene: body.hygiene,
+    bladder: body.bladder,
   };
   return body;
 }
@@ -141,8 +187,28 @@ export function createApiRouter({ hub, getDay }) {
       bank: BANK,
       travelFares: TRAVEL_FARES,
       studyCost: STUDY_COST,
+      // V2 milestone config data
+      careerTracks: M7_CONFIG.careerTracks,
+      skillLabels: M7_CONFIG.skillLabels,
+      needs: M8_CONFIG.needs,
+      housingBuy: M10_CONFIG.housingBuy,
+      shopTypes: M10_CONFIG.shopTypes,
+      lapo: M10_CONFIG.lapo,
+      tax: M10_CONFIG.tax,
+      skills: M12_CONFIG.skills,
+      courses: M12_CONFIG.courses,
+      skillTuning: M12_CONFIG.tuning,
     });
   });
+
+  // ---- V2 REST endpoints (see each module's REST_SPEC) ----
+  mountV2Spec(router, M7_REST);
+  mountV2Spec(router, M8_REST);
+  mountV2Spec(router, M9_REST);
+  mountV2Spec(router, M10_REST);
+  // M13: only the public list route here — admin billboard routes live in
+  // routes/admin.js (their handlers require req.admin from requireAdmin).
+  mountV2Spec(router, M13_REST.filter(r => !r.admin));
 
   // ---- auth ----
   router.use('/auth', createAuthRouter());

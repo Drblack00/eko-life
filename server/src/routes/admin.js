@@ -11,7 +11,11 @@ import {
   listReports, listCandidates, currentElection, getMeta,
 } from '../db.js';
 import { cleanText } from '../game/data.js';
-import { electionState } from '../game/elections.js';
+import { fullElectionState } from '../game/elections.js';
+// M13: billboard admin CRUD (handlers read req.admin from requireAdmin).
+import {
+  handleAdminCreateBillboard, handleAdminUpdateBillboard, handleAdminDeleteBillboard,
+} from '../game/v2/m13.js';
 
 export function createAdminRouter({ hub, getDay }) {
   const router = Router();
@@ -91,14 +95,14 @@ export function createAdminRouter({ hub, getDay }) {
     res.json({ ok: true });
   });
 
-  // ---- election status (M5): the real cycle, candidates and governor ----
+  // ---- election status (M5; M11: policy + commissioners via fullElectionState) ----
   router.get('/election', async (req, res) => {
     const el = await currentElection();
     const governorId = Number((await getMeta('governor_id')) || 0);
     const candidates = el ? await listCandidates(el.id) : [];
     const governor = governorId ? await getUserById(governorId) : null;
     res.json({
-      election: electionState(el, candidates, { governorId, day: getDay().day }),
+      election: await fullElectionState(el, candidates, { governorId, day: getDay().day }),
       governorId,
       governor: governor ? { id: governor.id, username: governor.username } : null,
     });
@@ -114,6 +118,11 @@ export function createAdminRouter({ hub, getDay }) {
       governor: governor ? { id: governor.id, username: governor.username } : null,
     });
   });
+
+  // ---- billboards (M13): admin CRUD — text, colors, position ----
+  router.post('/billboards', handleAdminCreateBillboard);
+  router.patch('/billboards/:id', handleAdminUpdateBillboard);
+  router.delete('/billboards/:id', handleAdminDeleteBillboard);
 
   // ---- player reports queue (M5) ----
   router.get('/reports', async (req, res) => {
