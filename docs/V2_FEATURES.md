@@ -74,6 +74,25 @@ only feature concepts and numeric values were reused.
   own designs); admin UI to add/remove/edit (text, colors, position),
   persisted server-side, live-updated to clients.
 
+## Map v2.1 (2026-10-10, from owner iPhone testing)
+- **Blank-map bug:** the scene builder was guarded by an inverted
+  `if (!cancelled)` check, so the canvas was never created on any device.
+  Fixed to `if (cancelled) return;`. Added a WebGL-unavailable fallback panel
+  with retry instead of a dead blank box.
+- **Gestures:** one finger pans, pinch zooms, two fingers tilt (polar) and
+  turn (azimuth); mouse: left-drag pan, wheel zoom, right-drag rotate. Tap
+  still selects pins. `touch-action: none` on the map so the browser never
+  hijacks gestures.
+- **Detail pass (all original procedural geometry):** 90 warm houses with
+  pitched roofs + 60 mid-rise blocks + 8 glass towers (instanced), gray roads
+  with dashed center lines, two lagoon bridges, landmarks (stadium, hospital
+  with red-cross sign, school, striped market stalls), 6 animated sailboats,
+  palms + leafy trees, region + landmark labels. ~40 static draw calls,
+  pixelRatio capped at 2 for mobile.
+- **HUD overlap fix:** the governor pill rendered as a native iOS button and
+  painted over the ₦ balance; now `appearance: none` + `flex: none` +
+  `max-width` with ellipsis, and the HUD row tightens under 400px.
+
 ## Cross-cutting
 - No real-money features anywhere (no payments, no cash-out).
 - Server-authoritative economy: every money move is a ledger row.
