@@ -1,0 +1,221 @@
+/* M13 — map billboard manager. Mobile-first, self-contained. */
+
+.eko-m13 {
+  margin-top: 1rem;
+  padding: 1rem;
+}
+
+.eko-m13__title {
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+}
+
+.eko-m13__note {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.eko-m13__editor {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.eko-m13__preview {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2 / 1;
+  border-radius: 0.5rem;
+  display: block;
+  background: #0f172a;
+}
+
+.eko-m13__fields {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.eko-m13__field {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.eko-m13__field > span {
+  font-weight: 600;
+}
+
+.eko-m13__colors {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.eko-m13__color {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.eko-m13__color-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.eko-m13__color input[type="color"] {
+  width: 44px;
+  height: 44px;
+  padding: 2px;
+  border: 1px solid var(--eko-border, #cbd5e1);
+  border-radius: 0.5rem;
+  background: transparent;
+  cursor: pointer;
+  flex: none;
+}
+
+.eko-m13__hex {
+  min-width: 0;
+  flex: 1;
+  font-family: ui-monospace, monospace;
+}
+
+.eko-m13__slider {
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+}
+
+.eko-m13__slider-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.eko-m13__slider input[type="range"] {
+  width: 100%;
+  min-height: 44px;
+  accent-color: var(--eko-accent, #0ea5e9);
+}
+
+.eko-m13__check {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  font-size: 0.9rem;
+  min-height: 44px;
+}
+
+.eko-m13__check input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--eko-accent, #0ea5e9);
+}
+
+.eko-m13__actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.eko-m13__list-title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.eko-m13__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.eko-m13__row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.6rem;
+  border: 1px solid var(--eko-border, #e2e8f0);
+  border-radius: 0.75rem;
+}
+
+.eko-m13__row .eko-m13__preview {
+  border-radius: 0.35rem;
+}
+
+.eko-m13__row--off {
+  opacity: 0.6;
+}
+
+.eko-m13__row-meta {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  min-width: 0;
+}
+
+.eko-m13__row-meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eko-m13__row-sub {
+  opacity: 0.7;
+  font-size: 0.78rem;
+}
+
+.eko-m13__badge {
+  display: inline-block;
+  width: fit-content;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.eko-m13__row-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.eko-m13__confirm p {
+  margin-top: 0;
+}
+
+.eko-m13__confirm-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+@media (min-width: 720px) {
+  .eko-m13__editor {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .eko-m13__row {
+    grid-template-columns: 180px 1fr auto;
+  }
+
+  .eko-m13__row-actions {
+    grid-column: auto;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eko-m13 * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
