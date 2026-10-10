@@ -76,6 +76,9 @@ CREATE TABLE IF NOT EXISTS furniture (
   owner_id INTEGER NOT NULL,
   item TEXT NOT NULL,
   placed INTEGER NOT NULL DEFAULT 0,
+  x INTEGER,
+  z INTEGER,
+  rot INTEGER,
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_furniture_owner ON furniture(owner_id);
@@ -219,6 +222,9 @@ CREATE TABLE IF NOT EXISTS furniture (
   owner_id INTEGER NOT NULL,
   item TEXT NOT NULL,
   placed INTEGER NOT NULL DEFAULT 0,
+  x INTEGER,
+  z INTEGER,
+  rot INTEGER,
   created_at BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_furniture_owner ON furniture(owner_id);
@@ -390,6 +396,10 @@ export async function initDb() {
     await ensureColumn('characters', 'housing_owned', 'INTEGER NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0');
     await ensureColumn('characters', 'skills', 'TEXT', 'TEXT');
     await ensureColumn('characters', 'skills_used', 'TEXT', 'TEXT');
+    // M14: home-grid placement columns (no-op on fresh DBs)
+    await ensureColumn('furniture', 'x', 'INTEGER', 'INTEGER');
+    await ensureColumn('furniture', 'z', 'INTEGER', 'INTEGER');
+    await ensureColumn('furniture', 'rot', 'INTEGER', 'INTEGER');
     console.log('[db] PostgreSQL connected');
   } else {
     const dbPath = process.env.EKO_DB_PATH || path.join(__dirname, 'eko-life.db');
@@ -421,6 +431,10 @@ export async function initDb() {
     await ensureColumn('characters', 'housing_owned', 'INTEGER NOT NULL DEFAULT 0', '');
     await ensureColumn('characters', 'skills', 'TEXT', '');
     await ensureColumn('characters', 'skills_used', 'TEXT', '');
+    // M14: home-grid placement columns (no-op on fresh DBs)
+    await ensureColumn('furniture', 'x', 'INTEGER', '');
+    await ensureColumn('furniture', 'z', 'INTEGER', '');
+    await ensureColumn('furniture', 'rot', 'INTEGER', '');
     console.log(`[db] SQLite connected (${dbPath === ':memory:' ? 'in-memory' : 'local file'})`);
   }
 }
@@ -596,18 +610,22 @@ export async function saveCharacter(c) {
     params);
 }
 
-// ---------- furniture (M3: inventory + placed items) ----------
-export async function addFurniture(ownerId, item) {
+// ---------- furniture (M3: inventory + placed items; M14: home-grid x/z/rot) ----------
+export async function addFurniture(ownerId, item, placement = {}) {
   const now = Date.now();
+  // x/z/rot default NULL (inventory items have no grid position).
+  const x = placement.x == null ? null : Math.floor(Number(placement.x));
+  const z = placement.z == null ? null : Math.floor(Number(placement.z));
+  const rot = placement.rot == null ? null : Math.floor(Number(placement.rot));
   let id;
   if (pool) {
     const r = await pool.query(
-      'INSERT INTO furniture (owner_id, item, placed, created_at) VALUES ($1,$2,0,$3) RETURNING id',
-      [ownerId, item, now]);
+      'INSERT INTO furniture (owner_id, item, placed, x, z, rot, created_at) VALUES ($1,$2,0,$3,$4,$5,$6) RETURNING id',
+      [ownerId, item, x, z, rot, now]);
     id = r.rows[0].id;
   } else {
-    const r = sdb.prepare('INSERT INTO furniture (owner_id, item, placed, created_at) VALUES (?,?,0,?)')
-      .run(ownerId, item, now);
+    const r = sdb.prepare('INSERT INTO furniture (owner_id, item, placed, x, z, rot, created_at) VALUES (?,?,0,?,?,?,?)')
+      .run(ownerId, item, x, z, rot, now);
     id = Number(r.lastInsertRowid);
   }
   return id;
@@ -627,13 +645,37 @@ export async function getFurnitureById(id) {
 
 // Owner-checked place/unplace (placed = 1|0). Returns false if not the owner's item.
 export async function setFurniturePlaced(id, ownerId, placed) {
+  return setFurniturePlacement(id, ownerId, { placed });
+}
+
+// M14: placement persistence with optional grid coordinates. Passing x/z/rot
+// (integers, may be null to clear) is validated by the caller (actions.js).
+// Backward-compatible: behaves like setFurniturePlaced when called with
+// { placed } only.
+export async function setFurniturePlacement(id, ownerId, { placed, x = null, z = null, rot = null } = {}) {
+  const px = x == null ? null : Math.floor(Number(x));
+  const pz = z == null ? null : Math.floor(Number(z));
+  const pr = rot == null ? null : Math.floor(Number(rot));
   const r = await runQ(
-    'UPDATE furniture SET placed=? WHERE id=? AND owner_id=?',
-    'UPDATE furniture SET placed=$1 WHERE id=$2 AND owner_id=$3',
-    [placed ? 1 : 0, id, ownerId]);
+    'UPDATE furniture SET placed=?, x=?, z=?, rot=? WHERE id=? AND owner_id=?',
+    'UPDATE furniture SET placed=$1, x=$2, z=$3, rot=$4 WHERE id=$5 AND owner_id=$6',
+    [placed ? 1 : 0, px, pz, pr, id, ownerId]);
   if (pool) {
     const row = await getFurnitureById(id);
     return !!row && Number(row.owner_id) === Number(ownerId) && Number(row.placed) === (placed ? 1 : 0);
+  }
+  return r.changes > 0;
+}
+
+// Owner-checked delete (M14: sell_furniture). Returns false if not the owner's item.
+export async function deleteFurniture(id, ownerId) {
+  const r = await runQ(
+    'DELETE FROM furniture WHERE id=? AND owner_id=?',
+    'DELETE FROM furniture WHERE id=$1 AND owner_id=$2',
+    [id, ownerId]);
+  if (pool) {
+    const row = await getFurnitureById(id);
+    return !row;
   }
   return r.changes > 0;
 }
