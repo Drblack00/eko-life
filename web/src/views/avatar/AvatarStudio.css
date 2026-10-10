@@ -65,16 +65,24 @@
 .eko-studio__framebtn {
   min-height: 36px;
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-pill);
-  border: 1px solid rgb(255 255 255 / 0.22);
-  background: rgb(10 18 32 / 0.55);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  /* Frosted pill from .glass, floating over the 3D preview. */
   color: #e8f1fb;
   font-weight: 700;
   font-size: 0.82rem;
   letter-spacing: 0.02em;
   cursor: pointer;
+}
+
+.eko-studio__framebtn.glass {
+  --glass-tint: rgb(10 18 32 / 0.55);
+  --glass-radius: var(--radius-pill);
+}
+
+/* Selected preset keeps its solid green identity over the frost. */
+.eko-studio__framebtn--active.glass {
+  background: var(--palm-500);
+  border: 1px solid var(--palm-500);
+  box-shadow: 0 4px 14px rgb(34 197 94 / 0.45);
 }
 
 .eko-studio__framebtn--active {
@@ -92,17 +100,28 @@
   bottom: var(--space-3);
   transform: translateX(-50%);
   padding: 6px 14px;
-  border-radius: var(--radius-pill);
-  background: rgb(10 18 32 / 0.6);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgb(255 255 255 / 0.14);
+  /* Frosted chip from .glass. */
   color: rgb(232 241 251 / 0.85);
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.03em;
   pointer-events: none;
   white-space: nowrap;
+}
+
+.eko-studio__zoomhint.glass {
+  --glass-tint: rgb(10 18 32 / 0.60);
+  --glass-radius: var(--radius-pill);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .eko-studio__framebtn.glass,
+  .eko-studio__zoomhint.glass {
+    background: rgb(10 18 32 / 0.85);
+  }
+  .eko-studio__framebtn--active.glass {
+    background: var(--palm-500);
+  }
 }
 
 .eko-studio--compact .eko-studio__preview {
@@ -120,9 +139,12 @@
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--surface) 55%, transparent);
-  border: 1px solid color-mix(in srgb, var(--surface-2) 70%, transparent);
+  /* Frosted card material from .glass (src/styles/glass.css). */
+}
+
+.eko-studio__row.glass {
+  --glass-tint: color-mix(in srgb, var(--surface) 60%, transparent);
+  --glass-radius: var(--radius-md);
 }
 
 .eko-studio__label {
@@ -142,17 +164,21 @@
 .eko-studio__pill {
   min-height: 40px;
   padding: var(--space-2) var(--space-3);
-  border-radius: 999px;
-  border: 2px solid var(--surface-2);
-  background: var(--surface);
+  /* Frosted pill from .glass (no blur — small repeating control). */
   color: var(--text);
   font-weight: 600;
   font-size: 0.9rem;
 }
 
-.eko-studio__pill--active {
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+.eko-studio__pill.glass {
+  --glass-tint: color-mix(in srgb, var(--surface) 65%, transparent);
+  --glass-radius: 999px;
+  --glass-blur: 0px;
+}
+
+.eko-studio__pill--active.glass {
+  border: 2px solid var(--primary);
+  --glass-tint: color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
 .eko-studio__swatches {
@@ -202,20 +228,38 @@
   flex: 1;
   min-height: 52px;
   border: none;
-  border-radius: 999px;
-  background: var(--palm-500);
+  /* Glassy CTA: palm-tinted frost from .glass, white label. */
   color: #fff;
   font-weight: 800;
   font-size: 1rem;
-  box-shadow: 0 6px 16px rgb(34 197 94 / 0.35);
   cursor: pointer;
 }
 
+.eko-studio__save.glass {
+  /* Theme-aware green frost via indirection; the disabled state swaps the
+     var instead of fighting .glass--strong's fixed background. */
+  --glass-tint: var(--glass-tint-green);
+  --glass-radius: 999px;
+  border: none;
+}
+
 .eko-studio__save:disabled {
-  background: #d9f6e7;
   color: #5f8a73;
-  box-shadow: none;
   cursor: not-allowed;
+}
+
+.eko-studio__save:disabled.glass {
+  --glass-tint: var(--glass-tint-mint);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .eko-studio__save.glass {
+    background: var(--palm-500);
+    border: none;
+  }
+  .eko-studio__save:disabled.glass {
+    background: #d9f6e7;
+  }
 }
 
 /* "Edit look" entry button (Me tab profile header) */

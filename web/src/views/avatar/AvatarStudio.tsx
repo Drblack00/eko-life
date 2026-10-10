@@ -381,7 +381,7 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
         <div className="eko-studio__framing" role="group" aria-label="Camera framing">
           <button
             type="button"
-            className={`eko-studio__framebtn${activePreset === "face" ? " eko-studio__framebtn--active" : ""}`}
+            className={`eko-studio__framebtn glass${activePreset === "face" ? " eko-studio__framebtn--active" : ""}`}
             onClick={() => goPreset("face")}
             aria-pressed={activePreset === "face"}
           >
@@ -389,7 +389,7 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
           </button>
           <button
             type="button"
-            className={`eko-studio__framebtn${activePreset === "body" ? " eko-studio__framebtn--active" : ""}`}
+            className={`eko-studio__framebtn glass${activePreset === "body" ? " eko-studio__framebtn--active" : ""}`}
             onClick={() => goPreset("body")}
             aria-pressed={activePreset === "body"}
           >
@@ -397,7 +397,7 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
           </button>
         </div>
         {zoomHint && (
-          <div className="eko-studio__zoomhint" aria-hidden="true">
+          <div className="eko-studio__zoomhint glass" aria-hidden="true">
             Pinch or scroll to zoom
           </div>
         )}
@@ -463,7 +463,7 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
         </button>
         <button
           type="button"
-          className="eko-studio__save"
+          className="eko-studio__save glass"
           disabled={!dirty || saving}
           onClick={() => onSave(look)}
         >
@@ -486,7 +486,7 @@ function PillRow({
   onPick: (id: string) => void;
 }) {
   return (
-    <div className="eko-studio__row">
+    <div className="eko-studio__row glass">
       <span className="eko-studio__label">{label}</span>
       <div className="eko-studio__pills" role="radiogroup" aria-label={label}>
         {items.map((it) => (
@@ -495,7 +495,7 @@ function PillRow({
             type="button"
             role="radio"
             aria-checked={value === it.id}
-            className={`eko-studio__pill${value === it.id ? " eko-studio__pill--active" : ""}`}
+            className={`eko-studio__pill glass${value === it.id ? " eko-studio__pill--active" : ""}`}
             onClick={() => onPick(it.id)}
           >
             {it.name}
@@ -518,7 +518,7 @@ function SwatchRow({
   onPick: (id: string) => void;
 }) {
   return (
-    <div className="eko-studio__row">
+    <div className="eko-studio__row glass">
       <span className="eko-studio__label">{label}</span>
       <div className="eko-studio__swatches" role="radiogroup" aria-label={label}>
         {colors.map((c) => (
