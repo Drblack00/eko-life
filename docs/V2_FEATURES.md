@@ -93,6 +93,17 @@ only feature concepts and numeric values were reused.
   painted over the ₦ balance; now `appearance: none` + `flex: none` +
   `max-width` with ellipsis, and the HUD row tightens under 400px.
 
+## M14 — Home room (Buy mode) (2026-10-10)
+- **Reference:** buy-mode furniture catalogue + 3D home room.
+- **Ours:** 16-item original catalogue across 4 categories (🛏️ Sleep, 🍳 Kitchen,
+  🛁 Bath, 🛋️ Comfort) with prices (₦500–₦45,000), grid sizes and effect hooks;
+  isometric 3D home room (Three.js, all original low-poly models) on a 6×6
+  grid — rotate/zoom camera, ghost placement preview, tap a placed item for
+  Use / Rotate / Store / Sell. Use maps to existing actions (bed→sleep,
+  stove/fridge→eat, TV/sofa→fun). Server validates footprints, overlap and the
+  6-slot cap; sell-back refunds 50% on unplaced items. Existing furniture and
+  bonuses carry over untouched.
+
 ## Cross-cutting
 - No real-money features anywhere (no payments, no cash-out).
 - Server-authoritative economy: every money move is a ledger row.
