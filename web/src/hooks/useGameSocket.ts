@@ -166,6 +166,11 @@ function normalizeElection(msg: ServerMsg): ElectionState | null {
         : typeof msg.endsInDays === "number"
           ? msg.endsInDays
           : undefined,
+    // M11: policy + commissioners ride the same election payload.
+    policy: (src.policy as ElectionState["policy"]) ?? ((msg as unknown as Record<string, unknown>).policy as ElectionState["policy"]) ?? null,
+    pickablePolicies: (src.pickablePolicies as ElectionState["pickablePolicies"]) ?? [],
+    commissioners: (src.commissioners as ElectionState["commissioners"]) ?? [],
+    policyWindowOpen: src.policyWindowOpen === true || (msg as unknown as Record<string, unknown>).policyWindowOpen === true,
   };
 }
 
