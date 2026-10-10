@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { beaconError } from "./lib/beacon";
 import "./styles/tokens.css";
 import "./styles/base.css";
+import "./styles/glass.css";
 import "./boot.css";
 
 const STAGES = [
