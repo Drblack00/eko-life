@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Button, Dialog, EmptyState, Sheet, useToast } from "../../components";
 import type { GameSocket } from "../../hooks/useGameSocket";
 import { naira, type You } from "../../game/types";
+import { PolicyBanner, PolicyPicker, Commissioners } from "../v2/m11";
+import "../v2/m11/m11.css";
 import "./Election.css";
 
 /** Governor candidacy fee (ARCHITECTURE.md game constants, server-validated). */
@@ -204,6 +206,11 @@ export function ElectionSheet({
               once-a-day city-wide broadcast.
             </p>
           </section>
+
+          {/* M11: governance with teeth — policy + cabinet */}
+          <PolicyBanner sock={sock} />
+          <PolicyPicker sock={sock} you={you} />
+          <Commissioners sock={sock} you={you} />
         </div>
       </Sheet>
 
