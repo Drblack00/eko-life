@@ -121,7 +121,7 @@ test('M3 data: 60+ tagged locations, 10 jobs, 4+ career paths', () => {
   assert.ok(Object.keys(data.PROPERTIES).length >= 3);
   assert.ok(Object.keys(data.BIZ).length >= 3);
   assert.ok(Object.keys(data.VEHICLES).length >= 3);
-  assert.equal(Object.keys(data.FURN).length, 6);
+  assert.equal(Object.keys(data.FURN).length, 16); // M14: 6 original + 10 buy-mode items
   assert.equal(data.HOME_SLOTS, 6);
 });
 
