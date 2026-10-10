@@ -71,6 +71,11 @@ export interface FurnitureEntry {
   icon?: string;
   effect?: string;
   placed?: boolean;
+  /** M14 grid placement: cell coords 0..5 on the 6×6 home room grid. */
+  x?: number | null;
+  z?: number | null;
+  /** Quarter-turns clockwise; odd rotations swap the w/d footprint. */
+  rot?: 0 | 1 | 2 | 3 | null;
 }
 
 /** A street-find spawn from the server (`spawn {s}` / `despawn {id}`).
@@ -313,6 +318,7 @@ export type ActName =
   | "buy_vehicle"
   | "buy_furniture"
   | "place_furniture"
+  | "sell_furniture"
   | "loan"
   | "repay"
   | "bank"
