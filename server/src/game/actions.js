@@ -10,7 +10,7 @@ import {
   CLASSES, JOBS, FOOD, FUN, LOCATIONS, HOUSING,
   PROPERTIES, BIZ, VEHICLES, FURN, FURN_EFFECTS, HOME_SLOTS,
   BANK, STARTER_LOAN_AMOUNT, TRAVEL_FARES, STUDY_COST, COLLECT_RADIUS,
-  cleanText,
+  cleanText, sanitizeAvatar, WALLS, FLOORS,
 } from './data.js';
 import { clamp, chargeRent, applyDayEconomy, furnitureEffects, distUnits } from './sim.js';
 import {
@@ -509,6 +509,36 @@ export async function handleAct(ctx, msg) {
     await commit({
       kind: 'sell_furniture', amount: refund, meta: { item: row.item, furniture_id: fid },
       note: `${def.icon} Sold the ${def.name} for ${naira(refund)}.`,
+    });
+    return;
+  }
+
+  // ---------- save_avatar (M15: free, validated, persisted as JSON text) ----------
+  if (a === 'save_avatar') {
+    const res = sanitizeAvatar(msg.avatar);
+    if (!res.ok) { err(res.error); return; }
+    c.avatar_look = JSON.stringify(res.avatar);
+    console.log(`[act] ${conn.user.username} saved avatar look (${res.avatar.body}/${res.avatar.skin}/${res.avatar.hair})`);
+    // commit → saveCharacter → fresh `you` snapshot (carries avatar_look via youSnapshot)
+    await commit({ note: 'Your new look is saved.' });
+    return;
+  }
+
+  // ---------- buy_home_style (M15: wall/floor finish, charged + applied) ----------
+  if (a === 'buy_home_style') {
+    const kind = String(msg.kind || '');
+    if (kind !== 'wall' && kind !== 'floor') { err('Unknown home style kind — wall or floor.'); return; }
+    const list = kind === 'wall' ? WALLS : FLOORS;
+    const style = list.find(s => s.id === String(msg.id));
+    if (!style) { err(`Unknown home ${kind} style.`); return; }
+    const price = style.price;
+    if (Number(c.money) < price) { err(`You need ${naira(price)} for the ${style.name}.`); return; }
+    c.money = Math.floor(Number(c.money)) - price;
+    if (kind === 'wall') c.home_wall = style.id; else c.home_floor = style.id;
+    console.log(`[act] ${conn.user.username} bought home ${kind} ${style.id} (−${naira(price)})`);
+    await commit({
+      kind: 'buy_home_style', amount: -price, meta: { kind, id: style.id },
+      note: `${style.name} applied to your home.`,
     });
     return;
   }

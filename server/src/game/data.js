@@ -317,8 +317,127 @@ export function DEFAULT_CHARACTER(classId = 'street_smart', displayName = 'Playe
     customized: 0,
     starter_loan_available: 0,
     loan_free: 0,
+    // M15: avatar look (JSON text) + home style ids
+    avatar_look: null,
+    home_wall: null,
+    home_floor: null,
   };
 }
 
 // Game-day length (ms) — M1: day ticker only, full sim lands in M2
 export const DAY_MS = 5 * 60 * 1000;
+
+// ============================================================
+// M15: avatar + home-style customization (100% original content)
+// AvatarLook = { body:'woman'|'man', skin, hair, outfit, fabric,
+//                topColor, bottomColor } — stored on the character
+// as JSON text (c.avatar_look); home_wall / home_floor are style ids.
+// ============================================================
+
+export const AVATAR_BODIES = [
+  { id: 'woman', name: 'Woman' },
+  { id: 'man', name: 'Man' },
+];
+
+export const AVATAR_SKINS = [
+  { id: 'deep_espresso', name: 'Deep Espresso', hex: '#3b2314' },
+  { id: 'dark_cocoa',    name: 'Dark Cocoa',    hex: '#4a2c17' },
+  { id: 'burnt_caramel', name: 'Burnt Caramel', hex: '#5d3a1f' },
+  { id: 'mahogany',      name: 'Mahogany',      hex: '#6f4426' },
+  { id: 'walnut',        name: 'Walnut',        hex: '#7d5330' },
+  { id: 'cocoa',         name: 'Cocoa',         hex: '#8a5f38' },
+  { id: 'coffee',        name: 'Coffee',        hex: '#9a6f45' },
+  { id: 'latte',         name: 'Latte',         hex: '#ab8054' },
+  { id: 'honey',         name: 'Honey',         hex: '#bc9066' },
+  { id: 'sand',          name: 'Sand',          hex: '#cda077' },
+  { id: 'amber',         name: 'Amber',         hex: '#dcb07e' },
+  { id: 'cream',         name: 'Cream',         hex: '#e8cfa3' },
+];
+
+export const AVATAR_HAIRS = [
+  { id: 'lowcut',  name: 'Low cut' },
+  { id: 'bald',    name: 'Bald' },
+  { id: 'curls',   name: 'Curls' },
+  { id: 'afro',    name: 'Afro' },
+  { id: 'locs',    name: 'Locs' },
+  { id: 'braids',  name: 'Braids' },
+  { id: 'classic', name: 'Classic' },
+];
+
+export const AVATAR_OUTFITS = [
+  { id: 'casual',   name: 'Casual' },
+  { id: 'hoodie',   name: 'Hoodie' },
+  { id: 'office',   name: 'Office' },
+  { id: 'chill',    name: 'Chill' },
+  { id: 'sitework', name: 'Site work' },
+];
+
+export const AVATAR_FABRICS = [
+  { id: 'plain',  name: 'Plain' },
+  { id: 'ankara', name: 'Ankara' },
+  { id: 'adire',  name: 'Adire' },
+  { id: 'asoke',  name: 'Aso-oke' },
+];
+
+export const AVATAR_TOP_COLORS = [
+  '#22d3ee', '#f472b6', '#a3e635', '#fbbf24', '#c084fc',
+  '#fb7185', '#34d399', '#60a5fa', '#ef4444', '#fb923c',
+];
+
+export const AVATAR_BOTTOM_COLORS = [
+  '#334155', '#111827', '#f8fafc', '#1e3a8a', '#64748b',
+  '#78350f', '#14532d', '#7c2d12', '#831843', '#3b0764',
+];
+
+export const DEFAULT_AVATAR = {
+  body: 'woman',
+  skin: 'cocoa',
+  hair: 'lowcut',
+  outfit: 'casual',
+  fabric: 'plain',
+  topColor: '#22d3ee',
+  bottomColor: '#334155',
+};
+
+// Validate an AvatarLook payload. Every field is checked against the
+// allowlists; colors must appear in the color lists (case-insensitive).
+// Returns { ok:true, avatar } with canonical values on success, or
+// { ok:false, avatar:null, error } naming the bad field on failure.
+export function sanitizeAvatar(raw) {
+  const bad = (field, value) => ({ ok: false, avatar: null, error: `Invalid avatar ${field}: '${value}'.` });
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return bad('body', '');
+  if (!AVATAR_BODIES.some(b => b.id === raw.body)) return bad('body', raw.body);
+  if (!AVATAR_SKINS.some(s => s.id === raw.skin)) return bad('skin', raw.skin);
+  if (!AVATAR_HAIRS.some(h => h.id === raw.hair)) return bad('hair', raw.hair);
+  if (!AVATAR_OUTFITS.some(o => o.id === raw.outfit)) return bad('outfit', raw.outfit);
+  if (!AVATAR_FABRICS.some(f => f.id === raw.fabric)) return bad('fabric', raw.fabric);
+  const top = String(raw.topColor || '').toLowerCase();
+  if (!AVATAR_TOP_COLORS.includes(top)) return bad('topColor', raw.topColor);
+  const bottom = String(raw.bottomColor || '').toLowerCase();
+  if (!AVATAR_BOTTOM_COLORS.includes(bottom)) return bad('bottomColor', raw.bottomColor);
+  return {
+    ok: true,
+    avatar: {
+      body: raw.body, skin: raw.skin, hair: raw.hair,
+      outfit: raw.outfit, fabric: raw.fabric,
+      topColor: top, bottomColor: bottom,
+    },
+    error: null,
+  };
+}
+
+// ---------------- Home styles (wall/floor finishes, priced in naira) ----------------
+export const WALLS = [
+  { id: 'smooth_matte', name: 'Smooth Matte', price: 1500,  hex: '#e7e5e4', desc: 'Clean matte finish — easy on the eyes, cheap to refresh.' },
+  { id: 'lagoon_teal',  name: 'Lagoon Teal',  price: 4500,  hex: '#0e7490', desc: 'Cool teal wash, like the lagoon at noon.' },
+  { id: 'sunset_ochre', name: 'Sunset Ochre', price: 8000,  hex: '#b45309', desc: 'Warm ochre walls — golden-hour glow all day.' },
+  { id: 'regal_plum',   name: 'Regal Plum',   price: 14000, hex: '#6d28d9', desc: 'Deep plum with a premium, owambe-night feel.' },
+  { id: 'gold_leaf',    name: 'Gold Leaf',    price: 25000, hex: '#a16207', desc: 'Metallic gold shimmer — proper soft-life walls.' },
+];
+
+export const FLOORS = [
+  { id: 'polished_concrete', name: 'Polished Concrete', price: 5000,  hex: '#9ca3af', desc: 'Sleek polished concrete — modern and cool underfoot.' },
+  { id: 'lagos_hardwood',    name: 'Lagos Hardwood',    price: 10000, hex: '#7c4a2d', desc: 'Warm hardwood planks, classic comfort.' },
+  { id: 'marble_vein',       name: 'Marble Vein',       price: 15000, hex: '#e2e8f0', desc: 'Bright marble with soft grey veining.' },
+  { id: 'obsidian_gloss',    name: 'Obsidian Gloss',    price: 20000, hex: '#1f2937', desc: 'Dark glossy tiles — sharp, premium finish.' },
+];
