@@ -400,6 +400,10 @@ export async function initDb() {
     await ensureColumn('furniture', 'x', 'INTEGER', 'INTEGER');
     await ensureColumn('furniture', 'z', 'INTEGER', 'INTEGER');
     await ensureColumn('furniture', 'rot', 'INTEGER', 'INTEGER');
+    // M15: avatar look (JSON text) + home style ids (no-op on fresh DBs)
+    await ensureColumn('characters', 'avatar_look', 'TEXT', 'TEXT');
+    await ensureColumn('characters', 'home_wall', 'TEXT', 'TEXT');
+    await ensureColumn('characters', 'home_floor', 'TEXT', 'TEXT');
     console.log('[db] PostgreSQL connected');
   } else {
     const dbPath = process.env.EKO_DB_PATH || path.join(__dirname, 'eko-life.db');
@@ -435,6 +439,10 @@ export async function initDb() {
     await ensureColumn('furniture', 'x', 'INTEGER', '');
     await ensureColumn('furniture', 'z', 'INTEGER', '');
     await ensureColumn('furniture', 'rot', 'INTEGER', '');
+    // M15: avatar look (JSON text) + home style ids (no-op on fresh DBs)
+    await ensureColumn('characters', 'avatar_look', 'TEXT', '');
+    await ensureColumn('characters', 'home_wall', 'TEXT', '');
+    await ensureColumn('characters', 'home_floor', 'TEXT', '');
     console.log(`[db] SQLite connected (${dbPath === ':memory:' ? 'in-memory' : 'local file'})`);
   }
 }
@@ -482,6 +490,8 @@ async function insertCharacter(userId, c, now) {
   const perksJson = typeof c.perks === 'string' ? c.perks : JSON.stringify(c.perks || []);
   const skillsJson = typeof c.skills === 'string' ? c.skills : (c.skills == null ? null : JSON.stringify(c.skills));
   const skillsUsedJson = typeof c.skills_used === 'string' ? c.skills_used : (c.skills_used == null ? null : JSON.stringify(c.skills_used));
+  // M15: avatar look is JSON text (null until the player saves a look)
+  const avatarLookJson = typeof c.avatar_look === 'string' ? c.avatar_look : (c.avatar_look == null ? null : JSON.stringify(c.avatar_look));
   const params = [userId, c.name, c.class, c.avatar, c.color, c.money, c.energy, c.health,
     c.happiness, c.hunger, c.housing, c.property, c.vehicle, c.biz ?? null, c.savings, c.loan, c.cert,
     c.location_id, c.x ?? null, c.y ?? null, c.rent_misses || 0, c.customized || 0,
@@ -490,20 +500,23 @@ async function insertCharacter(userId, c, now) {
     c.fun ?? 100, c.social ?? 100, c.hygiene ?? 100, c.bladder ?? 100,
     Math.max(0, Math.floor(Number(c.perk_stars) || 0)), perksJson,
     Number(c.housing_owned) ? 1 : 0, skillsJson, skillsUsedJson,
+    avatarLookJson, c.home_wall ?? null, c.home_floor ?? null,
     now || Date.now()];
   await runQ(
     `INSERT INTO characters (user_id, name, class, avatar, color, money, energy, health, happiness,
       hunger, housing, property, vehicle, biz, savings, loan, cert, location_id,
       x, y, rent_misses, customized, starter_loan_available, loan_free,
       shift_job, shift_started_at, shift_ends_at, fun, social, hygiene, bladder,
-      perk_stars, perks, housing_owned, skills, skills_used, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      perk_stars, perks, housing_owned, skills, skills_used, avatar_look, home_wall, home_floor,
+      updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     `INSERT INTO characters (user_id, name, class, avatar, color, money, energy, health, happiness,
       hunger, housing, property, vehicle, biz, savings, loan, cert, location_id,
       x, y, rent_misses, customized, starter_loan_available, loan_free,
       shift_job, shift_started_at, shift_ends_at, fun, social, hygiene, bladder,
-      perk_stars, perks, housing_owned, skills, skills_used, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37)`,
+      perk_stars, perks, housing_owned, skills, skills_used, avatar_look, home_wall, home_floor,
+      updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40)`,
     params);
 }
 
@@ -585,6 +598,8 @@ export async function saveCharacter(c) {
   const perksJson = typeof c.perks === 'string' ? c.perks : JSON.stringify(c.perks || []);
   const skillsJson = typeof c.skills === 'string' ? c.skills : (c.skills == null ? null : JSON.stringify(c.skills));
   const skillsUsedJson = typeof c.skills_used === 'string' ? c.skills_used : (c.skills_used == null ? null : JSON.stringify(c.skills_used));
+  // M15: avatar look is JSON text (null until the player saves a look)
+  const avatarLookJson = typeof c.avatar_look === 'string' ? c.avatar_look : (c.avatar_look == null ? null : JSON.stringify(c.avatar_look));
   const params = [c.name, c.class, c.avatar, c.color, c.money, c.energy, c.health,
     c.happiness, c.hunger, c.housing, c.property, c.vehicle, c.biz ?? null, c.savings, c.loan,
     c.cert, c.location_id, c.x ?? null, c.y ?? null, c.rent_misses || 0,
@@ -593,6 +608,7 @@ export async function saveCharacter(c) {
     c.fun ?? 100, c.social ?? 100, c.hygiene ?? 100, c.bladder ?? 100,
     Math.max(0, Math.floor(Number(c.perk_stars) || 0)), perksJson,
     Number(c.housing_owned) ? 1 : 0, skillsJson, skillsUsedJson,
+    avatarLookJson, c.home_wall ?? null, c.home_floor ?? null,
     Date.now(), c.user_id];
   await runQ(
     `UPDATE characters SET name=?, class=?, avatar=?, color=?, money=?, energy=?, health=?,
@@ -600,13 +616,15 @@ export async function saveCharacter(c) {
       cert=?, location_id=?, x=?, y=?, rent_misses=?, customized=?, starter_loan_available=?,
       loan_free=?, shift_job=?, shift_started_at=?, shift_ends_at=?,
       fun=?, social=?, hygiene=?, bladder=?, perk_stars=?, perks=?,
-      housing_owned=?, skills=?, skills_used=?, updated_at=? WHERE user_id=?`,
+      housing_owned=?, skills=?, skills_used=?,
+      avatar_look=?, home_wall=?, home_floor=?, updated_at=? WHERE user_id=?`,
     `UPDATE characters SET name=$1, class=$2, avatar=$3, color=$4, money=$5, energy=$6, health=$7,
       happiness=$8, hunger=$9, housing=$10, property=$11, vehicle=$12, biz=$13, savings=$14, loan=$15,
       cert=$16, location_id=$17, x=$18, y=$19, rent_misses=$20, customized=$21,
       starter_loan_available=$22, loan_free=$23, shift_job=$24, shift_started_at=$25, shift_ends_at=$26,
       fun=$27, social=$28, hygiene=$29, bladder=$30, perk_stars=$31, perks=$32,
-      housing_owned=$33, skills=$34, skills_used=$35, updated_at=$36 WHERE user_id=$37`,
+      housing_owned=$33, skills=$34, skills_used=$35,
+      avatar_look=$36, home_wall=$37, home_floor=$38, updated_at=$39 WHERE user_id=$40`,
     params);
 }
 
