@@ -1,4 +1,6 @@
 import type {
+  AvatarLook,
+  AvatarLookOptions,
   LeaderEntry,
   NewsItem,
   PresenceEntry,
@@ -199,6 +201,15 @@ export interface TransactionInfo {
   meta?: unknown;
 }
 
+/** M15 home-style option (walls / floors) from /api/config. */
+export interface WallFloorOption {
+  id: string;
+  name: string;
+  price: number;
+  hex: string;
+  desc?: string;
+}
+
 export interface GameConfig {
   classes: Record<string, ClassInfo>;
   locations: ApiLocation[];
@@ -220,6 +231,11 @@ export interface GameConfig {
   bounds: { xMin: number; xMax: number; yMin: number; yMax: number };
   avatars?: string[];
   colors?: string[];
+  /** M15: avatar-studio option lists (optional until the server lands). */
+  avatarLook?: AvatarLookOptions;
+  /** M15: home wall / floor style catalogs for `buy_home_style`. */
+  walls?: WallFloorOption[];
+  floors?: WallFloorOption[];
 }
 
 /**
@@ -249,6 +265,10 @@ export function normalizeConfig(raw: Record<string, unknown> | undefined): GameC
     r.travelFares && typeof r.travelFares === "object"
       ? (r.travelFares as GameConfig["travelFares"])
       : undefined;
+  const avatarLook =
+    r.avatarLook && typeof r.avatarLook === "object"
+      ? (r.avatarLook as GameConfig["avatarLook"])
+      : undefined;
   return {
     classes,
     locations: asList(r.locations as GameConfig["locations"]),
@@ -272,6 +292,9 @@ export function normalizeConfig(raw: Record<string, unknown> | undefined): GameC
     studyCost: typeof r.studyCost === "number" ? r.studyCost : 5000,
     spawn: typeof r.spawn === "string" ? r.spawn : "ojuelegba",
     bounds,
+    avatarLook,
+    walls: asList(r.walls as GameConfig["walls"]),
+    floors: asList(r.floors as GameConfig["floors"]),
   };
 }
 
@@ -318,6 +341,8 @@ export interface Me {
   is_admin: boolean;
   guest: boolean;
   customized?: boolean;
+  /** M15: staged 3D avatar look (server contract: character.avatar_look). */
+  avatar_look?: AvatarLook | null;
 }
 
 export interface PublicStats {
@@ -510,7 +535,14 @@ export const api = {
   /** M2 character creation — once per character. Server validates & applies class stats. */
   createCharacter: (
     token: string,
-    body: { name: string; class: string; avatar: string; color: string }
+    body: {
+      name: string;
+      class: string;
+      avatar: string;
+      color: string;
+      /** M15: staged 3D look (sanitized client-side; server re-validates). */
+      avatar_look?: AvatarLook;
+    }
   ) =>
     request<{ ok: boolean; character?: Me }>("/api/characters", {
       method: "POST",
