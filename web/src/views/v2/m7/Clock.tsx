@@ -38,9 +38,17 @@ export function Clock({ label: externalLabel }: { label?: string }) {
     };
   }, [externalLabel]);
 
+  const parts = label.split("·").map((s) => s.trim());
+  const datePart = parts.length > 1 ? parts[0] : "";
+  const timePart = parts.length > 1 ? parts.slice(1).join(" · ") : label;
+
   return (
     <span className="m7-clock" role="timer" aria-label={`Game time: ${label}`}>
-      <span aria-hidden="true">🕐</span> {label}
+      <span aria-hidden="true">🕐</span>{" "}
+      {datePart ? (
+        <span className="m7-clock__date">{datePart} · </span>
+      ) : null}
+      {timePart}
     </span>
   );
 }
