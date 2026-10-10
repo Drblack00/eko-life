@@ -32,6 +32,10 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
 
   const mountRef = useRef<HTMLDivElement>(null);
   const [glFailed, setGlFailed] = useState(false);
+  // Updater for the current figure's idle animation (blink, breathing, …).
+  const updateRef = useRef<((t: number, dt: number) => void) | undefined>(
+    undefined
+  );
 
   /* ---------- Three.js preview ---------- */
   // Mount effect: renderer, lights, stage. Stashes the spinner group on the
@@ -123,10 +127,18 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
     ro.observe(mount);
 
     let raf = 0;
+    const clock = new THREE.Clock();
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const tick = () => {
       raf = requestAnimationFrame(tick);
+      const dt = Math.min(clock.getDelta(), 0.1);
+      updateRef.current?.(clock.elapsedTime, dt);
       // Gentle auto-spin when the user hasn't touched it recently.
-      if (!dragging && performance.now() - lastInteract > 3000) target += 0.004;
+      if (!reduceMotion && !dragging && performance.now() - lastInteract > 3000)
+        target += 0.004;
       angle += (target - angle) * 0.12;
       spinner.rotation.y = angle;
       renderer.render(scene, camera);
@@ -157,7 +169,9 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
     const mount = mountRef.current;
     const spinner = (mount as unknown as { __spinner?: THREE.Group } | null)?.__spinner;
     if (!spinner) return;
-    const next = buildAvatarLook(THREE, look);
+    const built = buildAvatarLook(look);
+    const next = built.group;
+    updateRef.current = built.update;
     const old = spinner.children[0] as THREE.Group | undefined;
     spinner.add(next);
     if (old) {
