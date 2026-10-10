@@ -165,7 +165,188 @@ CREATE TABLE IF NOT EXISTS reports (
   status TEXT NOT NULL DEFAULT 'open',
   created_at INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports(reported_id);`;
+CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports(reported_id);
+-- ============================================================
+-- FINTECH FOUNDATION (Worker A) — real-money cash ledger.
+-- ADDITIVE ONLY: no existing game table, game code, or the
+-- gameplay-coins economy (characters.money / transactions) is
+-- touched by these tables.
+--
+-- 1) CASH / GAMEPLAY SEPARATION RULE
+--    cash_wallets holds REAL money in NGN kobo. characters.money
+--    holds GAMEPLAY coins. The two ledgers are fully independent
+--    and no code path may move value between them.
+-- 2) NO-CONVERSION RULE
+--    There is no exchange rate, purchase, or redemption path
+--    between gameplay coins and cash kobo — ever. Treat them as
+--    different currencies that can never touch.
+-- 3) WITHDRAWAL STATE MACHINE (cash_withdrawal_requests.status):
+--       requested → reserved → submitted → processing → completed
+--       requested → rejected      (policy/admin reject, pre-reserve)
+--       reserved  → rejected      (policy/admin reject, pre-submit)
+--       requested|reserved|submitted|processing → failed
+--                 (validation, reservation, or provider failure)
+--       completed → reversed      (ONLY via a linked 'reversal'
+--                 journal: ledger_journals.type='reversal' with
+--                 related_journal_id → the original journal)
+--    Terminal states: completed, failed, rejected, reversed.
+--    Transition enforcement lives in the ledger engine (Worker B);
+--    the CHECK constraint here only whitelists valid statuses.
+-- 4) IDEMPOTENCY
+--    ledger_journals.journal_key is the single idempotency key for
+--    every balanced journal; deposit/transfer/withdrawal rows link
+--    back via their own journal_key. provider_ref carries the
+--    provider's reference and is unique wherever present — the
+--    partial unique index below ignores NULLs.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ledger_accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('asset','liability','revenue','expense','clearing')),
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS ledger_journals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  journal_key TEXT UNIQUE NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('deposit','transfer','withdrawal','commission','reversal','adjustment')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','posted','reversed','failed')),
+  user_id INTEGER REFERENCES users(id),
+  related_journal_id INTEGER REFERENCES ledger_journals(id),
+  provider_ref TEXT,
+  currency TEXT NOT NULL DEFAULT 'NGN' CHECK (currency = 'NGN'),
+  memo TEXT,
+  metadata TEXT,
+  created_at INTEGER NOT NULL,
+  posted_at INTEGER
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_journals_provider_ref
+  ON ledger_journals(provider_ref) WHERE provider_ref IS NOT NULL;
+CREATE TABLE IF NOT EXISTS ledger_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  journal_id INTEGER NOT NULL REFERENCES ledger_journals(id),
+  account_id INTEGER NOT NULL REFERENCES ledger_accounts(id),
+  side TEXT NOT NULL CHECK (side IN ('debit','credit')),
+  amount_kobo INTEGER NOT NULL CHECK (amount_kobo >= 0),
+  currency TEXT NOT NULL DEFAULT 'NGN' CHECK (currency = 'NGN'),
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ledger_entries_journal ON ledger_entries(journal_id);
+CREATE TABLE IF NOT EXISTS cash_wallets (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id),
+  available_kobo INTEGER NOT NULL DEFAULT 0 CHECK (available_kobo >= 0),
+  reserved_kobo INTEGER NOT NULL DEFAULT 0 CHECK (reserved_kobo >= 0),
+  currency TEXT NOT NULL DEFAULT 'NGN' CHECK (currency = 'NGN'),
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS cash_deposits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  journal_key TEXT UNIQUE NOT NULL,
+  amount_kobo INTEGER NOT NULL CHECK (amount_kobo >= 0),
+  currency TEXT NOT NULL DEFAULT 'NGN' CHECK (currency = 'NGN'),
+  provider TEXT NOT NULL DEFAULT 'mock',
+  provider_ref TEXT UNIQUE,
+  status TEXT NOT NULL CHECK (status IN ('pending','confirmed','failed','refunded','expired')),
+  confirmed_at INTEGER,
+  metadata TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS cash_transfers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sender_id INTEGER NOT NULL REFERENCES users(id),
+  recipient_id INTEGER NOT NULL REFERENCES users(id),
+  journal_key TEXT UNIQUE NOT NULL,
+  amount_kobo INTEGER NOT NULL CHECK (amount_kobo > 0),
+  currency TEXT NOT NULL DEFAULT 'NGN' CHECK (currency = 'NGN'),
+  status TEXT NOT NULL CHECK (status IN ('pending','completed','failed','reversed')),
+  idempotency_key TEXT UNIQUE NOT NULL,
+  memo TEXT,
+  created_at INTEGER NOT NULL,
+  completed_at INTEGER,
+  CHECK (sender_id != recipient_id)
+);
+-- NOTE: account_number stores the FULL account number (the payout
+-- provider needs it to send money). NEVER log this column. NEVER
+-- store banking passwords, PINs, or OTPs anywhere in this database.
+CREATE TABLE IF NOT EXISTS cash_withdrawal_beneficiaries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  label TEXT NOT NULL,
+  bank_code TEXT NOT NULL,
+  account_number TEXT NOT NULL,
+  account_name TEXT,
+  verified INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  UNIQUE (user_id, bank_code, account_number)
+);
+CREATE TABLE IF NOT EXISTS cash_withdrawal_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  beneficiary_id INTEGER NOT NULL REFERENCES cash_withdrawal_beneficiaries(id),
+  journal_key TEXT UNIQUE NOT NULL,
+  gross_kobo INTEGER NOT NULL CHECK (gross_kobo > 0),
+  commission_kobo INTEGER NOT NULL CHECK (commission_kobo >= 0),
+  net_kobo INTEGER NOT NULL CHECK (net_kobo >= 0),
+  fee_policy_version INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'NGN' CHECK (currency = 'NGN'),
+  status TEXT NOT NULL CHECK (status IN ('requested','reserved','submitted','processing','completed','failed','rejected','reversed')),
+  provider_ref TEXT UNIQUE,
+  failure_reason TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  completed_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS provider_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider TEXT NOT NULL DEFAULT 'mock',
+  event_type TEXT NOT NULL,
+  provider_ref TEXT,
+  payload TEXT NOT NULL,
+  signature_valid INTEGER,
+  processed INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_provider_events_ref ON provider_events(provider_ref);
+CREATE TABLE IF NOT EXISTS fee_policies (
+  version INTEGER PRIMARY KEY,
+  rate_bps INTEGER NOT NULL,
+  rounding TEXT NOT NULL DEFAULT 'half_up',
+  applies_from INTEGER NOT NULL,
+  memo TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS fintech_audit_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor TEXT NOT NULL,
+  action TEXT NOT NULL,
+  entity TEXT NOT NULL,
+  entity_id TEXT,
+  detail TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fintech_audit_entity ON fintech_audit_logs(entity, entity_id);
+-- Milestone 9 (Worker B): manual risk reviews for withdrawals.
+-- A withdrawal diverted by the risk policy keeps its row status
+-- ('reserved') while an 'open' review exists here; the API reports an
+-- effective status of 'under_review'. Approve -> payout proceeds;
+-- reject -> reserved funds released via compensating journal.
+CREATE TABLE IF NOT EXISTS risk_reviews (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  withdrawal_id INTEGER NOT NULL REFERENCES cash_withdrawal_requests(id),
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','approved','rejected','closed')),
+  reasons TEXT,
+  gross_kobo INTEGER NOT NULL CHECK (gross_kobo > 0),
+  note TEXT,
+  reviewed_by INTEGER REFERENCES users(id),
+  review_reason TEXT,
+  created_at INTEGER NOT NULL,
+  reviewed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_risk_reviews_withdrawal ON risk_reviews(withdrawal_id);
+CREATE INDEX IF NOT EXISTS idx_risk_reviews_status ON risk_reviews(status);`;
 
 const PG_SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -311,9 +492,184 @@ CREATE TABLE IF NOT EXISTS reports (
   status TEXT NOT NULL DEFAULT 'open',
   created_at BIGINT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports(reported_id);`;
-
-// ---------- low-level helpers (same API, both backends) ----------
+CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports(reported_id);
+-- ============================================================
+-- FINTECH FOUNDATION (Worker A) — real-money cash ledger.
+-- ADDITIVE ONLY: no existing game table, game code, or the
+-- gameplay-coins economy (characters.money / transactions) is
+-- touched by these tables.
+--
+-- 1) CASH / GAMEPLAY SEPARATION RULE
+--    cash_wallets holds REAL money in NGN kobo. characters.money
+--    holds GAMEPLAY coins. The two ledgers are fully independent
+--    and no code path may move value between them.
+-- 2) NO-CONVERSION RULE
+--    There is no exchange rate, purchase, or redemption path
+--    between gameplay coins and cash kobo — ever. Treat them as
+--    different currencies that can never touch.
+-- 3) WITHDRAWAL STATE MACHINE (cash_withdrawal_requests.status):
+--       requested → reserved → submitted → processing → completed
+--       requested → rejected      (policy/admin reject, pre-reserve)
+--       reserved  → rejected      (policy/admin reject, pre-submit)
+--       requested|reserved|submitted|processing → failed
+--                 (validation, reservation, or provider failure)
+--       completed → reversed      (ONLY via a linked 'reversal'
+--                 journal: ledger_journals.type='reversal' with
+--                 related_journal_id → the original journal)
+--    Terminal states: completed, failed, rejected, reversed.
+--    Transition enforcement lives in the ledger engine (Worker B);
+--    the CHECK constraint here only whitelists valid statuses.
+-- 4) IDEMPOTENCY
+--    ledger_journals.journal_key is the single idempotency key for
+--    every balanced journal; deposit/transfer/withdrawal rows link
+--    back via their own journal_key. provider_ref carries the
+--    provider's reference and is unique wherever present — the
+--    partial unique index below ignores NULLs.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ledger_accounts (
+  id SERIAL PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('asset','liability','revenue','expense','clearing')),
+  created_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS ledger_journals (
+  id SERIAL PRIMARY KEY,
+  journal_key TEXT UNIQUE NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('deposit','transfer','withdrawal','commission','reversal','adjustment')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','posted','reversed','failed')),
+  user_id INTEGER REFERENCES users(id),
+  related_journal_id INTEGER REFERENCES ledger_journals(id),
+  provider_ref TEXT,
+  currency TEXT NOT NULL DEFAULT 'NGN' CHECK (currency = 'NGN'),
+  memo TEXT,
+  metadata TEXT,
+  created_at BIGINT NOT NULL,
+  posted_at BIGINT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_journals_provider_ref
+  ON ledger_journals(provider_ref) WHERE provider_ref IS NOT NULL;
+CREATE TABLE IF NOT EXISTS ledger_entries (
+  id SERIAL PRIMARY KEY,
+  journal_id INTEGER NOT NULL REFERENCES ledger_journals(id),
+  account_id INTEGER NOT NULL REFERENCES ledger_accounts(id),
+  side TEXT NOT NULL CHECK (side IN ('debit','credit')),
+  amount_kobo INTEGER NOT NULL CHECK (amount_kobo >= 0),
+  currency TEXT NOT NULL DEFAULT 'NGN' CHECK (currency = 'NGN'),
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ledger_entries_journal ON ledger_entries(journal_id);
+CREATE TABLE IF NOT EXISTS cash_wallets (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id),
+  available_kobo INTEGER NOT NULL DEFAULT 0 CHECK (available_kobo >= 0),
+  reserved_kobo INTEGER NOT NULL DEFAULT 0 CHECK (reserved_kobo >= 0),
+  currency TEXT NOT NULL DEFAULT 'NGN' CHECK (currency = 'NGN'),
+  updated_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS cash_deposits (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  journal_key TEXT UNIQUE NOT NULL,
+  amount_kobo INTEGER NOT NULL CHECK (amount_kobo >= 0),
+  currency TEXT NOT NULL DEFAULT 'NGN' CHECK (currency = 'NGN'),
+  provider TEXT NOT NULL DEFAULT 'mock',
+  provider_ref TEXT UNIQUE,
+  status TEXT NOT NULL CHECK (status IN ('pending','confirmed','failed','refunded','expired')),
+  confirmed_at BIGINT,
+  metadata TEXT,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS cash_transfers (
+  id SERIAL PRIMARY KEY,
+  sender_id INTEGER NOT NULL REFERENCES users(id),
+  recipient_id INTEGER NOT NULL REFERENCES users(id),
+  journal_key TEXT UNIQUE NOT NULL,
+  amount_kobo INTEGER NOT NULL CHECK (amount_kobo > 0),
+  currency TEXT NOT NULL DEFAULT 'NGN' CHECK (currency = 'NGN'),
+  status TEXT NOT NULL CHECK (status IN ('pending','completed','failed','reversed')),
+  idempotency_key TEXT UNIQUE NOT NULL,
+  memo TEXT,
+  created_at BIGINT NOT NULL,
+  completed_at BIGINT,
+  CHECK (sender_id != recipient_id)
+);
+-- NOTE: account_number stores the FULL account number (the payout
+-- provider needs it to send money). NEVER log this column. NEVER
+-- store banking passwords, PINs, or OTPs anywhere in this database.
+CREATE TABLE IF NOT EXISTS cash_withdrawal_beneficiaries (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  label TEXT NOT NULL,
+  bank_code TEXT NOT NULL,
+  account_number TEXT NOT NULL,
+  account_name TEXT,
+  verified BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at BIGINT NOT NULL,
+  UNIQUE (user_id, bank_code, account_number)
+);
+CREATE TABLE IF NOT EXISTS cash_withdrawal_requests (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  beneficiary_id INTEGER NOT NULL REFERENCES cash_withdrawal_beneficiaries(id),
+  journal_key TEXT UNIQUE NOT NULL,
+  gross_kobo INTEGER NOT NULL CHECK (gross_kobo > 0),
+  commission_kobo INTEGER NOT NULL CHECK (commission_kobo >= 0),
+  net_kobo INTEGER NOT NULL CHECK (net_kobo >= 0),
+  fee_policy_version INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'NGN' CHECK (currency = 'NGN'),
+  status TEXT NOT NULL CHECK (status IN ('requested','reserved','submitted','processing','completed','failed','rejected','reversed')),
+  provider_ref TEXT UNIQUE,
+  failure_reason TEXT,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  completed_at BIGINT
+);
+CREATE TABLE IF NOT EXISTS provider_events (
+  id SERIAL PRIMARY KEY,
+  provider TEXT NOT NULL DEFAULT 'mock',
+  event_type TEXT NOT NULL,
+  provider_ref TEXT,
+  payload TEXT NOT NULL,
+  signature_valid BOOLEAN,
+  processed BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_provider_events_ref ON provider_events(provider_ref);
+CREATE TABLE IF NOT EXISTS fee_policies (
+  version INTEGER PRIMARY KEY,
+  rate_bps INTEGER NOT NULL,
+  rounding TEXT NOT NULL DEFAULT 'half_up',
+  applies_from BIGINT NOT NULL,
+  memo TEXT,
+  created_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS fintech_audit_logs (
+  id SERIAL PRIMARY KEY,
+  actor TEXT NOT NULL,
+  action TEXT NOT NULL,
+  entity TEXT NOT NULL,
+  entity_id TEXT,
+  detail TEXT,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fintech_audit_entity ON fintech_audit_logs(entity, entity_id);
+-- Milestone 9 (Worker B): manual risk reviews for withdrawals (PG variant).
+CREATE TABLE IF NOT EXISTS risk_reviews (
+  id SERIAL PRIMARY KEY,
+  withdrawal_id INTEGER NOT NULL REFERENCES cash_withdrawal_requests(id),
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','approved','rejected','closed')),
+  reasons TEXT,
+  gross_kobo INTEGER NOT NULL CHECK (gross_kobo > 0),
+  note TEXT,
+  reviewed_by INTEGER REFERENCES users(id),
+  review_reason TEXT,
+  created_at BIGINT NOT NULL,
+  reviewed_at BIGINT
+);
+CREATE INDEX IF NOT EXISTS idx_risk_reviews_withdrawal ON risk_reviews(withdrawal_id);
+CREATE INDEX IF NOT EXISTS idx_risk_reviews_status ON risk_reviews(status);`;
 async function runQ(sqliteSql, pgSql, params) {
   if (pool) { await pool.query(pgSql, params); return { changes: 0 }; }
   const r = sdb.prepare(sqliteSql).run(...params);
@@ -1200,4 +1556,69 @@ export async function listTopByMoney(limit = 10) {
      ORDER BY c.money DESC NULLS LAST LIMIT $1`,
     [lim]);
   return rows.map(r => ({ username: r.username, money: Number(r.money) }));
+}
+
+// ============================================================
+// Fintech — backend-agnostic transaction helper (ADDITIVE only;
+// no existing game code path uses it).
+//
+// dbTransaction(cb) runs cb() inside a single DB transaction on the
+// active backend and serializes concurrent transactions with a
+// promise mutex, so two journal posts can never interleave on one
+// backend connection:
+//
+// - PostgreSQL: checks out ONE client from the pool and temporarily
+//   routes the module's query helpers (dbRun/dbGet/dbAll) through it
+//   for the duration of the callback, so every statement in cb()
+//   shares the same BEGIN/COMMIT. (Non-transactional game queries may
+//   briefly run on that client instead of the pool — same API, harmless.)
+// - SQLite (node:sqlite): BEGIN IMMEDIATE / COMMIT / ROLLBACK on the
+//   single DatabaseSync connection.
+//
+// Re-entrant: calling dbTransaction inside an active transaction just
+// runs the callback (no nested BEGIN).
+// ============================================================
+let txChain = Promise.resolve(); // serialization mutex across transactions
+let txDepth = 0;                 // >0 while the mutex holder is inside a tx
+
+export async function dbTransaction(cb) {
+  if (txDepth > 0) return cb();
+  const run = txChain.then(async () => {
+    txDepth++;
+    try {
+      if (pool) {
+        const client = await pool.connect();
+        const prev = pool;
+        pool = client; // route dbRun/dbGet/dbAll through the tx client
+        try {
+          await client.query('BEGIN');
+          const out = await cb();
+          await client.query('COMMIT');
+          return out;
+        } catch (e) {
+          try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+          throw e;
+        } finally {
+          pool = prev;
+          client.release();
+        }
+      } else {
+        sdb.exec('BEGIN IMMEDIATE');
+        try {
+          const out = await cb();
+          sdb.exec('COMMIT');
+          return out;
+        } catch (e) {
+          try { sdb.exec('ROLLBACK'); } catch { /* ignore */ }
+          throw e;
+        }
+      }
+    } finally {
+      txDepth--;
+    }
+  });
+  // Keep the chain alive even when a transaction fails; the caller
+  // still receives the original rejection via `run`.
+  txChain = run.then(() => undefined, () => undefined);
+  return run;
 }

@@ -22,14 +22,31 @@ import { ensureSchema as m10Schema } from './game/v2/m10.js';
 import { ensureSchema as m11Schema } from './game/v2/m11.js';
 import { ensureSchema as m12Schema } from './game/v2/m12.js';
 import { ensureSchema as m13Schema } from './game/v2/m13.js';
+// Fintech foundation (M5/M6a): chart of accounts + fee policy v1 seeding.
+import { ensureChartOfAccounts, ensureFeePolicyV1 } from './fintech/seed.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export async function createApp() {
   await initDb();
 
+  // Fintech foundation (M5/M6a): idempotent seeding of the chart of
+  // accounts and the v1 fee policy. Uses INSERT OR IGNORE / ON CONFLICT
+  // DO NOTHING, so it is safe to run on every boot.
+  await ensureChartOfAccounts();
+  await ensureFeePolicyV1();
+
   const app = express();
-  app.use(express.json({ limit: '32kb' }));
+  // verify() captures the raw request bytes on req.rawBody. The
+  // provider webhook route (POST /api/cash-wallet/deposit/webhook/:provider)
+  // verifies provider signatures over the EXACT bytes that arrived —
+  // re-serializing req.body would produce different bytes and break
+  // HMAC verification. Harmless for every other route (parsed body is
+  // unchanged).
+  app.use(express.json({
+    limit: '32kb',
+    verify: (req, _res, buf) => { req.rawBody = buf; },
+  }));
 
   // ---- security headers ----
   app.use((req, res, next) => {
