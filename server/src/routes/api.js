@@ -14,6 +14,9 @@ import {
   CLASSES, LOCATIONS, JOBS, FOOD, FUN, HOUSING, SPAWN, WORLD_BOUNDS,
   AVATARS, COLORS, PROPERTIES, BIZ, VEHICLES, FURN, HOME_SLOTS,
   BANK, TRAVEL_FARES, STUDY_COST,
+  AVATAR_BODIES, AVATAR_SKINS, AVATAR_HAIRS, AVATAR_OUTFITS, AVATAR_FABRICS,
+  AVATAR_TOP_COLORS, AVATAR_BOTTOM_COLORS, DEFAULT_AVATAR, sanitizeAvatar,
+  WALLS, FLOORS,
 } from '../game/data.js';
 // V2 milestones: REST_SPECS + CONFIG_DATA + clock helper, mounted below.
 import { REST_SPEC as M7_REST, CONFIG_DATA as M7_CONFIG, lagosNow } from '../game/v2/m7.js';
@@ -63,6 +66,10 @@ function characterBody(user, c, day) {
     avatar: c.avatar,
     color: c.color,
     customized: !!Number(c.customized),
+    // M15: avatar look (parsed JSON or null), home style ids
+    avatar_look: (() => { try { return c.avatar_look ? JSON.parse(c.avatar_look) : null; } catch { return null; } })(),
+    home_wall: c.home_wall || null,
+    home_floor: c.home_floor || null,
     money: Number(c.money),
     energy: Number(c.energy),
     health: Number(c.health),
@@ -198,6 +205,19 @@ export function createApiRouter({ hub, getDay }) {
       skills: M12_CONFIG.skills,
       courses: M12_CONFIG.courses,
       skillTuning: M12_CONFIG.tuning,
+      // M15: avatar + home-style config (server is the source of truth)
+      avatarLook: {
+        bodies: AVATAR_BODIES,
+        skins: AVATAR_SKINS,
+        hairs: AVATAR_HAIRS,
+        outfits: AVATAR_OUTFITS,
+        fabrics: AVATAR_FABRICS,
+        topColors: AVATAR_TOP_COLORS,
+        bottomColors: AVATAR_BOTTOM_COLORS,
+        defaults: DEFAULT_AVATAR,
+      },
+      walls: WALLS,
+      floors: FLOORS,
     });
   });
 
@@ -276,12 +296,20 @@ export function createApiRouter({ hub, getDay }) {
     const color = String(req.body.color || '').toLowerCase();
     if (!AVATARS.includes(avatar)) return res.status(400).json({ error: 'Invalid avatar.' });
     if (!COLORS.includes(color)) return res.status(400).json({ error: 'Invalid color.' });
+    // M15: optional full avatar look (validated; stored as JSON text).
+    let avatarLook = null;
+    if (req.body.avatar_look != null) {
+      const res15 = sanitizeAvatar(req.body.avatar_look);
+      if (!res15.ok) return res.status(400).json({ error: res15.error });
+      avatarLook = JSON.stringify(res15.avatar);
+    }
 
     const pkg = CLASSES[classId];
     c.name = name;
     c.class = pkg.id;
     c.avatar = avatar;
     c.color = color;
+    c.avatar_look = avatarLook; // M15: null unless a valid look was provided
     c.customized = 1;
     c.rent_misses = 0;
     c.money = pkg.startMoney;
