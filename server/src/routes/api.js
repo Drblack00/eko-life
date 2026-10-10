@@ -7,9 +7,13 @@ import { Router } from 'express';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getUserById, getCharacter, ensureCharacter, saveCharacter, addTransaction, getMeta, dbMode, listTransactions, getPropertyOwnerIds, listFurniture, listTopByMoney } from '../db.js';
+import { getUserById, getCharacter, ensureCharacter, saveCharacter, addTransaction, getMeta, dbMode, listTransactions, getPropertyOwnerIds, listFurniture, listTopByMoney, resolveReferralCode } from '../db.js';
 import { authMiddleware, createAuthRouter, USER_RE } from '../auth.js';
 import { createAdminRouter } from './admin.js';
+import { createFriendsRouter } from './friends.js';
+import { createCashWalletRouter } from './cashWallet.js';
+import { createCashFlowsRouter } from './cashFlows.js';
+import { createCashAdminRouter } from './cashAdmin.js';
 import {
   CLASSES, LOCATIONS, JOBS, FOOD, FUN, HOUSING, SPAWN, WORLD_BOUNDS,
   AVATARS, COLORS, PROPERTIES, BIZ, VEHICLES, FURN, HOME_SLOTS,
@@ -233,8 +237,27 @@ export function createApiRouter({ hub, getDay }) {
   // ---- auth ----
   router.use('/auth', createAuthRouter());
 
+  // ---- W3: public referral-code resolver (landing ?ref= → "Invited by") ----
+  // Invalid codes resolve to 404; the client ignores them gracefully.
+  router.get('/referral/:code', async (req, res) => {
+    try {
+      const user = await resolveReferralCode(req.params.code);
+      if (!user) return res.status(404).json({ error: 'Unknown invite code.' });
+      res.json({ username: user.username });
+    } catch (e) { console.error('[referral] resolve:', e.message); res.status(500).json({ error: 'Lookup failed.' }); }
+  });
+
+  // ---- W3: friends page (all routes behind Bearer <redacted>) ----
+  router.use('/friends', createFriendsRouter({ hub }));
+
   // ---- admin (M4) ----
   router.use('/admin', createAdminRouter({ hub, getDay }));
+
+  // ---- cash wallet (fintech M5-M7; all routes behind requireCashOps -> 403 while disabled) ----
+  router.use('/cash-wallet', createCashWalletRouter());
+  router.use('/cash-wallet', createCashFlowsRouter());
+  // ---- cash admin (fintech M9: risk controls, adjustments, review, reconcile) ----
+  router.use('/admin/cash', createCashAdminRouter());
 
   // ---- me (full character state) ----
   router.get('/me', authMiddleware, async (req, res) => {
