@@ -23,6 +23,11 @@ import { spawnMapXY } from "../game/types";
 
 export type SocketStatus = "connecting" | "open" | "retrying" | "failed";
 
+/** Lifecycle of a room's member-list fetch: never an infinite spinner. */
+export type RoomMembersStatus = "loading" | "loaded" | "error";
+/** Silence window before a member-list fetch is declared failed. */
+export const ROOM_MEMBERS_TIMEOUT_MS = 10000;
+
 const MAX_ATTEMPTS = 5;
 /** Chat history kept per surface (city chat + room threads + DM threads). */
 const MSG_KEEP = 100;
@@ -281,6 +286,28 @@ function normalizeRoomMember(raw: unknown): RoomMember | null {
   };
 }
 
+/**
+ * Extract a normalized member list from a `t:'room_members'` server message.
+ * Canonical wire field is `room_members`; `members` is accepted as a legacy
+ * fallback (a past server/client skew sent one while the other read the
+ * other, which left the UI stuck on "Loading members…" forever).
+ * Returns null when the payload is unusable.
+ */
+export function extractRoomMembersMessage(
+  msg: unknown
+): { roomId: string; members: RoomMember[] } | null {
+  if (!msg || typeof msg !== "object") return null;
+  const m = msg as Record<string, unknown>;
+  const roomId = m.roomId;
+  if (roomId === undefined || roomId === null) return null;
+  const raw = (m.room_members ?? m.members) as unknown;
+  if (raw === undefined) return null;
+  const members = (Array.isArray(raw) ? raw : [])
+    .map(normalizeRoomMember)
+    .filter((m): m is RoomMember => m !== null);
+  return { roomId: String(roomId), members };
+}
+
 function normalizeDmThread(raw: unknown): DmThread | null {
   if (!raw || typeof raw !== "object") return null;
   const t = raw as Record<string, unknown>;
@@ -416,6 +443,7 @@ export interface GameSocket {
   rooms: RoomEntry[];
   roomMessages: Record<string, RoomMessage[]>;
   roomMembers: Record<string, RoomMember[]>;
+  roomMembersStatus: Record<string, RoomMembersStatus>;
   roomUnread: Record<string, number>;
   setActiveRoom: (roomId: string | number | null) => void;
   createRoom: (name: string, topic: string, icon: string) => void;
@@ -484,6 +512,9 @@ export function useGameSocket(token: string | null): GameSocket {
   const [rooms, setRooms] = useState<RoomEntry[]>([]);
   const [roomMessages, setRoomMessages] = useState<Record<string, RoomMessage[]>>({});
   const [roomMembers, setRoomMembers] = useState<Record<string, RoomMember[]>>({});
+  const [roomMembersStatus, setRoomMembersStatus] = useState<Record<string, RoomMembersStatus>>({});
+  /** Pending per-room member-fetch timeouts (flip "loading" -> "error" on silence). */
+  const roomMembersTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [roomUnread, setRoomUnread] = useState<Record<string, number>>({});
   const [dmThreads, setDmThreads] = useState<DmThread[]>([]);
   const [dmMessages, setDmMessages] = useState<Record<string, DmMessage[]>>({});
@@ -783,8 +814,27 @@ export function useGameSocket(token: string | null): GameSocket {
         case "room_left": {
           const rid = msg.roomId;
           if (rid !== undefined && rid !== null) {
-            setRooms((prev) => prev.filter((r) => String(r.id) !== String(rid)));
-            if (String(activeRoomRef.current) === String(rid)) activeRoomRef.current = null;
+            const key = String(rid);
+            setRooms((prev) => prev.filter((r) => String(r.id) !== key));
+            if (String(activeRoomRef.current) === key) activeRoomRef.current = null;
+            // Drop cached membership so a later rejoin starts from a clean fetch.
+            const timer = roomMembersTimers.current[key];
+            if (timer) {
+              clearTimeout(timer);
+              delete roomMembersTimers.current[key];
+            }
+            setRoomMembers((prev) => {
+              if (!(key in prev)) return prev;
+              const next = { ...prev };
+              delete next[key];
+              return next;
+            });
+            setRoomMembersStatus((prev) => {
+              if (!(key in prev)) return prev;
+              const next = { ...prev };
+              delete next[key];
+              return next;
+            });
           }
           break;
         }
@@ -821,11 +871,15 @@ export function useGameSocket(token: string | null): GameSocket {
           break;
         }
         case "room_members": {
-          if (msg.roomId !== undefined && msg.room_members !== undefined) {
-            const members = (Array.isArray(msg.room_members) ? msg.room_members : [])
-              .map(normalizeRoomMember)
-              .filter((m): m is RoomMember => m !== null);
-            setRoomMembers((prev) => ({ ...prev, [String(msg.roomId)]: members }));
+          const payload = extractRoomMembersMessage(msg);
+          if (payload) {
+            const timer = roomMembersTimers.current[payload.roomId];
+            if (timer) {
+              clearTimeout(timer);
+              delete roomMembersTimers.current[payload.roomId];
+            }
+            setRoomMembers((prev) => ({ ...prev, [payload.roomId]: payload.members }));
+            setRoomMembersStatus((prev) => ({ ...prev, [payload.roomId]: "loaded" }));
           }
           break;
         }
@@ -1061,6 +1115,8 @@ export function useGameSocket(token: string | null): GameSocket {
       cancelledRef.current = true;
       clearTimer();
       closeSocket();
+      for (const t of Object.values(roomMembersTimers.current)) clearTimeout(t);
+      roomMembersTimers.current = {};
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
@@ -1196,7 +1252,21 @@ export function useGameSocket(token: string | null): GameSocket {
     [sendSocial]
   );
   const requestRoomMembers = useCallback(
-    (roomId: string | number) => sendSocial("room_members", { roomId }),
+    (roomId: string | number) => {
+      const key = String(roomId);
+      setRoomMembersStatus((prev) => ({ ...prev, [key]: "loading" }));
+      const prevTimer = roomMembersTimers.current[key];
+      if (prevTimer) clearTimeout(prevTimer);
+      // Never leave the UI on an infinite spinner: if the server stays
+      // silent (not a member, dropped message), surface an error + retry.
+      roomMembersTimers.current[key] = setTimeout(() => {
+        delete roomMembersTimers.current[key];
+        setRoomMembersStatus((prev) =>
+          prev[key] === "loading" ? { ...prev, [key]: "error" } : prev
+        );
+      }, ROOM_MEMBERS_TIMEOUT_MS);
+      sendSocial("room_members", { roomId });
+    },
     [sendSocial]
   );
   const kickRoomMember = useCallback(
@@ -1366,6 +1436,7 @@ export function useGameSocket(token: string | null): GameSocket {
     rooms,
     roomMessages,
     roomMembers,
+    roomMembersStatus,
     roomUnread,
     setActiveRoom,
     createRoom,
