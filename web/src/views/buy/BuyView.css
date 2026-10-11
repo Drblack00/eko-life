@@ -1,0 +1,63 @@
+/* Workstream C — BUY tab header treatment. The catalogue sheet itself
+ * carries the "Buy mode" handle affordance; this header gives the tab a
+ * clear, premium title above the room stage. */
+
+.eko-buy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-buy__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 18px;
+}
+
+.eko-buy__head-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+}
+
+.eko-buy__head-text {
+  min-width: 0;
+}
+
+.eko-buy__head-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  /* The glass card renders light — use the app's ink tone, like the
+   * section headers, so the title stays legible. */
+  color: #1c2b45;
+  letter-spacing: 0.01em;
+}
+
+.eko-buy__head-sub {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(28, 43, 69, 0.62);
+  line-height: 1.35;
+}
+
+@media (min-width: 720px) {
+  .eko-buy__head {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .eko-buy__head-icon {
+    font-size: 2rem;
+  }
+
+  .eko-buy__head-title {
+    font-size: 1.25rem;
+  }
+
+  .eko-buy__head-sub {
+    font-size: 0.85rem;
+  }
+}
