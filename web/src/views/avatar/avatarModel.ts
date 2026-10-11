@@ -3,7 +3,7 @@ import type { AvatarLook } from "../../game/types";
 import { buildMaterials, skinHex } from "./parts/materials";
 import { buildBody } from "./parts/body";
 import { dressBody, type OutfitId } from "./parts/clothing";
-import { buildHead } from "./parts/head";
+import { HEAD_GROUP_SCALE, buildHead } from "./parts/head";
 import { attachHair, buildHair } from "./parts/hair";
 
 /**
@@ -103,6 +103,11 @@ function buildInternal(T: typeof import("three"), look: AvatarLook): AvatarBuild
   const head = buildHead(T, { skin, mats });
   body.headMount.add(head.group);
   attachHair(head, buildHair(T, look.hair, mats));
+  // Cuteness: slightly larger head-to-body ratio. Applied after attachHair
+  // so the hair scales with the head; the group origin is at the neck top,
+  // so the chin anchor (figure y=1.4) does not move. Shared builder — the
+  // room avatar gets the same look.
+  head.group.scale.setScalar(HEAD_GROUP_SCALE);
 
   const rig: Rig = {
     upper: body.upper,
