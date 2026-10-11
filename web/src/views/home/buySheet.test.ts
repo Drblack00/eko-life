@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buyDataReady,
+  buyModeNextSnap,
   isSheetOpen,
   nearestSnap,
   nextSnap,
@@ -109,5 +110,13 @@ describe("buyDataReady", () => {
   it("is true once furniture is an array, even an empty one", () => {
     expect(buyDataReady({ furniture: [] })).toBe(true);
     expect(buyDataReady({ furniture: [{ id: "bed" }] })).toBe(true);
+  });
+});
+
+describe("buyModeNextSnap", () => {
+  it("cycles half → full → half and never lands on collapsed", () => {
+    expect(buyModeNextSnap("half")).toBe("full");
+    expect(buyModeNextSnap("full")).toBe("half");
+    expect(buyModeNextSnap("collapsed")).toBe("half");
   });
 });

@@ -50,6 +50,7 @@ import {
 } from "./cameraRig";
 import {
   buyDataReady,
+  buyModeNextSnap,
   isSheetOpen,
   nearestSnap,
   nextSnap,
@@ -1294,6 +1295,7 @@ export function HomeRoomSection({
   config,
   sendAct,
   onBuySheetOpen,
+  buyMode = false,
 }: {
   you: You;
   config: GameConfig;
@@ -1302,6 +1304,12 @@ export function HomeRoomSection({
    *  shell uses it to auto-dismiss the HUD hint banner so it can never
    *  cover the sheet's interactive content. */
   onBuySheetOpen?: (open: boolean) => void;
+  /** Workstream C: dedicated Buy tab mode. When true, the buy sheet is the
+   *  primary panel — it defaults to the half snap, the collapsed snap is
+   *  disabled (handle tap cycles half → full → half), and the handle shows
+   *  a "Buy mode" affordance. When false/omitted (default), the entire buy
+   *  sheet is not rendered at all — this is how the Home tab loses it. */
+  buyMode?: boolean;
 }) {
   const owned: FurnitureEntry[] = useMemo(
     () => (Array.isArray(you.furniture) ? you.furniture : []),
@@ -1434,9 +1442,13 @@ export function HomeRoomSection({
   // M16: the Buy catalogue lives in a bottom sheet over the room stage
   // (workstream B: a right-docked side panel in landscape).
   const landscape = useLandscape();
-  const [sheetSnap, setSheetSnap] = useState<SheetSnap>("collapsed");
+  // Workstream C: in buyMode the sheet opens at half snap — the collapsed
+  // snap is disabled (handle tap cycles half → full → half).
+  const [sheetSnap, setSheetSnap] = useState<SheetSnap>(
+    buyMode ? "half" : "collapsed"
+  );
   const [sheetHidden, setSheetHidden] = useState(false);
-  const prevSnapRef = useRef<SheetSnap>("collapsed");
+  const prevSnapRef = useRef<SheetSnap>(buyMode ? "half" : "collapsed");
   const sheetSnapRef = useRef(sheetSnap);
   sheetSnapRef.current = sheetSnap;
   const sheetHiddenRef = useRef(sheetHidden);
@@ -1587,6 +1599,10 @@ export function HomeRoomSection({
     if (!d) return;
     // A real drag swallows the click that follows it.
     justDraggedRef.current = d.moved;
+    // Workstream C (buyMode): the collapsed snap is disabled — a drag
+    // that would settle on collapsed settles on half instead.
+    const settleSnap = (raw: SheetSnap): SheetSnap =>
+      buyMode && raw === "collapsed" ? "half" : raw;
     if (d.moved) {
       if (landscape) {
         const widths = sheetWidths(stageW());
@@ -1594,14 +1610,14 @@ export function HomeRoomSection({
           widths.full,
           Math.max(widths.collapsed, d.startW + (d.startX - d.lastX))
         );
-        setSheetSnap(nearestSnap(w, widths));
+        setSheetSnap(settleSnap(nearestSnap(w, widths)));
       } else {
         const heights = sheetHeights(stageH());
         const h = Math.min(
           heights.full,
           Math.max(heights.collapsed, d.startH + (d.startY - d.lastY))
         );
-        setSheetSnap(nearestSnap(h, heights));
+        setSheetSnap(settleSnap(nearestSnap(h, heights)));
       }
     }
     setDragH(null);
@@ -1610,12 +1626,14 @@ export function HomeRoomSection({
 
   // Tap the handle cycles collapsed → half → full → collapsed.
   // Functional update so rapid successive taps each advance one snap.
+  // Workstream C (buyMode): the collapsed snap is disabled, so tapping
+  // the handle cycles half → full → half.
   const onSheetHandleTap = () => {
     if (justDraggedRef.current) {
       justDraggedRef.current = false;
       return;
     }
-    setSheetSnap((s) => nextSnap(s));
+    setSheetSnap((s) => (buyMode ? buyModeNextSnap(s) : nextSnap(s)));
   };
 
   const placingSize: Footprint = useMemo(
@@ -2002,12 +2020,16 @@ export function HomeRoomSection({
             </div>
           )}
           {/* M16: Buy catalogue as a bottom sheet over the room stage
-              (workstream B: right-docked side panel in landscape). */}
-          {!placing && !sheetHidden && (
+              (workstream B: right-docked side panel in landscape).
+              Workstream C: rendered only in buyMode (dedicated Buy tab);
+              on Home the entire buy-sheet block stays out of the DOM. */}
+          {buyMode && !placing && !sheetHidden && (
             <div
               className={`eko-room__sheet eko-room__sheet--${sheetSnap}${
                 landscape ? " eko-room__sheet--side" : ""
-              }${(landscape ? dragW : dragH) != null ? " eko-room__sheet--dragging" : ""} glass`}
+              }${(landscape ? dragW : dragH) != null ? " eko-room__sheet--dragging" : ""}${
+                buyMode ? " eko-room__sheet--buymode" : ""
+              } glass`}
               style={
                 landscape
                   ? { width: dragW ?? sheetWidths(stageW())[sheetSnap] }
@@ -2018,7 +2040,9 @@ export function HomeRoomSection({
                 className="eko-room__sheet-handle"
                 role="button"
                 tabIndex={0}
-                aria-label={`Buy sheet, ${sheetSnap}. Drag the handle or tap to resize.`}
+                aria-label={`Buy sheet${
+                  buyMode ? " (buy mode)" : ""
+                }, ${sheetSnap}. Drag the handle or tap to resize.`}
                 onPointerDown={onSheetHandleDown}
                 onPointerMove={onSheetHandleMove}
                 onPointerUp={onSheetHandleUp}
@@ -2035,7 +2059,9 @@ export function HomeRoomSection({
                 <span className="eko-room__sheet-rail" aria-hidden="true">
                   🛋️
                 </span>
-                <span className="eko-room__sheet-title">Buy 🛋️</span>
+                <span className="eko-room__sheet-title">
+                  {buyMode ? "Buy mode 🛍️" : "Buy 🛋️"}
+                </span>
                 <span className="eko-room__sheet-balance">{naira(you.money)}</span>
                 {sheetSnap !== "collapsed" && (
                   <button
@@ -2212,7 +2238,9 @@ export function HomeRoomSection({
               </div>
             </div>
           )}
-          {!placing && sheetHidden && (
+          {/* Workstream C: the show-sheet FAB is part of the buy sheet and
+              only exists in buyMode. */}
+          {buyMode && !placing && sheetHidden && (
             <button
               type="button"
               className="eko-room__sheet-fab glass"

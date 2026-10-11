@@ -80,3 +80,11 @@ export function nearestSnap(height: number, heights: SheetHeights): SheetSnap {
 export function nextSnap(s: SheetSnap): SheetSnap {
   return s === "collapsed" ? "half" : s === "half" ? "full" : "collapsed";
 }
+
+/**
+ * Workstream C: handle taps in Buy mode skip the collapsed snap entirely,
+ * cycling half → full → half.
+ */
+export function buyModeNextSnap(s: SheetSnap): SheetSnap {
+  return s === "half" ? "full" : "half";
+}

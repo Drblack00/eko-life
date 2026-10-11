@@ -429,6 +429,13 @@
   white-space: nowrap;
 }
 
+/* Workstream C: in buyMode the handle doubles as the tab's primary
+ * affordance — a small accent pill under the grip marks it. */
+.eko-room__sheet--buymode .eko-room__sheet-grip {
+  background: var(--palm-400);
+  box-shadow: 0 0 8px var(--palm-400);
+}
+
 .eko-room__sheet-balance {
   margin-left: auto;
   font-weight: 800;
