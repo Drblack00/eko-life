@@ -13,10 +13,10 @@
 
 .eko-toast {
   /* Material (blur/tint/highlight/shadow) comes from .glass in
-     src/styles/glass.css. The dark tint (via --glass-tint indirection, so
-     the theme-aware value always wins) keeps white text legible over any
-     backdrop. Layout + accent edge only here. */
-  color: #fff;
+     src/styles/glass.css. The tint is theme-aware (Fix Round 2: the old
+     hardcoded dark tint left toasts stuck dark in the Light theme).
+     Layout + accent edge only here. */
+  color: var(--text);
   padding: var(--space-3) var(--space-4);
   font-size: 0.95rem;
   text-align: center;
@@ -25,13 +25,13 @@
 }
 
 .eko-toast.glass {
-  --glass-tint: var(--glass-tint-dark);
+  --glass-tint: color-mix(in srgb, var(--surface) 78%, transparent);
   --glass-radius: var(--radius-pill);
 }
 
 @media (prefers-reduced-transparency: reduce) {
   .eko-toast.glass {
-    background: rgb(28 24 20 / 0.95);
+    background: var(--surface);
   }
 }
 

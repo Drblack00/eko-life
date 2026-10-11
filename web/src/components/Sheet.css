@@ -31,7 +31,8 @@
   width: 44px;
   height: 5px;
   border-radius: 99px;
-  background: var(--neutral-200);
+  /* Theme-aware grabber: visible on both the light and dark sheet. */
+  background: rgb(128 128 128 / 0.5);
   margin: 0 auto var(--space-3);
 }
 

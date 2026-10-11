@@ -1,8 +1,10 @@
 .eko-skeleton {
+  /* Theme-aware shimmer: the old --neutral-0 mid-stop flashed white in the
+     night theme. */
   background: linear-gradient(
     90deg,
     var(--surface-2) 25%,
-    var(--neutral-0) 50%,
+    var(--surface) 50%,
     var(--surface-2) 75%
   );
   background-size: 200% 100%;
