@@ -9,9 +9,11 @@
  * decision. The React component (AvatarStudio.tsx) consumes these; unit
  * tests live in studio.test.ts.
  *
- * Figure-space anchors below are measured from the avatar build (see
- * scratch measurements: head y in [1.396, 1.610], tallest hair (afro) top
- * at 1.803) and are camera-use only — the avatarLook geometry contract is
+ * Figure-space anchors below are measured from the avatar build (per-
+ * hairstyle Box3 measurements: feet minY 0.0950, chin at 1.4 — the head
+ * group scales about the neck-top origin so the chin anchor does not
+ * move — tallest hair (afro) top at 1.8358 with HEAD_GROUP_SCALE=1.08)
+ * and are camera-use only — the avatarLook geometry contract is
  * untouched.
  */
 
@@ -24,8 +26,8 @@ export interface CameraFraming {
 
 /** Figure-space height of the chin (head group origin). */
 export const FIGURE_CHIN_Y = 1.4;
-/** Figure-space top of the tallest hairstyle (afro, measured 1.803). */
-export const FIGURE_HAIR_TOP_Y = 1.81;
+/** Figure-space top of the tallest hairstyle (afro, measured 1.8358). */
+export const FIGURE_HAIR_TOP_Y = 1.84;
 /** Figure-space height of the feet. */
 export const FIGURE_FEET_Y = 0.09;
 

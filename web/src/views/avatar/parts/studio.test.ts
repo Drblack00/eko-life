@@ -181,6 +181,37 @@ describe("framingForContainer", () => {
   });
 });
 
+describe("fix round 2 anchors (head scale-up)", () => {
+  it("anchors the tallest-hair constant at the measured afro top", () => {
+    // Per-hairstyle Box3 with HEAD_GROUP_SCALE=1.08: afro maxY 1.8358,
+    // chin still at 1.4 (head group scales about the neck-top origin).
+    expect(FIGURE_HAIR_TOP_Y).toBeGreaterThanOrEqual(1.8358);
+    expect(FIGURE_HAIR_TOP_Y).toBeLessThanOrEqual(1.86);
+    expect(FIGURE_CHIN_Y).toBeCloseTo(1.4, 5);
+  });
+
+  it("keeps chin and afro top inside the frame on the phone card (Face)", () => {
+    const f = framingForContainer("face", 358, 340);
+    const top = f.targetY + TAN_H * f.distance;
+    const bottom = f.targetY - TAN_H * f.distance;
+    expect(bottom).toBeLessThanOrEqual(FIGURE_CHIN_Y - FRAMING_MARGIN_Y);
+    expect(top).toBeGreaterThanOrEqual(FIGURE_HAIR_TOP_Y + FRAMING_MARGIN_Y);
+    // Not pushed low like the pre-fix evidence: the headroom above the
+    // hair top stays close to the reserved pill zone, not a big dark gap.
+    const pxAbove =
+      ((top - (FIGURE_HAIR_TOP_Y + FRAMING_MARGIN_Y)) / (2 * TAN_H * f.distance)) * 340;
+    expect(pxAbove).toBeLessThan(PREVIEW_TOP_UI_PX + 24);
+  });
+
+  it("keeps feet and afro top inside the frame on the phone card (Full body)", () => {
+    const f = framingForContainer("body", 358, 340);
+    const top = f.targetY + TAN_H * f.distance;
+    const bottom = f.targetY - TAN_H * f.distance;
+    expect(bottom).toBeLessThanOrEqual(FIGURE_FEET_Y - FRAMING_MARGIN_Y);
+    expect(top).toBeGreaterThanOrEqual(FIGURE_HAIR_TOP_Y + FRAMING_MARGIN_Y);
+  });
+});
+
 describe("compensateDistance", () => {
   it("leaves the distance alone for wide aspects", () => {
     expect(compensateDistance(1.15, 1.5)).toBe(1.15);

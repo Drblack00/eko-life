@@ -27,6 +27,15 @@ import {
 export const HEAD_R = 0.105;
 const HC = 0.105; // skull centre height (head-local)
 
+/**
+ * Head-to-body ratio (cuteness pass, fix round 2). The whole head group —
+ * skull, face AND hair (applied in avatarModel after attachHair) — is
+ * scaled by this about the neck-top origin, so the chin anchor stays at
+ * figure y=1.4 while the head reads slightly larger and friendlier.
+ * The studio camera anchors (parts/studio.ts) are measured against this.
+ */
+export const HEAD_GROUP_SCALE = 1.08;
+
 export interface HeadCtx {
   /** Skin hex (resolved). */
   skin: string;
@@ -84,6 +93,11 @@ export function distToSeg(
  * cheekbone lift, temple narrowing, brow ridge, carved eye sockets,
  * nasolabial-fold depressions, chin with cleft, forehead slope and a
  * slightly fuller occiput. Skull-local coords, centre at origin, radius r.
+ *
+ * Cuteness pass (fix round 2): softer, rounder shaping — gentler jaw
+ * taper, slimmer masseter, softer brow ridge, fuller-but-smooth cheeks,
+ * shallower folds. Head proportions grow separately via the head-group
+ * scale in avatarModel (HEAD_GROUP_SCALE).
  */
 export function sculptSkull(T: typeof import("three"), r: number): THREE.BufferGeometry {
   const geo = new T.SphereGeometry(r, 34, 24);
@@ -95,23 +109,24 @@ export function sculptSkull(T: typeof import("three"), r: number): THREE.BufferG
     const front = sstep(0.12, 0.55, v.z / r); // 0 at back → 1 at face
     const side = Math.min(1, Math.abs(v.x) / r);
 
-    // Jaw taper + masseter fullness at the jaw angle.
+    // Jaw taper + masseter fullness at the jaw angle — softened so the
+    // jaw reads round rather than angular.
     const k = jawTaperK(ny);
     if (k > 0) {
       const p = Math.pow(k, 1.35);
-      v.x *= 1 - 0.3 * p;
-      v.z *= 1 - 0.2 * p;
+      v.x *= 1 - 0.24 * p;
+      v.z *= 1 - 0.16 * p;
       const mass = Math.exp(-Math.pow((ny + 0.38) / 0.13, 2)) * side;
-      v.x *= 1 + 0.055 * mass;
+      v.x *= 1 + 0.035 * mass;
     }
-    // Cheekbones: lift out and slightly forward at the sides.
+    // Cheekbones: soft fullness at the sides, less forward push.
     const ch = cheekBoost(ny) * front * side;
-    v.x *= 1 + 0.045 * ch;
-    v.z += 0.004 * ch;
+    v.x *= 1 + 0.04 * ch;
+    v.z += 0.003 * ch;
     // Temples: gentle narrowing.
     v.x *= 1 - 0.028 * Math.exp(-Math.pow((ny - 0.34) / 0.12, 2));
-    // Brow ridge.
-    v.z += 0.0032 * Math.exp(-Math.pow((ny - 0.3) / 0.1, 2)) * front;
+    // Brow ridge: softened so the eyes read open and friendly.
+    v.z += 0.0022 * Math.exp(-Math.pow((ny - 0.3) / 0.1, 2)) * front;
     // Eye sockets: shallow hollows so the eyes sit *in* the face.
     for (const ex of [-0.0415, 0.0415]) {
       const dx = v.x - ex;
@@ -123,14 +138,14 @@ export function sculptSkull(T: typeof import("three"), r: number): THREE.BufferG
     // mouth corners.
     for (const sx of [-1, 1]) {
       const d = distToSeg(v.x, v.y, sx * 0.016, -0.027, sx * 0.042, -0.069);
-      v.z -= 0.0021 * Math.exp(-Math.pow(d / 0.011, 2)) * front;
+      v.z -= 0.0016 * Math.exp(-Math.pow(d / 0.011, 2)) * front;
     }
-    // Chin: forward + down, with a subtle cleft.
+    // Chin: forward + down, with a subtle cleft — softened.
     if (ny < -0.6) {
       const c = (-0.6 - ny) / 0.4;
-      v.z += 0.011 * c * front;
-      v.y -= 0.0045 * c;
-      if (Math.abs(v.x) < 0.009 && front > 0.5) v.z -= 0.0016 * c * front;
+      v.z += 0.009 * c * front;
+      v.y -= 0.0035 * c;
+      if (Math.abs(v.x) < 0.009 && front > 0.5) v.z -= 0.0012 * c * front;
     }
     // Forehead slopes gently back.
     if (ny > 0.45 && v.z > 0) {
@@ -299,12 +314,13 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
     dorsum.scale.set(0.72, 1.6, 0.5);
     dorsum.rotation.x = -0.1;
     add(dorsum);
-    // Tip: generous bulb overlapping the dorsum bottom (no junction gap).
+    // Tip: soft bulb overlapping the dorsum bottom (no junction gap) —
+    // kept modest for a cuter, less prominent nose.
     const tipGeo = shapeGeo(T, new T.SphereGeometry(0.0165, 16, 12), (v) => {
       if (v.y < -0.004) v.y *= 0.82;
     });
-    const tip = hm(tipGeo, skinPhys, "nose", 0, 0.068, 0.1035);
-    tip.scale.set(1.05, 0.8, 0.9);
+    const tip = hm(tipGeo, skinPhys, "nose", 0, 0.0695, 0.1025);
+    tip.scale.set(0.96, 0.76, 0.84);
     tip.rotation.x = 0.15;
     add(tip);
     for (const sx of [-1, 1]) {
@@ -360,9 +376,9 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
     borderL.rotation.z = Math.PI;
     borderL.scale.set(1.28, 0.5, 1);
     add(borderL);
-    // Mouth corners.
+    // Mouth corners: lifted a touch for a gentle, friendly default.
     for (const sx of [-1, 1]) {
-      add(hm(new T.SphereGeometry(0.0028, 6, 5), mouthDarkMat, "mouth", sx * 0.0305, 0.0312, 0.0625));
+      add(hm(new T.SphereGeometry(0.0028, 6, 5), mouthDarkMat, "mouth", sx * 0.0295, 0.0326, 0.0625));
     }
     head.add(mouth);
   }
@@ -374,7 +390,7 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
       new T.Vector3(sx * 0.031, 0.057, 0.0765),
       new T.Vector3(sx * 0.04, 0.036, 0.069)
     );
-    head.add(hm(new T.TubeGeometry(curve, 12, 0.0013, 6), skinDarkPhys, "fold"));
+    head.add(hm(new T.TubeGeometry(curve, 12, 0.0011, 6), skinDarkPhys, "fold"));
   }
 
   /* ---------------- eyes (the centrepiece) ---------------- */
@@ -393,35 +409,35 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
     const add = (m: THREE.Mesh) => eye.add(m);
 
     // Soft orbital shading behind the eyeball.
-    add(hm(new T.CircleGeometry(0.0275, 20), skinDarkPhys, "eye", 0, 0, -0.002));
-    // Eyeball.
-    const sclera = hm(new T.SphereGeometry(0.0245, 14, 10), scleraMat, "eye", 0, 0, 0.001);
-    sclera.scale.set(1.02, 0.8, 0.62);
+    add(hm(new T.CircleGeometry(0.0305, 20), skinDarkPhys, "eye", 0, 0, -0.002));
+    // Eyeball: larger and rounder than the old almond cut (cuteness pass).
+    const sclera = hm(new T.SphereGeometry(0.0272, 16, 12), scleraMat, "eye", 0, 0, 0.001);
+    sclera.scale.set(1.0, 0.92, 0.6);
     add(sclera);
     // Iris + pupil on the front of the ball.
-    add(hm(new T.CircleGeometry(0.0118, 24), irisMat, "eye", 0, 0, 0.017));
-    add(hm(new T.CircleGeometry(0.0056, 16), pupilMat, "eye", 0, 0, 0.0176));
+    add(hm(new T.CircleGeometry(0.0132, 24), irisMat, "eye", 0, 0, 0.0178));
+    add(hm(new T.CircleGeometry(0.0064, 16), pupilMat, "eye", 0, 0, 0.0184));
     // Cornea bulge: clear wet dome over the iris.
     const cornea = hm(
-      new T.SphereGeometry(0.0135, 14, 10, 0, Math.PI * 2, 0, 1.05),
+      new T.SphereGeometry(0.0148, 14, 10, 0, Math.PI * 2, 0, 1.05),
       corneaMat,
       "eye",
       0,
       0.0005,
-      0.0085
+      0.0095
     );
     add(cornea);
     // Catchlights: crisp main + faint secondary.
-    const cl1 = hm(new T.PlaneGeometry(0.0042, 0.0058), catchMat, "eye", 0.0042, 0.005, 0.0216);
+    const cl1 = hm(new T.PlaneGeometry(0.0046, 0.0064), catchMat, "eye", 0.0047, 0.0056, 0.023);
     cl1.rotation.z = -0.4;
     add(cl1);
-    add(hm(new T.PlaneGeometry(0.0024, 0.0024), catchMat, "eye", -0.005, -0.0042, 0.0203));
+    add(hm(new T.PlaneGeometry(0.0026, 0.0026), catchMat, "eye", -0.0056, -0.0047, 0.022));
     // Upper eyelid: draped shell hugging the top of the ball. The rim of
     // the cap lands just above the iris centre so the eye reads open.
-    const lidGeo = new T.SphereGeometry(0.0285, 16, 8, 0, Math.PI * 2, 0, 1.35);
-    const lid = hm(lidGeo, skinPhysDS, "eye", 0, 0.004, 0.002);
+    const lidGeo = new T.SphereGeometry(0.0315, 16, 8, 0, Math.PI * 2, 0, 1.35);
+    const lid = hm(lidGeo, skinPhysDS, "eye", 0, 0.0045, 0.002);
     lid.rotation.x = 0.12;
-    lid.scale.set(1.04, 0.62, 0.72);
+    lid.scale.set(1.02, 0.6, 0.7);
     add(lid);
     // Lid-rim curve (front arc of the lid edge) — lash line, lashes and
     // crease all follow it so they sit exactly on the lid.
@@ -440,18 +456,18 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
       return new T.CatmullRomCurve3(pts);
     };
     // Lash line: dark tube along the lid rim.
-    const LASH_Y = 0.0055;
-    add(hm(new T.TubeGeometry(rimCurve(LASH_Y, 0.002, 0.0265, 0.02, 0.002, 1.05), 16, 0.0022, 5), lashMat, "eye"));
+    const LASH_Y = 0.0062;
+    add(hm(new T.TubeGeometry(rimCurve(LASH_Y, 0.0022, 0.0295, 0.022, 0.002, 1.05), 16, 0.0023, 5), lashMat, "eye"));
     // Individual lashes: short tapered cones along the rim, flicking down-forward.
     const lashRand = mulberry32(hashSeed(skin) + (sx > 0 ? 11 : 77));
     const lashDir = new T.Vector3();
     const lashUp = new T.Vector3(0, 1, 0);
     for (let i = 0; i < 9; i++) {
       const phi = -1.0 + (i / 8) * 2.0 + (lashRand() - 0.5) * 0.12;
-      const px = 0.0265 * Math.sin(phi);
-      const py = LASH_Y - 0.002 * Math.abs(Math.sin(phi));
-      const pz = 0.002 + 0.02 * Math.cos(phi);
-      const lash = hm(new T.ConeGeometry(0.0011, 0.0075, 5), lashMat, "eye", px, py + 0.001, pz + 0.001);
+      const px = 0.0295 * Math.sin(phi);
+      const py = LASH_Y - 0.0022 * Math.abs(Math.sin(phi));
+      const pz = 0.002 + 0.022 * Math.cos(phi);
+      const lash = hm(new T.ConeGeometry(0.0012, 0.0082, 5), lashMat, "eye", px, py + 0.001, pz + 0.001);
       lashDir.set(Math.sin(phi) * 0.45, -0.62, Math.cos(phi) * 0.64).normalize();
       lash.quaternion.setFromUnitVectors(lashUp, lashDir);
       lash.rotateX((lashRand() - 0.5) * 0.2);
@@ -459,9 +475,9 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
       add(lash);
     }
     // Lower lid: slim arc under the eye.
-    add(hm(new T.TubeGeometry(rimCurve(-0.0105, -0.0035, 0.0245, 0.0165, 0.0015, 1.1), 14, 0.0026, 5), skinPhys, "eye"));
+    add(hm(new T.TubeGeometry(rimCurve(-0.0115, -0.0038, 0.027, 0.018, 0.0015, 1.1), 14, 0.0027, 5), skinPhys, "eye"));
     // Eyelid crease above.
-    add(hm(new T.TubeGeometry(rimCurve(0.0175, 0.003, 0.03, 0.016, -0.002, 1.05), 14, 0.0018, 5), skinDarkPhys, "eye"));
+    add(hm(new T.TubeGeometry(rimCurve(0.0195, 0.0032, 0.033, 0.0175, -0.002, 1.05), 14, 0.0019, 5), skinDarkPhys, "eye"));
 
     head.add(eye);
     return eye;
@@ -472,13 +488,15 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
   /* ---------------- eyebrows: individual strand cards ---------------- */
   // Strands sit just proud of the skull surface (computed from the sphere —
   // the sculpt terms are negligible on the forehead) and below the hairline.
-  const strandGeo = new T.PlaneGeometry(0.0026, 0.008);
+  // Cuteness pass: slightly thicker, raised, gentler slope — no stern
+  // downward pinch at the inner ends.
+  const strandGeo = new T.PlaneGeometry(0.0031, 0.0085);
   for (const sx of [-1, 1]) {
     const browRand = mulberry32(hashSeed(skin) + (sx > 0 ? 101 : 202));
     for (let i = 0; i < 14; i++) {
       const t = i / 13;
       const bx = sx * (0.02 + 0.046 * t);
-      const by = 0.1505 + 0.004 * Math.sin(Math.PI * Math.pow(t, 0.85)) - 0.003 * t;
+      const by = 0.1535 + 0.004 * Math.sin(Math.PI * Math.pow(t, 0.85)) - 0.0015 * t;
       const yl = by - HC; // skull-local y
       const surfZ = Math.sqrt(Math.max(1e-6, HEAD_R * HEAD_R - bx * bx - yl * yl));
       const bz = surfZ + 0.0028;
