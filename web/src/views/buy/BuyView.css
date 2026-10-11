@@ -40,7 +40,9 @@
   margin: 2px 0 0;
   font-size: 0.78rem;
   font-weight: 600;
-  color: rgba(28, 43, 69, 0.62);
+  /* Theme ink: the old hardcoded dark slate went unreadable in the night
+     theme. */
+  color: var(--text-muted);
   line-height: 1.35;
 }
 
