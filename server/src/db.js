@@ -1001,9 +1001,16 @@ export async function saveCharacter(c) {
   const skillsUsedJson = typeof c.skills_used === 'string' ? c.skills_used : (c.skills_used == null ? null : JSON.stringify(c.skills_used));
   // M15: avatar look is JSON text (null until the player saves a look)
   const avatarLookJson = typeof c.avatar_look === 'string' ? c.avatar_look : (c.avatar_look == null ? null : JSON.stringify(c.avatar_look));
-  // M6: appearance_rev stays in lockstep with avatar_look — the in-memory
-  // row carries the last persisted rev so saveCharacter never clobbers a
-  // newer revision with a stale JSON payload.
+  // M6: appearance_rev stays in lockstep with avatar_look.
+  // DEFECT FIX (2026-10-11): the REST appearance PUT writes avatar_look +
+  // appearance_rev directly to the DB, but the WS hub's in-memory character
+  // row is NOT refreshed (only the legacy WS save_avatar path syncs it).
+  // The next saveCharacter() of that stale row — the 60s decay tick, any
+  // game act, a move-save — used to unconditionally overwrite the fresh
+  // write, so "Saved ✓" silently reverted on reopen. The avatar columns are
+  // now written only when the in-memory revision is NOT older than the
+  // stored one (COALESCE guards pre-M6 NULL revs); all gameplay columns
+  // keep the old unconditional behavior — the live session still owns them.
   const appearanceRev = Math.max(0, Math.floor(Number(c.appearance_rev ?? 0) || 0));
   const params = [c.name, c.class, c.avatar, c.color, c.money, c.energy, c.health,
     c.happiness, c.hunger, c.housing, c.property, c.vehicle, c.biz ?? null, c.savings, c.loan,
@@ -1013,8 +1020,10 @@ export async function saveCharacter(c) {
     c.fun ?? 100, c.social ?? 100, c.hygiene ?? 100, c.bladder ?? 100,
     Math.max(0, Math.floor(Number(c.perk_stars) || 0)), perksJson,
     Number(c.housing_owned) ? 1 : 0, skillsJson, skillsUsedJson,
-    avatarLookJson, c.home_wall ?? null, c.home_floor ?? null,
-    appearanceRev,
+    // Avatar columns: conditional (see the M6 note above) — params are
+    // (inMemRev, avatarLookJson) then (inMemRev, inMemRev).
+    appearanceRev, avatarLookJson, c.home_wall ?? null, c.home_floor ?? null,
+    appearanceRev, appearanceRev,
     Date.now(), c.user_id];
   await runQ(
     `UPDATE characters SET name=?, class=?, avatar=?, color=?, money=?, energy=?, health=?,
@@ -1023,14 +1032,20 @@ export async function saveCharacter(c) {
       loan_free=?, shift_job=?, shift_started_at=?, shift_ends_at=?,
       fun=?, social=?, hygiene=?, bladder=?, perk_stars=?, perks=?,
       housing_owned=?, skills=?, skills_used=?,
-      avatar_look=?, home_wall=?, home_floor=?, appearance_rev=?, updated_at=? WHERE user_id=?`,
+      avatar_look=CASE WHEN COALESCE(appearance_rev,0) <= ? THEN ? ELSE avatar_look END,
+      home_wall=?, home_floor=?,
+      appearance_rev=CASE WHEN COALESCE(appearance_rev,0) <= ? THEN ? ELSE appearance_rev END,
+      updated_at=? WHERE user_id=?`,
     `UPDATE characters SET name=$1, class=$2, avatar=$3, color=$4, money=$5, energy=$6, health=$7,
       happiness=$8, hunger=$9, housing=$10, property=$11, vehicle=$12, biz=$13, savings=$14, loan=$15,
       cert=$16, location_id=$17, x=$18, y=$19, rent_misses=$20, customized=$21,
       starter_loan_available=$22, loan_free=$23, shift_job=$24, shift_started_at=$25, shift_ends_at=$26,
       fun=$27, social=$28, hygiene=$29, bladder=$30, perk_stars=$31, perks=$32,
       housing_owned=$33, skills=$34, skills_used=$35,
-      avatar_look=$36, home_wall=$37, home_floor=$38, appearance_rev=$39, updated_at=$40 WHERE user_id=$41`,
+      avatar_look=CASE WHEN COALESCE(appearance_rev,0) <= $36 THEN $37 ELSE avatar_look END,
+      home_wall=$38, home_floor=$39,
+      appearance_rev=CASE WHEN COALESCE(appearance_rev,0) <= $40 THEN $41 ELSE appearance_rev END,
+      updated_at=$42 WHERE user_id=$43`,
     params);
 }
 
