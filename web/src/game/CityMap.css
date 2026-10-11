@@ -32,7 +32,7 @@
 .eko-citymap__nogl button {
   border: none;
   border-radius: var(--radius-pill);
-  background: var(--lagoon-600);
+  background: var(--lagoon-700);
   color: #fff;
   font-weight: 800;
   padding: var(--space-2) var(--space-4);
