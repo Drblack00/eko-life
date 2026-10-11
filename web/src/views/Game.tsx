@@ -464,6 +464,7 @@ function MeTab({
           look={you.avatar_look}
           options={config?.avatarLook ?? AVATAR_LOOK_FALLBACK_OPTIONS}
           sendAct={sendAct}
+          characterId={you.character_id}
         />
         <dl className="eko-me__rows">
           <div>
