@@ -1704,10 +1704,20 @@ function RoomCanvas({
   // Bugfix C: compare the avatar cell by value — furniture changes rebuild
   // the tuple identity, which must not teleport a walking avatar back.
   const avatarCellKey = avatarCell ? `${avatarCell[0]},${avatarCell[1]}` : "none";
+  // Defect 7: avatarLook is a fresh object on EVERY server "you" snapshot
+  // (JSON parse → new identity) even when the look didn't change. Re-seating
+  // the avatar on identity alone rebuilds the figure mid-walk: the walk is
+  // cancelled and the avatar teleports back to its spawn cell, so the first
+  // taps after load (while snapshots stream in) appear to do nothing.
+  // Compare by value — only a real look change re-seats the avatar.
+  const avatarLookKey = JSON.stringify(avatarLook);
+  const avatarLookKeyRef = useRef<string | null>(null);
   useEffect(() => {
+    if (avatarLookKeyRef.current === avatarLookKey) return;
+    avatarLookKeyRef.current = avatarLookKey;
     apiBox.current?.setAvatar(avatarLook, avatarCell);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [avatarLook, avatarCellKey]);
+  }, [avatarLook, avatarCellKey, avatarLookKey]);
 
   return <div ref={hostRef} className="eko-room__canvas" aria-label="3D home room" />;
 }
