@@ -42,7 +42,7 @@
   color: #92400e;
 }
 
-.m9-muted { color: var(--muted, #64748b); font-size: 0.85rem; margin: 4px 0; }
+.m9-muted { color: var(--muted, #475569); font-size: 0.85rem; margin: 4px 0; }
 
 .m9-riddle {
   font-size: 1.02rem;
@@ -103,7 +103,7 @@
 .m9-perk-icon { font-size: 1.6rem; line-height: 1; }
 .m9-perk-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .m9-perk-name { margin: 0; font-weight: 700; font-size: 0.92rem; }
-.m9-perk-desc { margin: 0; font-size: 0.8rem; color: var(--muted, #64748b); line-height: 1.35; }
+.m9-perk-desc { margin: 0; font-size: 0.8rem; color: var(--muted, #475569); line-height: 1.35; }
 .m9-perk-foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 6px; }
 .m9-perk-cost { font-weight: 800; color: #b45309; }
 .m9-perk-foot .eko-btn { min-height: 44px; }
