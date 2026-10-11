@@ -318,3 +318,264 @@
     grid-column: 1 / -1;
   }
 }
+
+/* ---- M5 rebuilt editor ---- */
+
+/* Category tabs */
+.eko-studio__tabs {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: rgb(255 255 255 / 0.04);
+  border: 1px solid rgb(255 255 255 / 0.07);
+}
+
+.eko-studio__tab {
+  flex: 1;
+  min-height: 44px;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.eko-studio__tab.glass {
+  --glass-tint: transparent;
+  --glass-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.eko-studio__tab--active.glass {
+  --glass-tint: color-mix(in srgb, var(--primary) 22%, transparent);
+  border: 1px solid var(--primary);
+  color: var(--text);
+}
+
+/* Outfit cards (5 exact pipeline outfits — honest, no fake combos) */
+.eko-studio__outfits {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-2);
+}
+
+.eko-studio__outfit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 64px;
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.eko-studio__outfit.glass {
+  --glass-tint: color-mix(in srgb, var(--surface) 65%, transparent);
+  --glass-radius: var(--radius-md);
+  --glass-blur: 0px;
+}
+
+.eko-studio__outfit--active.glass {
+  border: 2px solid var(--primary);
+  --glass-tint: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.eko-studio__outfitname {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.eko-studio__outfitcaption {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.eko-studio__caption {
+  margin: var(--space-2) 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+/* Status line: unsaved indicator + saved confirmation */
+.eko-studio__statusline {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+.eko-studio__unsaved {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--amber-500, #f59e0b);
+}
+
+.eko-studio__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--amber-500, #f59e0b);
+  box-shadow: 0 0 8px var(--amber-500, #f59e0b);
+}
+
+.eko-studio__savedflash {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--palm-500);
+}
+
+/* Loading + error states */
+.eko-studio__loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-content: center;
+  padding: var(--space-3);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.eko-studio__spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgb(255 255 255 / 0.2);
+  border-top-color: var(--primary);
+  animation: eko-studio-spin 0.8s linear infinite;
+}
+
+@keyframes eko-studio-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eko-studio__spinner {
+    animation: none;
+    border-top-color: rgb(255 255 255 / 0.2);
+  }
+}
+
+.eko-studio__error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: rgb(239 68 68 / 0.12);
+  border: 1px solid rgb(239 68 68 / 0.4);
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.eko-studio__error ul {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-4);
+}
+
+.eko-studio__errorbtn {
+  margin-left: auto;
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: var(--space-1) var(--space-2);
+  background: none;
+  border: 1px solid rgb(239 68 68 / 0.5);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+/* Modal dialogs: conflict + reset-to-default confirm */
+.eko-studio__dialogwrap {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgb(2 6 14 / 0.6);
+}
+
+.eko-studio__dialog {
+  width: 100%;
+  max-width: 420px;
+  padding: var(--space-5);
+  color: var(--text);
+}
+
+.eko-studio__dialog.glass {
+  --glass-tint: rgb(16 24 40 / 0.92);
+  --glass-radius: var(--radius-lg);
+}
+
+.eko-studio__dialog h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 1.1rem;
+}
+
+.eko-studio__dialog p {
+  margin: 0 0 var(--space-4);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.eko-studio__dialogbtns {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-studio__dialogbtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 56px;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--surface-2);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.eko-studio__dialogbtn--primary {
+  background: var(--palm-500);
+  border-color: var(--palm-500);
+  color: #fff;
+}
+
+.eko-studio__dialogsub {
+  font-weight: 500;
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+
+/* Ghost "Reset view" camera button next to the framing pills */
+.eko-studio__framebtn--ghost {
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+/* Landscape: new blocks join the scrolling options column */
+@media (orientation: landscape) {
+  .eko-studio__tabs,
+  .eko-studio__statusline,
+  .eko-studio__loading,
+  .eko-studio__error {
+    grid-column: 2;
+  }
+}
