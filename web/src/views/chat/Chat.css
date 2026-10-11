@@ -33,7 +33,7 @@
 }
 
 .eko-chat__seg--active {
-  background: var(--primary);
+  background: var(--lagoon-700);
   border-color: var(--primary);
   color: #fff;
 }
@@ -223,7 +223,7 @@
 }
 
 .eko-profile__reason--active {
-  background: var(--primary);
+  background: var(--lagoon-700);
   border-color: var(--primary);
   color: #fff;
 }
