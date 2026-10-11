@@ -30,11 +30,14 @@ export function AvatarEditButton({
   look,
   options,
   sendAct,
+  characterId,
 }: {
   /** Raw character.avatar_look (sanitized internally against options). */
   look: unknown;
   options?: AvatarLookOptions;
   sendAct: (a: ActName, params?: Record<string, unknown>) => void;
+  /** Character id — when present, the rebuilt v1 editor is used. */
+  characterId?: string | number;
 }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -86,6 +89,7 @@ export function AvatarEditButton({
               options={opts}
               onSave={handleSave}
               saving={saving}
+              characterId={characterId != null ? String(characterId) : undefined}
             />
           )}
         </div>
