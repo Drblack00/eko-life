@@ -5,6 +5,24 @@
   background: linear-gradient(180deg, var(--lagoon-100), var(--bg));
 }
 
+/* The auth screens are a designed light flow (light gradient, light
+   cards). Pin the semantic tokens to their day values inside it so the
+   flow renders identically in both themes — the in-game chrome is what
+   follows data-theme. */
+.eko-auth {
+  --bg: var(--neutral-50);
+  --surface: var(--neutral-0);
+  --surface-2: var(--neutral-100);
+  --text: var(--neutral-900);
+  --text-muted: var(--neutral-600);
+  --primary: var(--lagoon-600);
+  --primary-strong: var(--lagoon-700);
+  /* Pin the inherited ink too: without this, plain text inherits the
+     night body color even though --text is scoped above. */
+  color: var(--text);
+  color-scheme: light;
+}
+
 .eko-auth__top {
   display: flex;
   align-items: center;
@@ -95,7 +113,9 @@
 }
 
 .eko-field__error {
-  color: var(--danger);
+  /* Darkened from --danger: #dc2626 is 4.8:1 on white, this clears 4.5:1
+     with margin on the light auth card. */
+  color: #b91c1c;
   font-size: 0.85rem;
   margin: 0;
 }
@@ -171,7 +191,8 @@
 .eko-auth__form-error {
   background: rgb(220 38 38 / 0.08);
   border: 1px solid rgb(220 38 38 / 0.3);
-  color: var(--danger);
+  /* Darkened from --danger for 4.5:1 on the tinted light card. */
+  color: #b91c1c;
   border-radius: var(--radius-md);
   padding: var(--space-3);
   margin: 0;

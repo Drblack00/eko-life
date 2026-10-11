@@ -213,6 +213,10 @@
   color: var(--danger);
   font-weight: 600;
 }
+/* #dc2626 fails on dark surfaces — lighten at night. */
+[data-theme="night"] .eko-create__error {
+  color: #f87171;
+}
 
 .eko-create__fallback {
   display: flex;

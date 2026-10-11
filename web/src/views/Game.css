@@ -62,6 +62,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* palm-700 fails on the dark HUD — lighten at night. */
+[data-theme="night"] .eko-hud__money {
+  color: var(--palm-400);
+}
 
 /* Governor pill — must never paint over its neighbours. iOS Safari renders
    a native-styled <button> wider than its flex slot (ignoring overflow and
@@ -189,8 +193,8 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 60;
-  /* Dark frosted banner from .glass — floats over any tab. */
-  color: #fff;
+  /* Theme-following frosted banner (was hardcoded dark) — floats over any tab. */
+  color: var(--text);
   font-family: var(--font-display);
   font-weight: 700;
   padding: var(--space-3) var(--space-5);
@@ -198,13 +202,12 @@
 }
 
 .eko-daybanner.glass {
-  --glass-tint: var(--glass-tint-dark);
   --glass-radius: var(--radius-pill);
 }
 
 @media (prefers-reduced-transparency: reduce) {
   .eko-daybanner.glass {
-    background: rgb(28 24 20 / 0.95);
+    background: var(--surface);
   }
 }
 
@@ -344,6 +347,11 @@
   font-variant-numeric: tabular-nums;
   color: var(--palm-700);
   white-space: nowrap;
+}
+/* palm-700 fails on dark surfaces — lighten at night. */
+[data-theme="night"] .eko-job__pay,
+[data-theme="night"] .eko-food__cost {
+  color: var(--palm-400);
 }
 
 .eko-job__foot {
@@ -648,6 +656,11 @@
   padding-left: var(--space-2);
   padding-right: var(--space-2);
 }
+/* --lagoon-100 is a light chip in both themes: darken it at night so the
+   light row text stays legible. */
+[data-theme="night"] .eko-leaders__row--me {
+  background: #16405f;
+}
 
 .eko-leaders__rank {
   min-width: 32px;
@@ -665,7 +678,12 @@
 
 .eko-leaders__money {
   font-weight: 800;
-  color: var(--success);
+  /* --success (#16a34a) is only 3.3:1 on light surfaces — palm-700 clears
+     4.5:1 in the day theme, palm-400 in the night theme. */
+  color: var(--palm-700);
+}
+[data-theme="night"] .eko-leaders__money {
+  color: var(--palm-400);
 }
 .eko-work__group {
   display: flex;

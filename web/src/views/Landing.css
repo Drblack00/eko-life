@@ -5,6 +5,24 @@
   background: var(--lagoon-100);
 }
 
+/* The landing is a designed light marketing page (white hero cards, dark
+   ink). Pin the semantic tokens to their day values inside it so the page
+   renders identically in both themes — the in-game chrome (HUD, tabs,
+   phone, sheets, toasts) is what follows data-theme. */
+.eko-landing {
+  --bg: var(--neutral-50);
+  --surface: var(--neutral-0);
+  --surface-2: var(--neutral-100);
+  --text: var(--neutral-900);
+  --text-muted: var(--neutral-600);
+  --primary: var(--lagoon-600);
+  --primary-strong: var(--lagoon-700);
+  /* Pin the inherited ink too: without this, plain text inherits the
+     night body color even though --text is scoped above. */
+  color: var(--text);
+  color-scheme: light;
+}
+
 .eko-landing__map {
   position: absolute;
   inset: 0;

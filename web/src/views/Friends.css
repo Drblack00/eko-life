@@ -44,7 +44,9 @@
 }
 
 .eko-fpage__badge {
-  background: var(--success);
+  /* --success (#16a34a) is only 3.3:1 with white text — palm-700 clears
+     4.5:1 in both themes. */
+  background: var(--palm-700);
   color: #fff;
   border-radius: var(--radius-pill);
   font-size: 0.72rem;

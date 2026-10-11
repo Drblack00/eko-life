@@ -24,7 +24,7 @@
   border-radius: 12px;
   font-size: 20px;
   cursor: pointer;
-  color: var(--ink, #0f172a);
+  color: var(--text);
   box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.08));
 }
 
@@ -109,7 +109,7 @@
 .eko-admin__table td {
   text-align: left;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--hairline, #e2e8f0);
+  border-bottom: 1px solid var(--glass-border);
   white-space: nowrap;
 }
 
@@ -142,7 +142,7 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--hairline, #cbd5e1);
+  background: var(--surface-2);
   display: inline-block;
 }
 
@@ -162,12 +162,19 @@
 
 .eko-admin__flag--banned {
   background: color-mix(in srgb, var(--danger, #dc2626) 14%, transparent);
-  color: var(--danger, #dc2626);
+  /* --danger fails on dark surfaces — theme the flag ink. */
+  color: #b91c1c;
+}
+[data-theme="night"] .eko-admin__flag--banned {
+  color: #f87171;
 }
 
 .eko-admin__flag--admin {
   background: color-mix(in srgb, var(--accent, #7c3aed) 14%, transparent);
-  color: var(--accent, #7c3aed);
+  color: #92400e;
+}
+[data-theme="night"] .eko-admin__flag--admin {
+  color: var(--danfo-400);
 }
 
 .eko-admin__actions {
