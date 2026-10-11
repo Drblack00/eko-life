@@ -7,7 +7,7 @@ import { Router } from 'express';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getUserById, getCharacter, ensureCharacter, saveCharacter, addTransaction, getMeta, dbMode, listTransactions, getPropertyOwnerIds, listFurniture, listTopByMoney, resolveReferralCode } from '../db.js';
+import { getUserById, getCharacter, getCharacterById, ensureCharacter, saveCharacter, addTransaction, getMeta, dbMode, listTransactions, getPropertyOwnerIds, listFurniture, listTopByMoney, resolveReferralCode } from '../db.js';
 import { authMiddleware, createAuthRouter, USER_RE } from '../auth.js';
 import { createAdminRouter } from './admin.js';
 import { createFriendsRouter } from './friends.js';
@@ -22,6 +22,14 @@ import {
   AVATAR_TOP_COLORS, AVATAR_BOTTOM_COLORS, DEFAULT_AVATAR, sanitizeAvatar,
   WALLS, FLOORS,
 } from '../game/data.js';
+// M6: versioned appearance persistence (validator + persist + catalog).
+import {
+  AppearanceValidationError,
+  AppearanceConflictError,
+  AppearanceNotFoundError,
+  persistAppearance,
+  buildCatalog,
+} from '../game/appearance.js';
 // V2 milestones: REST_SPECS + CONFIG_DATA + clock helper, mounted below.
 import { REST_SPEC as M7_REST, CONFIG_DATA as M7_CONFIG, lagosNow } from '../game/v2/m7.js';
 import { REST_SPEC as M8_REST, CONFIG_DATA as M8_CONFIG } from '../game/v2/m8.js';
@@ -64,6 +72,7 @@ try {
 function characterBody(user, c, day) {
   const body = {
     id: user.id,
+    character_id: c.id,
     username: user.username,
     name: c.name,
     class: c.class,
@@ -343,6 +352,64 @@ export function createApiRouter({ hub, getDay }) {
     await addTransaction(user.id, 'class_package', c.money, c.money, { class: classId });
     console.log(`[characters] ${user.username} created character "${name}" (${classId})`);
     res.json({ ok: true, character: characterBody(user, c, getDay().day) });
+  });
+
+  // ---- M6: versioned appearance persistence ----
+  // GET /api/characters/:id/appearance → { appearance, revision }
+  // `appearance` is the stored JSON parsed verbatim: it may be a legacy
+  // flat look (the client migrates on read via migrateAvatarLookToV1) or
+  // null when unset. 404 when the character does not exist or is not
+  // yours (no existence leaking).
+  router.get('/characters/:id/appearance', authMiddleware, async (req, res) => {
+    const row = await getCharacterById(Number(req.params.id));
+    if (!row || Number(row.user_id) !== Number(req.userId)) {
+      return res.status(404).json({ error: 'Character not found.' });
+    }
+    let appearance = null;
+    try {
+      appearance = row.avatar_look ? JSON.parse(row.avatar_look) : null;
+    } catch {
+      appearance = null;
+    }
+    res.json({ appearance, revision: Number(row.appearance_rev ?? 0) || 0 });
+  });
+
+  // PUT /api/characters/:id/appearance { appearance, expectedRev }
+  // → 200 { appearance, revision }; 400 validation; 409 revision
+  // conflict { error: 'revision_conflict', revision }; 403 not yours;
+  // 404 character missing.
+  router.put('/characters/:id/appearance', authMiddleware, async (req, res) => {
+    const row = await getCharacterById(Number(req.params.id));
+    if (!row) return res.status(404).json({ error: 'Character not found.' });
+    if (Number(row.user_id) !== Number(req.userId)) {
+      return res.status(403).json({ error: 'Not your character.' });
+    }
+    try {
+      const result = await persistAppearance({
+        userId: req.userId,
+        characterId: Number(req.params.id),
+        appearance: req.body ? req.body.appearance : undefined,
+        expectedRev: req.body ? req.body.expectedRev : undefined,
+      });
+      res.json({ appearance: result.appearance, revision: result.revision });
+    } catch (e) {
+      if (e instanceof AppearanceValidationError) {
+        return res.status(400).json({ error: e.message, errors: e.errors });
+      }
+      if (e instanceof AppearanceConflictError) {
+        return res.status(409).json({ error: 'revision_conflict', revision: e.revision });
+      }
+      if (e instanceof AppearanceNotFoundError) {
+        return res.status(404).json({ error: 'Character not found.' });
+      }
+      throw e;
+    }
+  });
+
+  // GET /api/avatar/catalog → { schemaVersion: 1, ...ids } — the
+  // server-side mirror of the M2 avatar manifest (M6).
+  router.get('/avatar/catalog', authMiddleware, (req, res) => {
+    res.json(buildCatalog());
   });
 
   // ---- client error beacon ----
