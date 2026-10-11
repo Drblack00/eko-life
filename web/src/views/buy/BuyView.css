@@ -30,9 +30,9 @@
   margin: 0;
   font-size: 1.05rem;
   font-weight: 800;
-  /* The glass card renders light — use the app's ink tone, like the
-   * section headers, so the title stays legible. */
-  color: #1c2b45;
+  /* The glass card adapts to the theme — use the theme ink token so the
+   * title stays legible in both light and dark themes. */
+  color: var(--text);
   letter-spacing: 0.01em;
 }
 
