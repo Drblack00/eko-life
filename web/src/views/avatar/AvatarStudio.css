@@ -23,7 +23,14 @@
     radial-gradient(130% 100% at 50% 0%, #26334d 0%, #141d31 52%, #0a0f1c 100%),
     radial-gradient(100% 40% at 50% 108%, rgb(56 90 140 / 0.35) 0%, transparent 70%);
   overflow: hidden;
-  touch-action: none;
+  /* Bug 2 gesture fix: vertical swipes must scroll the sheet (Phone → Me),
+     so the preview allows the browser's native vertical pan. Horizontal
+     drags spin the figure via the directional lock in AvatarStudio.tsx.
+     touch-action MUST NOT be none here — none would trap the sheet's scroll
+     gesture on the preview (the old snap-back). The canvas inherits this;
+     scoping none to the canvas would intersect back to none for touches
+     starting on it, defeating the fix. */
+  touch-action: pan-y;
   cursor: grab;
   border: 1px solid rgb(255 255 255 / 0.08);
   box-shadow:

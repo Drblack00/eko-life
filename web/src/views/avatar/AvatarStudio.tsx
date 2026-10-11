@@ -6,12 +6,17 @@ import {
   BODY_PRESET,
   DEFAULT_FRAMING,
   FACE_PRESET,
+  STUDIO_FOV_DEG,
   clampZoom,
+  compensateDistance,
+  decideSpinLock,
+  driftTargetY,
   easeInOutCubic,
+  framingForContainer,
   matchesPreset,
-  targetYForDistance,
   cameraPositionFor,
   type CameraFraming,
+  type StudioPresetKind,
 } from "./parts/studio";
 import "./AvatarStudio.css";
 
@@ -82,10 +87,22 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
   // goPreset / zoom handlers need to reach into the mount effect's rig.
   const rigRef = useRef<{
     applyZoom: (distance: number) => void;
-    goPreset: (p: "face" | "body") => void;
+    goPreset: (p: StudioPresetKind) => void;
   } | null>(null);
 
-  const goPreset = (p: "face" | "body") => rigRef.current?.goPreset(p);
+  // Size-responsive preset anchors, re-derived from the measured preview
+  // container on every resize (Bug 2: the studio now lives in a smaller
+  // embedded card — framing must not be hardcoded for one card size).
+  const framingsRef = useRef<{ face: CameraFraming; body: CameraFraming }>({
+    face: { ...FACE_PRESET },
+    body: { ...BODY_PRESET },
+  });
+  // Live container aspect for render-time horizontal compensation.
+  const aspectRef = useRef(1);
+  // True until the first measured framing lands (snaps the opening frame).
+  const firstFrameRef = useRef(true);
+
+  const goPreset = (p: StudioPresetKind) => rigRef.current?.goPreset(p);
 
   /* ---------- Three.js preview ---------- */
   // Mount effect: renderer, studio lighting, stage, camera rig, input.
@@ -109,7 +126,7 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 50);
+    const camera = new THREE.PerspectiveCamera(STUDIO_FOV_DEG, 1, 0.1, 50);
 
     /* Studio 3-point lighting. */
     scene.add(new THREE.HemisphereLight(0xffffff, 0x1e293b, 0.85));
@@ -172,22 +189,57 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
     reduceMotionRef.current = reduceMotion;
 
     const syncPresetButton = () => {
-      if (matchesPreset(camTarget, FACE_PRESET)) setActivePreset("face");
-      else if (matchesPreset(camTarget, BODY_PRESET)) setActivePreset("body");
+      const { face, body } = framingsRef.current;
+      if (matchesPreset(camTarget, face)) setActivePreset("face");
+      else if (matchesPreset(camTarget, body)) setActivePreset("body");
       else setActivePreset(null);
+    };
+
+    // Derive the Face/Full-body anchors from the measured container so the
+    // full head + tallest hairstyle always fits (Bug 2). First call snaps
+    // the opening frame; later calls re-anchor a preset the user is sitting
+    // on (e.g. after rotation) and let the damped follow glide to it.
+    const applyFraming = () => {
+      const w = Math.max(1, mount.clientWidth);
+      const h = Math.max(1, mount.clientHeight);
+      aspectRef.current = w / h;
+      const prev = framingsRef.current;
+      const next = {
+        face: framingForContainer("face", w, h),
+        body: framingForContainer("body", w, h),
+      };
+      framingsRef.current = next;
+      if (firstFrameRef.current) {
+        firstFrameRef.current = false;
+        cam.distance = next.body.distance;
+        cam.targetY = next.body.targetY;
+        camTarget.distance = next.body.distance;
+        camTarget.targetY = next.body.targetY;
+        syncPresetButton();
+        return;
+      }
+      if (matchesPreset(camTarget, prev.face)) {
+        camTarget.distance = next.face.distance;
+        camTarget.targetY = next.face.targetY;
+      } else if (matchesPreset(camTarget, prev.body)) {
+        camTarget.distance = next.body.distance;
+        camTarget.targetY = next.body.targetY;
+      }
+      syncPresetButton();
     };
 
     rigRef.current = {
       applyZoom: (distance: number) => {
         transitionRef.current = null;
         const d = clampZoom(distance);
+        const { face, body } = framingsRef.current;
         camTarget.distance = d;
-        camTarget.targetY = targetYForDistance(d);
+        camTarget.targetY = driftTargetY(d, face.targetY, body.targetY);
         setZoomHint(false);
         syncPresetButton();
       },
-      goPreset: (p: "face" | "body") => {
-        const preset = p === "face" ? FACE_PRESET : BODY_PRESET;
+      goPreset: (p: StudioPresetKind) => {
+        const preset = framingsRef.current[p];
         camTarget.distance = preset.distance;
         camTarget.targetY = preset.targetY;
         if (reduceMotion) {
@@ -208,14 +260,23 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
       },
     };
 
-    /* Input: single-pointer drag spins; two-pointer pinch + wheel zoom. */
+    /* Input: single-pointer drag spins; two-pointer pinch + wheel zoom.
+       Bug 2 gesture fix: the preview is touch-action: pan-y, so a vertical
+       swipe scrolls the sheet natively. Touch drags additionally go through
+       a directional lock — only horizontal-dominant drags spin the figure;
+       vertical-dominant ones are left alone so the sheet's scroll is never
+       trapped (no more snap-back). Mouse/pen keep the legacy behavior. */
     let angle = 0.6;
     let target = 0.6;
     let dragging = false;
     let lastX = 0;
     let lastInteract = 0;
-    const pointers = new Map<number, { x: number; y: number }>();
+    const pointers = new Map<number, { x: number; y: number; type: string }>();
     let pinchStart: { pinch: number; dist: number } | null = null;
+    // Touch directional lock: null = undecided, true = spin, false = scroll.
+    let spinLock: boolean | null = null;
+    let startX = 0;
+    let startY = 0;
     const el = renderer.domElement;
 
     const pinchDist = () => {
@@ -224,19 +285,30 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
     };
 
     const onDown = (e: PointerEvent) => {
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
       lastInteract = performance.now();
       if (pointers.size === 2) {
         // Second finger down: switch from spin to pinch.
         dragging = false;
+        spinLock = null;
         pinchStart = { pinch: pinchDist(), dist: camTarget.distance };
       } else if (pointers.size === 1) {
-        dragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
         lastX = e.clientX;
-        try {
-          el.setPointerCapture(e.pointerId);
-        } catch {
-          /* noop */
+        spinLock = null;
+        if (e.pointerType === "touch") {
+          // Wait for the directional lock before spinning; capturing the
+          // pointer early can steal the browser's vertical pan on some
+          // platforms. A vertical swipe is left to the sheet's scroll.
+          dragging = false;
+        } else {
+          dragging = true;
+          try {
+            el.setPointerCapture(e.pointerId);
+          } catch {
+            /* noop */
+          }
         }
       }
     };
@@ -249,23 +321,45 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
       if (pointers.size === 2 && pinchStart && pinchStart.pinch > 0) {
         const ratio = pinchStart.pinch / Math.max(1, pinchDist());
         rigRef.current?.applyZoom(pinchStart.dist * ratio);
-      } else if (pointers.size === 1 && dragging) {
-        target += (e.clientX - lastX) * 0.012;
-        lastX = e.clientX;
+      } else if (pointers.size === 1) {
+        if (e.pointerType === "touch" && spinLock === null) {
+          const lock = decideSpinLock(e.clientX - startX, e.clientY - startY);
+          if (lock !== null) {
+            spinLock = lock;
+            if (lock) {
+              dragging = true;
+              try {
+                el.setPointerCapture(e.pointerId);
+              } catch {
+                /* noop */
+              }
+            }
+            // lock === false: vertical-dominant — hands off. The sheet
+            // scrolls natively; the browser pointercancels this gesture.
+          }
+        }
+        if (dragging) {
+          target += (e.clientX - lastX) * 0.012;
+          lastX = e.clientX;
+        }
       }
     };
     const onUp = (e: PointerEvent) => {
       pointers.delete(e.pointerId);
       lastInteract = performance.now();
+      spinLock = null;
       if (pointers.size === 0) {
         dragging = false;
         pinchStart = null;
       } else if (pointers.size === 1) {
-        // Back to one finger: resume spin from the remaining pointer.
+        // Back to one finger: re-arm from the remaining pointer (touch
+        // re-locks by direction; mouse/pen resume spinning immediately).
         pinchStart = null;
         const [rest] = [...pointers.values()];
-        dragging = true;
+        startX = rest.x;
+        startY = rest.y;
         lastX = rest.x;
+        dragging = rest.type !== "touch";
       }
     };
     const onWheel = (e: WheelEvent) => {
@@ -288,6 +382,9 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      // Re-derive the preset anchors from the live container size so the
+      // head keeps fitting after rotations / card resizes.
+      applyFraming();
     };
     resize();
     const ro = new ResizeObserver(resize);
@@ -319,7 +416,11 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
         cam.distance += (camTarget.distance - cam.distance) * a;
         cam.targetY += (camTarget.targetY - cam.targetY) * a;
       }
-      const pos = cameraPositionFor(cam);
+      // Narrow containers dolly out just enough to keep the head/hair
+      // clear sideways; the canonical framing (zoom state, pill matching)
+      // is untouched — this only widens the rendered frame when needed.
+      const renderDist = compensateDistance(cam.distance, aspectRef.current);
+      const pos = cameraPositionFor({ distance: renderDist, targetY: cam.targetY });
       camera.position.set(pos.x, pos.y, pos.z);
       camera.lookAt(0, cam.targetY, 0);
 
@@ -330,6 +431,9 @@ export function AvatarStudio({ initial, options, onSave, saving, compact }: Stud
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      // Re-arm the opening-frame snap so a StrictMode-style remount (or any
+      // re-run of this effect) re-derives framing from the live container.
+      firstFrameRef.current = true;
       el.removeEventListener("pointerdown", onDown);
       el.removeEventListener("pointermove", onMove);
       el.removeEventListener("pointerup", onUp);
