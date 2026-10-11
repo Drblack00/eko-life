@@ -4,14 +4,28 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  BODY_HALF_WIDTH,
   BODY_PRESET,
   DEFAULT_FRAMING,
+  FACE_HALF_WIDTH,
   FACE_PRESET,
+  FIGURE_CHIN_Y,
+  FIGURE_FEET_Y,
+  FIGURE_HAIR_TOP_Y,
+  FRAMING_MARGIN_Y,
+  PREVIEW_TOP_UI_PX,
+  SPIN_LOCK_PX,
+  STUDIO_FOV_DEG,
   ZOOM_MAX,
   ZOOM_MIN,
   cameraPositionFor,
   clampZoom,
+  compensateDistance,
+  decideSpinLock,
+  driftTargetY,
   easeInOutCubic,
+  framingForContainer,
+  halfWidthForDistance,
   matchesPreset,
   targetYForDistance,
 } from "./studio";
@@ -96,5 +110,141 @@ describe("cameraPositionFor", () => {
   it("raises the camera slightly above the look-at point", () => {
     const p = cameraPositionFor(BODY_PRESET);
     expect(p.y).toBeGreaterThan(BODY_PRESET.targetY);
+  });
+});
+
+const TAN_H = Math.tan((STUDIO_FOV_DEG * Math.PI) / 360);
+/** Vertical frame half-extent for a framing. */
+const halfH = (f: { distance: number }) => TAN_H * f.distance;
+
+describe("framingForContainer", () => {
+  it("keeps the tallest hair top clear of the overlaid pills (Face, embedded card)", () => {
+    // Actual embedded card geometry: ~328px wide in the phone sheet.
+    const f = framingForContainer("face", 328, 340);
+    const top = f.targetY + halfH(f);
+    const hairTop = FIGURE_HAIR_TOP_Y + FRAMING_MARGIN_Y;
+    // Hair top sits at least PREVIEW_TOP_UI_PX below the frame top.
+    const pxFromTop = ((top - hairTop) / (2 * halfH(f))) * 340;
+    expect(pxFromTop).toBeGreaterThanOrEqual(PREVIEW_TOP_UI_PX - 1e-9);
+  });
+
+  it("keeps the chin visible with margin (Face)", () => {
+    const f = framingForContainer("face", 328, 340);
+    expect(f.targetY - halfH(f)).toBeLessThanOrEqual(
+      FIGURE_CHIN_Y - FRAMING_MARGIN_Y
+    );
+  });
+
+  it("keeps feet and hair top in frame with pills clearance (Full body)", () => {
+    const f = framingForContainer("body", 328, 340);
+    expect(f.targetY - halfH(f)).toBeLessThanOrEqual(
+      FIGURE_FEET_Y - FRAMING_MARGIN_Y
+    );
+    const top = f.targetY + halfH(f);
+    const hairTop = FIGURE_HAIR_TOP_Y + FRAMING_MARGIN_Y;
+    const pxFromTop = ((top - hairTop) / (2 * halfH(f))) * 340;
+    expect(pxFromTop).toBeGreaterThanOrEqual(PREVIEW_TOP_UI_PX - 1e-9);
+  });
+
+  it("dollies out for narrow containers so the head keeps sideways clearance", () => {
+    const wide = framingForContainer("face", 328, 340);
+    const narrow = framingForContainer("face", 150, 340);
+    expect(narrow.distance).toBeGreaterThan(wide.distance);
+    // Horizontal half-extent still covers the afro + margin.
+    expect(TAN_H * narrow.distance * (150 / 340)).toBeGreaterThanOrEqual(
+      FACE_HALF_WIDTH
+    );
+  });
+
+  it("converges near the classic presets for tall, reasonably-wide cards", () => {
+    const face = framingForContainer("face", 700, 800);
+    const body = framingForContainer("body", 700, 800);
+    expect(face.distance).toBeGreaterThan(1.0);
+    expect(face.distance).toBeLessThan(1.4);
+    expect(body.distance).toBeGreaterThan(3.2);
+    expect(body.distance).toBeLessThan(3.8);
+  });
+
+  it("stays inside the zoom range for extreme containers", () => {
+    for (const [w, h] of [
+      [100, 120],
+      [800, 200],
+      [200, 900],
+    ] as Array<[number, number]>) {
+      for (const kind of ["face", "body"] as const) {
+        const f = framingForContainer(kind, w, h);
+        expect(f.distance).toBeGreaterThanOrEqual(ZOOM_MIN);
+        expect(f.distance).toBeLessThanOrEqual(ZOOM_MAX);
+        expect(Number.isFinite(f.targetY)).toBe(true);
+      }
+    }
+  });
+});
+
+describe("compensateDistance", () => {
+  it("leaves the distance alone for wide aspects", () => {
+    expect(compensateDistance(1.15, 1.5)).toBe(1.15);
+    expect(compensateDistance(3.4, 1.2)).toBe(3.4);
+  });
+
+  it("dollies out for narrow aspects until the half-width fits", () => {
+    const d = compensateDistance(1.15, 0.4);
+    expect(d).toBeGreaterThan(1.15);
+    expect(TAN_H * d * 0.4).toBeGreaterThanOrEqual(
+      halfWidthForDistance(1.15)
+    );
+  });
+
+  it("never dollies in and never exceeds ZOOM_MAX", () => {
+    expect(compensateDistance(2.0, 3)).toBe(2.0);
+    expect(compensateDistance(1.15, 0.05)).toBeLessThanOrEqual(ZOOM_MAX);
+  });
+});
+
+describe("halfWidthForDistance", () => {
+  it("spans the face/body requirements at the zoom extremes", () => {
+    expect(halfWidthForDistance(ZOOM_MIN)).toBeCloseTo(FACE_HALF_WIDTH, 6);
+    expect(halfWidthForDistance(ZOOM_MAX)).toBeCloseTo(BODY_HALF_WIDTH, 6);
+  });
+
+  it("grows monotonically as the camera pulls back", () => {
+    const ws = [1.2, 2.0, 3.0, 4.0].map(halfWidthForDistance);
+    for (let i = 1; i < ws.length; i++) expect(ws[i]).toBeGreaterThan(ws[i - 1]);
+  });
+});
+
+describe("driftTargetY", () => {
+  it("hits the given endpoints", () => {
+    expect(driftTargetY(ZOOM_MIN, 1.6, 1.0)).toBeCloseTo(1.6, 6);
+    expect(driftTargetY(ZOOM_MAX, 1.6, 1.0)).toBeCloseTo(1.0, 6);
+  });
+
+  it("matches targetYForDistance with the classic presets", () => {
+    for (const d of [1.15, 1.8, 2.6, 3.4, 4.6]) {
+      expect(driftTargetY(d, FACE_PRESET.targetY, BODY_PRESET.targetY)).toBeCloseTo(
+        targetYForDistance(d),
+        9
+      );
+    }
+  });
+});
+
+describe("decideSpinLock", () => {
+  it("stays undecided below the travel threshold", () => {
+    expect(decideSpinLock(0, 0)).toBeNull();
+    expect(decideSpinLock(SPIN_LOCK_PX - 1, 0)).toBeNull();
+    expect(decideSpinLock(3, 4)).toBeNull();
+  });
+
+  it("locks to spin for horizontal-dominant drags", () => {
+    expect(decideSpinLock(40, 5)).toBe(true);
+    expect(decideSpinLock(-30, 10)).toBe(true);
+  });
+
+  it("locks to scroll for vertical-dominant drags, ties included", () => {
+    expect(decideSpinLock(5, 40)).toBe(false);
+    expect(decideSpinLock(10, -30)).toBe(false);
+    // Ambiguous diagonals fall to scroll — the sheet always wins.
+    expect(decideSpinLock(25, 25)).toBe(false);
   });
 });
