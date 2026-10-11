@@ -257,9 +257,16 @@
 .eko-ledger__amt--in {
   color: var(--palm-700);
 }
+[data-theme="night"] .eko-ledger__amt--in {
+  color: var(--palm-400);
+}
 
 .eko-ledger__amt--out {
   color: var(--danger);
+}
+[data-theme="night"] .eko-ledger__amt--out {
+  /* #dc2626 fails on dark surfaces — lighten at night. */
+  color: #f87171;
 }
 
 .eko-ledger__bal {

@@ -84,6 +84,9 @@
 .eko-room__btn {
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: #fff;
+  /* Dark ink on the white button in both themes — the button used to
+     inherit light text from dark parents (white-on-white). */
+  color: var(--neutral-900);
   border-radius: var(--radius-pill);
   padding: var(--space-2) var(--space-3);
   font-weight: 700;
@@ -93,7 +96,8 @@
 
 .eko-room__btn:disabled {
   background: #d9f6e7;
-  color: #5f8a73;
+  /* #3f6b50 clears 4.5:1 on the mint chip (the old #5f8a73 was 3.4:1). */
+  color: #3f6b50;
   border-color: transparent;
   opacity: 1;
   cursor: not-allowed;
@@ -268,7 +272,8 @@
 
 .eko-room__buy:disabled {
   background: #d9f6e7;
-  color: #5f8a73;
+  /* #3f6b50 clears 4.5:1 on the mint chip (the old #5f8a73 was 3.4:1). */
+  color: #3f6b50;
   cursor: not-allowed;
 }
 
@@ -374,14 +379,15 @@
   z-index: 5;
   display: flex;
   flex-direction: column;
-  /* Dark frosted material from .glass — the 3D room glows through. */
+  /* Theme-following frosted material (Fix Round 2: the old hardcoded dark
+     tint left the sheet stuck dark in the Light theme). */
   overflow: hidden;
-  color: #eef3fa;
+  color: var(--text);
   transition: height 0.22s ease;
 }
 
 .eko-room__sheet.glass {
-  --glass-tint: rgb(13 20 38 / 0.66);
+  --glass-tint: var(--glass-tint-strong);
   --glass-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
@@ -419,13 +425,14 @@
   width: 44px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.35);
+  /* Theme-aware grabber: dark on the light sheet, light on the dark one. */
+  background: rgb(128 128 128 / 0.5);
 }
 
 .eko-room__sheet-title {
   font-weight: 800;
   font-size: 0.95rem;
-  color: #fff;
+  color: var(--text);
   white-space: nowrap;
 }
 
@@ -440,13 +447,17 @@
   margin-left: auto;
   font-weight: 800;
   font-size: 0.9rem;
-  color: var(--palm-400);
+  /* palm-400 fails on light surfaces — dark green in the day theme. */
+  color: var(--palm-700);
   white-space: nowrap;
+}
+[data-theme="night"] .eko-room__sheet-balance {
+  color: var(--palm-400);
 }
 
 .eko-room__sheet-hide {
   /* Frosted mini-pill from .glass (no blur — it sits on the sheet). */
-  color: #eef3fa;
+  color: var(--text);
   padding: var(--space-1) var(--space-3);
   font-weight: 700;
   font-size: 0.8rem;
@@ -472,11 +483,12 @@
   gap: var(--space-2);
 }
 
-/* Buy sheet content on the dark theme — frosted tints, no blur on the
-   small repeating controls (the sheet itself carries the blur). */
+/* Buy sheet content — theme ink (Fix Round 2: the old hardcoded light text
+   assumed the always-dark sheet). Frosted tints, no blur on the small
+   repeating controls (the sheet itself carries the blur). */
 
 .eko-room__sheet .eko-room__tab {
-  color: #e8edf7;
+  color: var(--text);
 }
 
 .eko-room__sheet .eko-room__tab.glass {
@@ -490,7 +502,7 @@
 }
 
 .eko-room__sheet .eko-room__card {
-  color: #eef3fa;
+  color: var(--text);
 }
 
 .eko-room__sheet .eko-room__card.glass {
@@ -499,11 +511,11 @@
 
 .eko-room__sheet .eko-room__card-sub,
 .eko-room__sheet .eko-room__group-h {
-  color: rgba(232, 237, 247, 0.72);
+  color: var(--text-muted);
 }
 
 .eko-room__sheet .eko-room__swatch {
-  color: #eef3fa;
+  color: var(--text);
 }
 
 .eko-room__sheet .eko-room__swatch.glass {
@@ -511,24 +523,19 @@
 }
 
 .eko-room__sheet .eko-room__swatch-sub {
-  color: rgba(232, 237, 247, 0.65);
+  color: var(--text-muted);
 }
 
 .eko-room__sheet .eko-room__swatch--current.glass {
-  border: 2px solid var(--palm-400);
+  border: 2px solid var(--palm-500);
 }
 
 .eko-room__sheet .eko-room__swatch--preview.glass {
-  border: 2px dashed var(--palm-400);
-}
-
-.eko-room__sheet .eko-room__buy:disabled {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(232, 237, 247, 0.55);
+  border: 2px dashed var(--palm-500);
 }
 
 .eko-room__sheet .eko-room__note {
-  color: rgba(232, 237, 247, 0.72);
+  color: var(--text-muted);
 }
 
 /* Reopen pill when the sheet is hidden. */
@@ -539,8 +546,8 @@
   transform: translateX(-50%);
   bottom: var(--space-3);
   z-index: 5;
-  /* Dark frosted pill from .glass. */
-  color: #fff;
+  /* Theme-following frosted pill. */
+  color: var(--text);
   padding: var(--space-2) var(--space-4);
   font-weight: 800;
   font-size: 0.9rem;
@@ -548,11 +555,11 @@
 }
 
 .eko-room__sheet-fab.glass {
-  --glass-tint: rgb(13 20 38 / 0.66);
+  --glass-tint: var(--glass-tint-strong);
   --glass-radius: var(--radius-pill);
 }
 
-/* ---- M16: compact placing toolbar (≤64px, dark frosted, bottom-docked) ---- */
+/* ---- M16: compact placing toolbar (≤64px, theme-following, bottom-docked) ---- */
 
 .eko-room__placing--compact {
   left: var(--space-2);
@@ -561,13 +568,14 @@
   z-index: 6;
   max-height: 64px;
   justify-content: center;
-  /* Material from .glass — the dark tint keeps the 3D room readable behind. */
-  color: #eef3fa;
+  /* Material from .glass — theme-following frost keeps the 3D room readable
+     behind in both themes. */
+  color: var(--text);
   padding: var(--space-1) var(--space-2);
 }
 
 .eko-room__placing--compact.glass {
-  --glass-tint: rgb(13 20 38 / 0.60);
+  --glass-tint: var(--glass-tint-strong);
   --glass-radius: var(--radius-pill);
 }
 
@@ -597,15 +605,18 @@
   left: 50%;
   transform: translateX(-50%);
   /* Amber edge kept as the warning signal; frost from .glass. */
-  color: #fbbf24;
+  color: #92400e;
   font-size: 0.75rem;
   font-weight: 700;
   padding: 4px 12px;
   white-space: nowrap;
 }
+[data-theme="night"] .eko-room__placing--compact .eko-room__placing-warn {
+  color: #fbbf24;
+}
 
 .eko-room__placing-warn.glass {
-  --glass-tint: rgb(13 20 38 / 0.70);
+  --glass-tint: var(--glass-tint-strong);
   --glass-radius: var(--radius-pill);
   border: 1px solid rgb(251 191 36 / 0.55);
 }
@@ -626,7 +637,7 @@
   transform: translateX(-50%);
   max-width: calc(100% - var(--space-3));
   /* Frosted material from .glass; the dashed palm edge marks preview mode. */
-  color: #eef3fa;
+  color: var(--text);
   padding: var(--space-1) var(--space-2);
   display: flex;
   flex-direction: row;
@@ -638,9 +649,12 @@
 }
 
 .eko-room__trybar.glass {
-  --glass-tint: rgb(13 20 38 / 0.62);
+  --glass-tint: var(--glass-tint-strong);
   --glass-radius: var(--radius-pill);
-  border: 1px dashed var(--palm-400);
+  border: 1px dashed var(--palm-500);
+}
+[data-theme="night"] .eko-room__trybar.glass {
+  border-color: var(--palm-400);
 }
 
 .eko-room__trybar-text {
@@ -773,11 +787,12 @@
 
 .eko-room__shimmer {
   border-radius: var(--radius-md);
+  /* Neutral grey shimmer — reads on both the light and dark sheet. */
   background: linear-gradient(
     100deg,
-    rgba(255, 255, 255, 0.05) 30%,
-    rgba(255, 255, 255, 0.13) 50%,
-    rgba(255, 255, 255, 0.05) 70%
+    rgb(128 128 128 / 0.08) 30%,
+    rgb(128 128 128 / 0.20) 50%,
+    rgb(128 128 128 / 0.08) 70%
   );
   background-size: 200% 100%;
   animation: eko-room__shimmer 1.6s ease-in-out infinite;
@@ -801,39 +816,14 @@
   }
 }
 
-/* Reduced transparency: opaque dark fallbacks for the room's dark frosted
-   surfaces — the .glass default would turn them light, breaking the light
-   text drawn on them. */
-@media (prefers-reduced-transparency: reduce) {
-  .eko-room__sheet.glass {
-    background: rgb(13 20 38 / 0.97);
-  }
-  .eko-room__placing--compact.glass {
-    background: rgb(13 20 38 / 0.92);
-  }
-  .eko-room__trybar.glass {
-    background: rgb(13 20 38 / 0.94);
-  }
-  .eko-room__placing-warn.glass {
-    background: rgb(13 20 38 / 0.95);
-  }
-  .eko-room__sheet-fab.glass {
-    background: rgb(13 20 38 / 0.95);
-  }
-  .eko-room__sheet-hide.glass {
-    background: rgb(38 52 80);
-  }
-  .eko-room__sheet .eko-room__tab.glass,
-  .eko-room__sheet .eko-room__card.glass,
-  .eko-room__sheet .eko-room__swatch.glass {
-    background: rgb(30 42 68);
-  }
-}
+/* Reduced transparency: the room surfaces now follow the theme, so the
+   global .glass fallback (solid theme surface, no blur) in
+   styles/glass.css covers them — no room-specific overrides needed. */
 
 /* Reduced motion: static placeholder, no shimmer sweep. */
 @media (prefers-reduced-motion: reduce) {
   .eko-room__shimmer {
     animation: none;
-    background: rgba(255, 255, 255, 0.06);
+    background: rgb(128 128 128 / 0.10);
   }
 }
