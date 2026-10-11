@@ -22,7 +22,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { useToast } from "../../../components";
 import { AvatarLoader, type AvatarHandle } from "../../../avatar/loader";
+import { fetchAppearance } from "../../../avatar/persistence";
+import { repairAppearanceV1 } from "../../../avatar/migrate";
 import {
   BODY_PRESET_TO_TYPE,
   type AppearanceV1,
@@ -36,7 +39,7 @@ import {
   BOTTOM_COLOR_OPTIONS,
   EDITOR_CATEGORIES,
   FABRIC_OPTIONS,
-  FACIAL_HAIR_OPTIONS,
+  facialHairOptionsForBody,
   HAIR_COLOR_OPTIONS,
   HAIR_STYLE_OPTIONS,
   OUTFIT_ROWS,
@@ -60,6 +63,11 @@ export function AvatarEditor({
   const [, setTick] = useState(0);
   const [tab, setTab] = useState<EditorCategory>("body");
   const [confirmResetDefault, setConfirmResetDefault] = useState(false);
+  // Defect 5: body/face switches trigger a full in-place rebuild
+  // (rebuildInto — the head hangs off the body subtree, so a group swap
+  // can't cover it). It blocks the main thread for seconds, so the shell
+  // shows a spinner + disables the option controls while it runs.
+  const [rebuilding, setRebuilding] = useState(false);
   const machineRef = useRef<AvatarEditorMachine | null>(null);
   const loaderRef = useRef<AvatarLoader | null>(null);
   const apiRef = useRef<StudioPreviewApi | null>(null);
@@ -68,13 +76,91 @@ export function AvatarEditor({
   const loadTokenRef = useRef(0);
   const onSavedRef = useRef(onSaved);
   onSavedRef.current = onSaved;
+  // Serial render queue: structural rebuilds are deferred past two frames
+  // so the spinner paints before the blocking work starts; edits that
+  // land mid-rebuild coalesce to the latest draft.
+  const renderQueueRef = useRef<AppearanceV1[]>([]);
+  const renderBusyRef = useRef(false);
+  const mountedRef = useRef(true);
+  const { toast } = useToast();
 
   /* Machine + loader lifecycle. */
   useEffect(() => {
+    mountedRef.current = true;
     const loader = new AvatarLoader(THREE, {});
     loaderRef.current = loader;
+
+    /** Structural switch (body/face preset or type) — mirrors the
+     * assembler's diffUpdateAssembled rebuild condition. */
+    const isStructuralChange = (
+      oldApp: AppearanceV1 | null,
+      next: AppearanceV1
+    ): boolean =>
+      !oldApp ||
+      oldApp.base.bodyPresetId !== next.base.bodyPresetId ||
+      oldApp.base.facePresetId !== next.base.facePresetId ||
+      oldApp.base.bodyType !== next.base.bodyType;
+
+    const pumpRenderQueue = () => {
+      if (renderBusyRef.current) return;
+      const next = renderQueueRef.current.shift();
+      if (!next) return;
+      const h = handleRef.current;
+      const l = loaderRef.current;
+      if (!h || h.discarded || !l) {
+        // Initial build still in flight — stash; renderInitial's
+        // completion handler applies the latest stashed draft.
+        pendingRef.current = next;
+        return;
+      }
+      renderBusyRef.current = true;
+      const structural = isStructuralChange(h.appearance, next);
+      const run = () => {
+        const hh = handleRef.current;
+        const ll = loaderRef.current;
+        try {
+          if (hh && !hh.discarded && ll) ll.diffUpdate(hh, hh.appearance, next);
+        } finally {
+          renderBusyRef.current = false;
+          if (mountedRef.current) setRebuilding(false);
+          // Drain edits that landed mid-rebuild (diffed from the fresh
+          // handle appearance, so coalescing is exact).
+          pumpRenderQueue();
+        }
+      };
+      if (structural) {
+        if (mountedRef.current) setRebuilding(true);
+        // Let the spinner PAINT before the blocking rebuild starts.
+        // rAF callbacks run before their frame's paint, so the work must
+        // be deferred to a task after the paint: rAF (DOM flushed) →
+        // rAF → setTimeout(0) (fires after the frame, paint included).
+        // Without this the indicator's DOM updates but never reaches the
+        // screen before the main thread blocks.
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => setTimeout(run, 0))
+        );
+      } else {
+        run();
+      }
+    };
+    const queueRender = (next: AppearanceV1) => {
+      // Coalesce: only the latest draft matters; every run diffs from the
+      // handle's current appearance.
+      renderQueueRef.current = [next];
+      pumpRenderQueue();
+    };
+
     const machine = new AvatarEditorMachine(
       {
+        // Defect 4: repair pre-compat-rule saves on load (feminine body
+        // + facial hair → clean-shaven) before anything renders.
+        fetchAppearanceFn: async (id: string) => {
+          const res = await fetchAppearance(id);
+          return {
+            appearance: repairAppearanceV1(res.appearance),
+            revision: res.revision,
+          };
+        },
         renderInitial: (app) => {
           const token = ++loadTokenRef.current;
           void loader
@@ -91,14 +177,16 @@ export function AvatarEditor({
               });
               handleRef.current = h;
               // Edits that landed while the staged build was in flight:
-              // apply the latest draft now (diffUpdate from what loaded).
+              // apply the latest draft now (diffUpdate from what loaded),
+              // through the render queue so structural ones get the
+              // rebuild indicator like any other edit.
               const pending = pendingRef.current;
               pendingRef.current = null;
               if (
                 pending &&
                 JSON.stringify(pending) !== JSON.stringify(h.appearance)
               ) {
-                loader.diffUpdate(h, h.appearance, pending);
+                queueRender(pending);
               }
             })
             .catch(() => {
@@ -107,14 +195,7 @@ export function AvatarEditor({
             });
         },
         renderEdit: (_prev, next) => {
-          const h = handleRef.current;
-          if (!h || h.discarded) {
-            // Initial build still in flight — stash; renderInitial's
-            // completion handler applies the latest stashed draft.
-            pendingRef.current = next;
-            return;
-          }
-          loader.diffUpdate(h, h.appearance, next);
+          queueRender(next);
         },
       },
       () => setTick((t) => t + 1)
@@ -129,7 +210,10 @@ export function AvatarEditor({
       };
     }
     return () => {
+      mountedRef.current = false;
       loadTokenRef.current++;
+      renderQueueRef.current = [];
+      renderBusyRef.current = false;
       const h = handleRef.current;
       handleRef.current = null;
       if (h) loader.disposeHandle(h);
@@ -151,6 +235,17 @@ export function AvatarEditor({
     const t = setTimeout(() => machine.clearSavedFlash(), 2600);
     return () => clearTimeout(t);
   }, [machine, machine?.savedFlash]);
+
+  // Save-confirmation toast (success AND failure): the machine records an
+  // explicit outcome for every save attempt, so a failed save can never
+  // claim success. Toasted exactly once, then cleared.
+  const saveOutcomeAt = machine?.saveOutcome?.at;
+  useEffect(() => {
+    const outcome = machine?.saveOutcome;
+    if (!outcome) return;
+    toast(outcome.message, outcome.ok ? "success" : "error");
+    machine.clearSaveOutcome();
+  }, [machine, saveOutcomeAt, toast]);
 
   // Parent notification on confirmed save (savedFlash flips true once).
   useEffect(() => {
@@ -176,6 +271,7 @@ export function AvatarEditor({
         onApi={(api) => {
           apiRef.current = api;
         }}
+        rebuilding={rebuilding}
       />
 
       {/* Status regions */}
@@ -251,6 +347,7 @@ export function AvatarEditor({
           <div role="tabpanel" aria-label={`${tab} options`}>
             {tab === "body" && (
               <PillRow
+                disabled={rebuilding}
                 label="Body"
                 items={BODY_OPTIONS}
                 value={draft.base.bodyPresetId}
@@ -259,6 +356,15 @@ export function AvatarEditor({
                     const preset = id as BodyPresetId;
                     d.base.bodyPresetId = preset;
                     d.base.bodyType = BODY_PRESET_TO_TYPE[preset];
+                    // Defect 4: facial hair is masculine-only — switching to
+                    // the Woman body clears it so the draft can never hold
+                    // (or save) the invalid combo.
+                    if (
+                      d.base.bodyType === "feminine" &&
+                      d.hair.facialHairId !== "facialhair_none_01"
+                    ) {
+                      d.hair.facialHairId = "facialhair_none_01";
+                    }
                   })
                 }
               />
@@ -266,6 +372,7 @@ export function AvatarEditor({
 
             {tab === "skin" && (
               <SwatchRow
+                disabled={rebuilding}
                 label="Skin tone"
                 colors={SKIN_TONE_OPTIONS}
                 value={draft.base.skinToneId}
@@ -280,6 +387,7 @@ export function AvatarEditor({
             {tab === "hair" && (
               <>
                 <PillRow
+                disabled={rebuilding}
                   label="Hairstyle"
                   items={HAIR_STYLE_OPTIONS}
                   value={draft.hair.styleId}
@@ -290,6 +398,7 @@ export function AvatarEditor({
                   }
                 />
                 <SwatchRow
+                disabled={rebuilding}
                   label="Hair colour"
                   colors={HAIR_COLOR_OPTIONS}
                   value={draft.hair.colorId}
@@ -300,8 +409,9 @@ export function AvatarEditor({
                   }
                 />
                 <PillRow
+                disabled={rebuilding}
                   label="Facial hair"
-                  items={FACIAL_HAIR_OPTIONS}
+                  items={facialHairOptionsForBody(draft.base.bodyType)}
                   value={draft.hair.facialHairId}
                   onPick={(id) =>
                     edit((d) => {
@@ -310,6 +420,11 @@ export function AvatarEditor({
                     })
                   }
                 />
+                {draft.base.bodyType === "feminine" && (
+                  <p className="eko-studio__caption">
+                    Facial hair styles are only available on the Man body.
+                  </p>
+                )}
               </>
             )}
 
@@ -328,6 +443,7 @@ export function AvatarEditor({
                         type="button"
                         role="radio"
                         aria-checked={activeRow?.outfitId === row.outfitId}
+                        disabled={rebuilding}
                         className={`eko-studio__outfit glass${activeRow?.outfitId === row.outfitId ? " eko-studio__outfit--active" : ""}`}
                         onClick={() => edit((d) => Object.assign(d, applyOutfitRow(d, row)))}
                       >
@@ -349,6 +465,7 @@ export function AvatarEditor({
                   </p>
                 </div>
                 <PillRow
+                disabled={rebuilding}
                   label="Fabric"
                   items={FABRIC_OPTIONS}
                   value={draft.clothing.fabricId}
@@ -360,6 +477,7 @@ export function AvatarEditor({
                   }
                 />
                 <SwatchRow
+                disabled={rebuilding}
                   label="Top colour"
                   colors={TOP_COLOR_OPTIONS}
                   value={draft.clothing.topColor}
@@ -370,6 +488,7 @@ export function AvatarEditor({
                   }
                 />
                 <SwatchRow
+                disabled={rebuilding}
                   label="Bottom colour"
                   colors={BOTTOM_COLOR_OPTIONS}
                   value={draft.clothing.bottomColor}
@@ -402,7 +521,7 @@ export function AvatarEditor({
           type="button"
           className="eko-studio__reset"
           onClick={doCancel}
-          disabled={!machine || !machine.dirty || saving || loading}
+          disabled={!machine || !machine.dirty || saving || loading || rebuilding}
           title="Discard unsaved changes and go back to your saved look"
         >
           Cancel
@@ -411,7 +530,7 @@ export function AvatarEditor({
           type="button"
           className="eko-studio__reset"
           onClick={() => setConfirmResetDefault(true)}
-          disabled={!machine || saving || loading}
+          disabled={!machine || saving || loading || rebuilding}
           title="Start over from the default look (you still need to save)"
         >
           Default
@@ -419,7 +538,7 @@ export function AvatarEditor({
         <button
           type="button"
           className="eko-studio__save glass"
-          disabled={!machine || !machine.dirty || saving || loading}
+          disabled={!machine || !machine.dirty || saving || loading || rebuilding}
           onClick={doSave}
         >
           {saving ? "Saving…" : "Save look"}

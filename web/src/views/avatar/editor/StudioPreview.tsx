@@ -19,6 +19,7 @@ import * as THREE from "three";
 import {
   BODY_PRESET,
   DEFAULT_FRAMING,
+  DEFAULT_SPIN_ANGLE,
   FACE_PRESET,
   STUDIO_FOV_DEG,
   clampZoom,
@@ -44,7 +45,7 @@ export interface StudioPreviewApi {
   /** Replace the on-screen figure (old removed + disposed). */
   setFigure: (fig: StudioFigure | null) => void;
   goPreset: (p: StudioPresetKind) => void;
-  /** Return the camera to the default full-body framing. */
+  /** Restore the exact default view: front 3/4 figure angle + default camera. */
   resetView: () => void;
 }
 
@@ -80,8 +81,11 @@ function disposeFigure(fig: StudioFigure): void {
 
 export function StudioPreview({
   onApi,
+  rebuilding,
 }: {
   onApi: (api: StudioPreviewApi | null) => void;
+  /** Defect 5: body rebuild in flight — overlay a spinner + status. */
+  rebuilding?: boolean;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const onApiRef = useRef(onApi);
@@ -108,6 +112,7 @@ export function StudioPreview({
   const rigRef = useRef<{
     applyZoom: (distance: number) => void;
     goPreset: (p: StudioPresetKind) => void;
+    resetView: () => void;
   } | null>(null);
 
   // Size-responsive preset anchors, re-derived from the measured preview
@@ -234,9 +239,16 @@ export function StudioPreview({
     // full head + tallest hairstyle always fits (Bug 2). First call snaps
     // the opening frame; later calls re-anchor a preset the user is sitting
     // on (e.g. after rotation) and let the damped follow glide to it.
+    //
+    // Defect 3: never lock in a one-shot measurement taken before the
+    // container is laid out. A degenerate read (e.g. during the sheet /
+    // phone entrance) must not consume the first-frame snap and must not
+    // poison the preset anchors — stay armed until a sane size arrives.
+    const MIN_SANE_MEASURE_PX = 40;
     const applyFraming = () => {
       const w = Math.max(1, mount.clientWidth);
       const h = Math.max(1, mount.clientHeight);
+      if (w < MIN_SANE_MEASURE_PX || h < MIN_SANE_MEASURE_PX) return;
       aspectRef.current = w / h;
       const prev = framingsRef.current;
       const next = {
@@ -293,12 +305,24 @@ export function StudioPreview({
         setZoomHint(false);
         setActivePreset(p);
       },
+      resetView: () => {
+        // Restore the EXACT opening view: the figure snaps back to the
+        // default front 3/4 angle (the camera never orbits — the figure
+        // spins — so a camera-only reset leaves it facing away) and the
+        // camera glides back to the default full-body framing.
+        // lastInteract is refreshed so the idle auto-spin doesn't nudge
+        // the figure the instant it lands.
+        angle = DEFAULT_SPIN_ANGLE;
+        target = DEFAULT_SPIN_ANGLE;
+        lastInteract = performance.now();
+        rigRef.current?.goPreset("body");
+      },
     };
 
     onApiRef.current({
       setFigure,
       goPreset: (p) => rigRef.current?.goPreset(p),
-      resetView: () => rigRef.current?.goPreset("body"),
+      resetView: () => rigRef.current?.resetView(),
     });
 
     /* Input: single-pointer drag spins; two-pointer pinch + wheel zoom.
@@ -307,11 +331,15 @@ export function StudioPreview({
        a directional lock — only horizontal-dominant drags spin the figure;
        vertical-dominant ones are left alone so the sheet's scroll is never
        trapped (no more snap-back). Mouse/pen keep the legacy behavior. */
-    let angle = 0.6;
-    let target = 0.6;
+    let angle = DEFAULT_SPIN_ANGLE;
+    let target = DEFAULT_SPIN_ANGLE;
     let dragging = false;
     let lastX = 0;
-    let lastInteract = 0;
+    // Start the idle clock at mount: the gentle auto-spin only engages
+    // after 3s of genuine idleness, so the opening front-3/4 view holds
+    // still while the user first looks at it (lastInteract = 0 meant the
+    // figure was already rotating on the first painted frame).
+    let lastInteract = performance.now();
     const pointers = new Map<number, { x: number; y: number; type: string }>();
     let pinchStart: { pinch: number; dist: number } | null = null;
     // Touch directional lock: null = undecided, true = spin, false = scroll.
@@ -409,17 +437,20 @@ export function StudioPreview({
       const next =
         camTarget.distance * (e.deltaY > 0 ? 1.12 : 1 / 1.12);
       rigRef.current?.applyZoom(next);
-    };
-    el.addEventListener("pointerdown", onDown);
+    };    el.addEventListener("pointerdown", onDown);
     el.addEventListener("pointermove", onMove);
     el.addEventListener("pointerup", onUp);
     el.addEventListener("pointercancel", onUp);
     el.addEventListener("wheel", onWheel, { passive: false });
 
     const resize = () => {
-      const w = mount.clientWidth;
-      const h = mount.clientHeight;
-      if (w === 0 || h === 0) return;
+      // Defect 3: clamp and ALWAYS size the renderer — never leave a stale
+      // drawing buffer because one read raced the entrance animation. The
+      // canvas display size stays 100%×100% via CSS; this only sets the
+      // backing store and camera aspect, and the ResizeObserver corrects
+      // any transient value on the next layout.
+      const w = Math.max(1, mount.clientWidth);
+      const h = Math.max(1, mount.clientHeight);
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
@@ -428,6 +459,10 @@ export function StudioPreview({
       applyFraming();
     };
     resize();
+    // Re-measure after the first paint too: the mount effect can run
+    // before the sheet/phone entrance settles, and a paint-then-measure
+    // pass guarantees the live size wins over any pre-animation read.
+    requestAnimationFrame(() => resize());
     const ro = new ResizeObserver(resize);
     ro.observe(mount);
 
@@ -521,7 +556,7 @@ export function StudioPreview({
           <button
             type="button"
             className="eko-studio__framebtn eko-studio__framebtn--ghost glass"
-            onClick={() => rigRef.current?.goPreset("body")}
+            onClick={() => rigRef.current?.resetView()}
             title="Reset the camera to the default full-body view"
           >
             Reset view
@@ -536,6 +571,12 @@ export function StudioPreview({
           <p className="eko-studio__nogl">
             3D preview isn't available on this device — your picks below still work.
           </p>
+        )}
+        {rebuilding && (
+          <div className="eko-studio__rebuild" role="status">
+            <span className="eko-studio__spinner" aria-hidden="true" />
+            Rebuilding body…
+          </div>
         )}
       </div>
   );

@@ -399,3 +399,113 @@ describe("AvatarEditorMachine", () => {
     expect(h.machine.error).toBeNull();
   });
 });
+
+describe("AvatarEditorMachine save outcomes (toast signal)", () => {
+  let h: Harness;
+  beforeEach(() => {
+    h = makeHarness();
+  });
+
+  it("successful save records an ok outcome (shell toasts success)", async () => {
+    await h.machine.open("char-1");
+    h.machine.edit((d) => {
+      d.base.skinToneId = "latte";
+    });
+    await h.machine.save();
+    expect(h.machine.savedFlash).toBe(true);
+    expect(h.machine.saveOutcome).not.toBeNull();
+    expect(h.machine.saveOutcome?.ok).toBe(true);
+    expect(h.machine.saveOutcome?.message).toBe("Look saved!");
+    h.machine.clearSaveOutcome();
+    expect(h.machine.saveOutcome).toBeNull();
+  });
+
+  it("failed save (network) records a failure outcome — success is never claimed", async () => {
+    await h.machine.open("char-1");
+    h.machine.edit((d) => {
+      d.base.skinToneId = "latte";
+    });
+    h.saveMock.mockRejectedValueOnce(new Error("socket hung up"));
+    await h.machine.save();
+    // The draft is preserved for retry…
+    expect(h.machine.draft?.base.skinToneId).toBe("latte");
+    // …but no success is ever signalled.
+    expect(h.machine.savedFlash).toBe(false);
+    expect(h.machine.status).toBe("error");
+    expect(h.machine.saveOutcome?.ok).toBe(false);
+    expect(h.machine.saveOutcome?.message).toContain("Couldn't save");
+  });
+
+  it("409 conflict records a failure outcome and preserves the draft", async () => {
+    await h.machine.open("char-1");
+    h.machine.edit((d) => {
+      d.hair.styleId = "braids";
+    });
+    h.saveMock.mockRejectedValueOnce(new AppearanceConflictError(9));
+    await h.machine.save();
+    expect(h.machine.status).toBe("conflict");
+    expect(h.machine.conflictRevision).toBe(9);
+    expect(h.machine.draft?.hair.styleId).toBe("braids");
+    expect(h.machine.savedFlash).toBe(false);
+    expect(h.machine.saveOutcome?.ok).toBe(false);
+    expect(h.machine.saveOutcome?.message).toContain("changed elsewhere");
+  });
+
+  it("400 validation records a failure outcome with field errors", async () => {
+    await h.machine.open("char-1");
+    h.saveMock.mockRejectedValueOnce(
+      new AppearanceValidationError(["hair.styleId: unknown hairstyle 'mohawk'"])
+    );
+    await h.machine.save();
+    expect(h.machine.status).toBe("error");
+    expect(h.machine.fieldErrors).toEqual([
+      "hair.styleId: unknown hairstyle 'mohawk'",
+    ]);
+    expect(h.machine.savedFlash).toBe(false);
+    expect(h.machine.saveOutcome?.ok).toBe(false);
+  });
+
+  it("save → reopen (new machine, server-backed mocks): the saved look restores", async () => {
+    // In-memory fake server: the source of truth across editor sessions.
+    let serverAppearance = savedApp();
+    let serverRev = 7;
+    const fakeFetch = async (_id: string) => ({
+      appearance: JSON.parse(JSON.stringify(serverAppearance)) as AppearanceV1,
+      revision: serverRev,
+    });
+    const fakeSave = async (_id: string, draft: AppearanceV1, rev: number) => {
+      if (rev !== serverRev) throw new AppearanceConflictError(serverRev);
+      serverAppearance = JSON.parse(JSON.stringify(draft)) as AppearanceV1;
+      serverRev += 1;
+      return {
+        appearance: JSON.parse(JSON.stringify(serverAppearance)) as AppearanceV1,
+        revision: serverRev,
+      };
+    };
+    const renderInitial = vi.fn();
+    const renderEdit = vi.fn();
+    const session1 = new AvatarEditorMachine(
+      { fetchAppearanceFn: fakeFetch, saveAppearanceFn: fakeSave, renderInitial, renderEdit },
+      () => {}
+    );
+    await session1.open("char-1");
+    session1.edit((d) => {
+      d.base.skinToneId = "latte";
+      d.hair.styleId = "curls";
+    });
+    await session1.save();
+    expect(session1.saveOutcome?.ok).toBe(true);
+    expect(serverRev).toBe(8);
+
+    // Close + reopen: a fresh editor session loads from the server.
+    const session2 = new AvatarEditorMachine(
+      { fetchAppearanceFn: fakeFetch, saveAppearanceFn: fakeSave, renderInitial, renderEdit },
+      () => {}
+    );
+    await session2.open("char-1");
+    expect(session2.draft?.base.skinToneId).toBe("latte");
+    expect(session2.draft?.hair.styleId).toBe("curls");
+    expect(session2.revision).toBe(8);
+    expect(session2.dirty).toBe(false);
+  });
+});

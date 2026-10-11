@@ -95,6 +95,7 @@ type MutableMachineState = Pick<
   | "revision"
   | "dirty"
   | "savedFlash"
+  | "saveOutcome"
   | "conflictRevision"
   | "error"
   | "fieldErrors"
@@ -112,6 +113,14 @@ export class AvatarEditorMachine {
   dirty = false;
   /** Transient "Saved ✓" confirmation (shell clears after a timeout). */
   savedFlash = false;
+  /**
+   * Explicit save outcome for the shell's toast: set on EVERY save
+   * attempt — { ok: true } only when the server confirmed the write.
+   * A failed save NEVER claims success. The shell toasts it, then calls
+   * clearSaveOutcome(). Conflict/validation outcomes accompany (not
+   * replace) the dedicated conflict dialog / field-error list.
+   */
+  saveOutcome: { ok: boolean; message: string; at: number } | null = null;
   /** 409 state: the server revision the PUT collided with. */
   conflictRevision: number | null = null;
   /** Non-field error (network, load failure, render failure). */
@@ -153,6 +162,7 @@ export class AvatarEditorMachine {
       fieldErrors: [],
       conflictRevision: null,
       savedFlash: false,
+      saveOutcome: null,
     });
     try {
       const { appearance, revision } = await this.deps.fetchAppearanceFn(
@@ -215,10 +225,12 @@ export class AvatarEditorMachine {
 
   /**
    * Explicit save with optimistic concurrency. On success saved = draft
-   * (server canonical), revision updated, "Saved" flashed. On 409 the
-   * draft is preserved and conflict UI state is set — never overwritten.
-   * On 400 the field errors are surfaced. On anything else the draft is
-   * kept and the error shown; success is never claimed.
+   * (server canonical), revision updated, "Saved" flashed AND a success
+   * outcome recorded for the shell's toast. On 409 the draft is preserved
+   * and conflict UI state is set — never overwritten — with a failure
+   * outcome. On 400 the field errors are surfaced with a failure outcome.
+   * On anything else the draft is kept and the error shown with a failure
+   * outcome; success is never claimed.
    */
   async save(): Promise<void> {
     if (
@@ -229,7 +241,12 @@ export class AvatarEditorMachine {
       return;
     }
     const snapshot = clone(this.draft);
-    this.set({ status: "saving", error: null, fieldErrors: [] });
+    this.set({
+      status: "saving",
+      error: null,
+      fieldErrors: [],
+      saveOutcome: null,
+    });
     try {
       const res = await this.deps.saveAppearanceFn(
         this.characterId,
@@ -249,6 +266,7 @@ export class AvatarEditorMachine {
         dirty: draftUnchanged ? false : !same(this.draft, canonical),
         conflictRevision: null,
         savedFlash: true,
+        saveOutcome: { ok: true, message: "Look saved!", at: Date.now() },
       });
     } catch (e) {
       if (e instanceof AppearanceConflictError) {
@@ -256,16 +274,31 @@ export class AvatarEditorMachine {
         this.set({
           status: "conflict",
           conflictRevision: e.revision,
+          saveOutcome: {
+            ok: false,
+            message: "Couldn't save — your look changed elsewhere.",
+            at: Date.now(),
+          },
         });
       } else if (e instanceof AppearanceValidationError) {
         this.set({
           status: "error",
           fieldErrors: [...e.errors],
+          saveOutcome: {
+            ok: false,
+            message: "Couldn't save — fix the highlighted issues and try again.",
+            at: Date.now(),
+          },
         });
       } else {
         this.set({
           status: "error",
           error: errMessage(e),
+          saveOutcome: {
+            ok: false,
+            message: `Couldn't save your look: ${errMessage(e)}`,
+            at: Date.now(),
+          },
         });
       }
     }
@@ -390,6 +423,11 @@ export class AvatarEditorMachine {
 
   clearSavedFlash(): void {
     if (this.savedFlash) this.set({ savedFlash: false });
+  }
+
+  /** The shell calls this after toasting the save outcome. */
+  clearSaveOutcome(): void {
+    if (this.saveOutcome) this.set({ saveOutcome: null });
   }
 
   clearError(): void {

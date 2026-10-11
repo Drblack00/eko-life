@@ -17,6 +17,7 @@ import {
   EDITOR_CATEGORIES,
   FABRIC_OPTIONS,
   FACIAL_HAIR_OPTIONS,
+  facialHairOptionsForBody,
   HAIR_COLOR_OPTIONS,
   HAIR_STYLE_OPTIONS,
   OUTFIT_ROWS,
@@ -157,5 +158,43 @@ describe("catalog honesty", () => {
     // Accessories: the manifest carries zero available accessory assets
     // (only a pending licensed-GLB pack).
     expect(manifestByKind("accessory", "available")).toEqual([]);
+  });
+});
+
+describe("defect 4: facial-hair compatibility metadata", () => {
+  it("styled facial hair is masculine-only in the manifest metadata", () => {
+    const compat = new Map(
+      FACIAL_HAIR_OPTIONS.map((o) => [o.id, o.compatibleBodyTypes])
+    );
+    expect(compat.get("facialhair_none_01")).toEqual([
+      "masculine",
+      "feminine",
+    ]);
+    for (const id of [
+      "facialhair_mustache_01",
+      "facialhair_goatee_01",
+      "facialhair_beard_short_01",
+    ]) {
+      expect(compat.get(id)).toEqual(["masculine"]);
+    }
+    // Wired from the resolver's metadata, not hardcoded in the catalog:
+    // the manifest is the source of truth.
+    for (const o of FACIAL_HAIR_OPTIONS) {
+      expect(AVATAR_MANIFEST_BY_ID[o.id].compatibleBodyTypes).toEqual(
+        o.compatibleBodyTypes
+      );
+    }
+  });
+
+  it("facialHairOptionsForBody hides styled options for feminine bodies", () => {
+    expect(facialHairOptionsForBody("feminine").map((o) => o.id)).toEqual([
+      "facialhair_none_01",
+    ]);
+    expect(facialHairOptionsForBody("masculine").map((o) => o.id)).toEqual([
+      "facialhair_none_01",
+      "facialhair_mustache_01",
+      "facialhair_goatee_01",
+      "facialhair_beard_short_01",
+    ]);
   });
 });

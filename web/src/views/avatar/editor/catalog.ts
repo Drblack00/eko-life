@@ -41,6 +41,7 @@ import {
 import type {
   AppearanceV1,
   BodyPresetId,
+  BodyType,
   ClothingBottomId,
   ClothingTopId,
   FabricId,
@@ -179,12 +180,34 @@ const FACIAL_HAIR_LABELS: Readonly<Record<FacialHairId, string>> = {
   facialhair_beard_short_01: "Short beard",
 };
 
-export const FACIAL_HAIR_OPTIONS: readonly CatalogOption[] = (
+export interface BodyCompatOption extends CatalogOption {
+  /** Manifest compatibleBodyTypes, wired through for the editor UI. */
+  compatibleBodyTypes: readonly BodyType[];
+}
+
+export const FACIAL_HAIR_OPTIONS: readonly BodyCompatOption[] = (
   Object.keys(FACIAL_HAIR_LABELS) as FacialHairId[]
 ).map((id) => {
-  available(id);
-  return { id, name: FACIAL_HAIR_LABELS[id] };
+  const asset = available(id);
+  return {
+    id,
+    name: FACIAL_HAIR_LABELS[id],
+    compatibleBodyTypes: asset.compatibleBodyTypes,
+  };
 });
+
+/**
+ * Defect 4: facial-hair options valid for a body type. The styled options
+ * are masculine-only per the manifest — for the feminine body only
+ * "None" is returned, so the editor hides the rest.
+ */
+export function facialHairOptionsForBody(
+  bodyType: BodyType
+): readonly CatalogOption[] {
+  return FACIAL_HAIR_OPTIONS.filter((o) =>
+    o.compatibleBodyTypes.includes(bodyType)
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /* Clothing — 5 outfit cards = the exact decomposition rows.            */

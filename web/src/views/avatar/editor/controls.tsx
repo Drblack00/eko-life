@@ -16,14 +16,17 @@ export function PillRow({
   items,
   value,
   onPick,
+  disabled,
 }: {
   label: string;
   items: readonly NamedItem[];
   value: string;
   onPick: (id: string) => void;
+  /** Defect 5: option controls disable while a body rebuild runs. */
+  disabled?: boolean;
 }) {
   return (
-    <div className="eko-studio__row glass">
+    <div className="eko-studio__row glass" aria-disabled={disabled || undefined}>
       <span className="eko-studio__label">{label}</span>
       <div className="eko-studio__pills" role="radiogroup" aria-label={label}>
         {items.map((it) => (
@@ -32,6 +35,7 @@ export function PillRow({
             type="button"
             role="radio"
             aria-checked={value === it.id}
+            disabled={disabled}
             className={`eko-studio__pill glass${value === it.id ? " eko-studio__pill--active" : ""}`}
             onClick={() => onPick(it.id)}
           >
@@ -52,14 +56,17 @@ export function SwatchRow({
   colors,
   value,
   onPick,
+  disabled,
 }: {
   label: string;
   colors: readonly SwatchItem[];
   value: string;
   onPick: (id: string) => void;
+  /** Defect 5: option controls disable while a body rebuild runs. */
+  disabled?: boolean;
 }) {
   return (
-    <div className="eko-studio__row glass">
+    <div className="eko-studio__row glass" aria-disabled={disabled || undefined}>
       <span className="eko-studio__label">{label}</span>
       <div className="eko-studio__swatches" role="radiogroup" aria-label={label}>
         {colors.map((c) => (
@@ -70,6 +77,7 @@ export function SwatchRow({
             aria-checked={value.toLowerCase() === c.id.toLowerCase()}
             aria-label={c.name}
             title={c.name}
+            disabled={disabled}
             className={`eko-studio__swatch${value.toLowerCase() === c.id.toLowerCase() ? " eko-studio__swatch--active" : ""}`}
             style={{ backgroundColor: c.hex }}
             onClick={() => onPick(c.id)}
