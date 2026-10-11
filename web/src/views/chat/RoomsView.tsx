@@ -1,8 +1,34 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Card, Dialog, EmptyState, useToast } from "../../components";
-import type { GameSocket } from "../../hooks/useGameSocket";
+import type { GameSocket, RoomMembersStatus } from "../../hooks/useGameSocket";
 import type { RoomEntry, RoomMember } from "../../game/types";
 import type { ProfileTarget } from "./ProfileSheet";
+
+/**
+ * Pure member-list view state: the UI must never sit on an infinite spinner.
+ * - "loading": fetch in flight (or not yet started)
+ * - "error": server stayed silent -> show error + retry
+ * - "empty": loaded, nobody in the room
+ * - "list": render members
+ */
+export type RoomMembersView =
+  | { kind: "loading" }
+  | { kind: "error" }
+  | { kind: "empty" }
+  | { kind: "list"; members: RoomMember[] };
+
+export function resolveRoomMembersView(
+  members: RoomMember[] | undefined,
+  status: RoomMembersStatus | undefined
+): RoomMembersView {
+  if (status === "error") return { kind: "error" };
+  if (members !== undefined) {
+    if (status === "loaded" || members.length > 0) {
+      return members.length === 0 ? { kind: "empty" } : { kind: "list", members };
+    }
+  }
+  return { kind: "loading" };
+}
 
 const ROOM_ICONS = ["💬", "🏠", "💼", "🎶", "⚽", "🍲", "📚", "🎮", "🌊", "🔥"];
 const MUTE_OPTIONS = [5, 15, 60];
@@ -46,8 +72,10 @@ function RoomThread({
   const sendThrottled = useThrottle();
   const key = String(room.id);
   const messages = (sock.roomMessages[key] ?? []).slice(-100);
-  const members = sock.roomMembers[key] ?? [];
-  const isOwner = room.ownerId === youId || members.some((m) => m.id === youId && m.isOwner);
+  const members = sock.roomMembers[key];
+  const membersView = resolveRoomMembersView(members, sock.roomMembersStatus?.[key]);
+  const isOwner =
+    room.ownerId === youId || (members ?? []).some((m) => m.id === youId && m.isOwner);
   const govName = sock.governor?.name ?? null;
   const govId = sock.governor?.id ?? null;
 
@@ -110,12 +138,30 @@ function RoomThread({
       {membersOpen && (
         <div className="eko-roomthread__members">
           <h3 className="eko-roomthread__members-h">
-            Members ({members.length || "…"}) {isOwner && "— you run this room 👑"}
+            Members (
+            {membersView.kind === "list"
+              ? membersView.members.length
+              : membersView.kind === "empty"
+                ? 0
+                : "…"}
+            ) {isOwner && "— you run this room 👑"}
           </h3>
-          {members.length === 0 ? (
+          {membersView.kind === "loading" && (
             <p className="eko-roomthread__note">Loading members…</p>
-          ) : (
-            members.map((m) => (
+          )}
+          {membersView.kind === "error" && (
+            <div className="eko-roomthread__note">
+              <p>Couldn't load members.</p>
+              <Button size="md" variant="ghost" onClick={() => sock.requestRoomMembers(room.id)}>
+                🔄 Retry
+              </Button>
+            </div>
+          )}
+          {membersView.kind === "empty" && (
+            <p className="eko-roomthread__note">No members yet.</p>
+          )}
+          {membersView.kind === "list" &&
+            membersView.members.map((m) => (
               <div key={m.id} className="eko-roomthread__member">
                 <span className="eko-dot eko-dot--sm" data-on={m.online ? "1" : "0"} aria-hidden="true" />
                 <button
@@ -146,8 +192,7 @@ function RoomThread({
                   </span>
                 )}
               </div>
-            ))
-          )}
+            ))}
         </div>
       )}
 
