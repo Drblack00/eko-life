@@ -307,6 +307,8 @@ export function asList<T>(v: T[] | Record<string, T> | undefined | null): T[] {
 /** Authoritative character state (GET /api/me). */
 export interface Me {
   id: number;
+  /** Character row id (for /api/characters/:id/appearance). */
+  character_id?: number;
   username: string;
   name: string;
   class: string | null;
