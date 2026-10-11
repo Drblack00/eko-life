@@ -5,13 +5,20 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Tab-bar contract tests. The vitest setup is node-only (no DOM), so these
- * verify the tab bar at the source level: the TABS structure in TabBar.tsx
- * and the .eko-tabs rules in Game.css. Real-browser screenshots are the
- * visual proof (see workstream A report).
+ * verify the tab bar at the source level: the TABS structure + FLIP logic in
+ * TabBar.tsx and the .eko-tabs rules in Game.css / glass.css. Real-browser
+ * screenshots are the visual proof (see workstream A report).
+ *
+ * Contract (iOS Liquid Glass reference video):
+ * - exactly 4 tabs: Home, Buy, Map, Phone — icon ABOVE a visible label;
+ * - the selected tab sits in a magnifying liquid-glass bubble, its
+ *   icon+label rendered TAB_ZOOM (1.28x) larger than unselected tabs;
+ * - the bubble FLIP-morphs between tabs with a mid-flight liquid stretch
+ *   and spring easing; reduced-motion jumps instantly.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
-const gameTsx = readFileSync(join(here, "TabBar.tsx"), "utf8");
+const tabTsx = readFileSync(join(here, "TabBar.tsx"), "utf8");
 const gameCss = readFileSync(join(here, "Game.css"), "utf8");
 const glassCss = readFileSync(join(here, "..", "styles", "glass.css"), "utf8");
 
@@ -36,18 +43,60 @@ function parseTabs(src: string): Array<{ id: string; label: string; icon: string
 function ruleBlock(css: string, selector: string): string {
   const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const m = css.match(new RegExp(`${esc}\\s*\\{([^}]*)\\}`, "s"));
-  if (!m) throw new Error(`CSS rule ${selector} not found in Game.css`);
+  if (!m) throw new Error(`CSS rule ${selector} not found`);
   return m[1];
 }
 
-describe("tab bar structure (Game.tsx)", () => {
+describe("tab bar structure (TabBar.tsx)", () => {
   it("has exactly the 4 tabs, in order, with unchanged labels and icons", () => {
-    expect(parseTabs(gameTsx)).toEqual(EXPECTED_TABS);
+    expect(parseTabs(tabTsx)).toEqual(EXPECTED_TABS);
   });
 
   it("gives every tab a unique id", () => {
-    const ids = parseTabs(gameTsx).map((t) => t.id);
+    const ids = parseTabs(tabTsx).map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("renders icon ABOVE a visible text label per tab", () => {
+    const nav = tabTsx.match(/<nav className="eko-tabs"[\s\S]*?<\/nav>/);
+    expect(nav).not.toBeNull();
+    // Visible label elements exist (labels are back — video-exact dock).
+    expect(nav![0]).toMatch(/eko-tabs__label/);
+    expect(nav![0]).toMatch(/\{t\.label\}/);
+    // Icon comes before the label inside the content column.
+    const content = nav![0].match(
+      /eko-tabs__content"[\s\S]*?eko-tabs__icon"[\s\S]*?eko-tabs__label"/
+    );
+    expect(content).not.toBeNull();
+  });
+
+  it("keeps aria-labels on the tab buttons", () => {
+    const nav = tabTsx.match(/<nav className="eko-tabs"[\s\S]*?<\/nav>/);
+    expect(nav).not.toBeNull();
+    expect(nav![0]).toMatch(/aria-label=\{t\.label\}/);
+  });
+
+  it("marks the active tab with aria-current", () => {
+    expect(tabTsx).toMatch(/aria-current=\{tab === t\.id \? "page" : undefined\}/);
+  });
+
+  it("exports the selected-tab magnification ratio (1.28x per the reference video)", () => {
+    expect(tabTsx).toMatch(/export const TAB_ZOOM = 1\.28/);
+  });
+
+  it("sizes the bubble from the content column (icon+label), not the icon alone", () => {
+    expect(tabTsx).toMatch(/querySelector\("\.eko-tabs__content"\)/);
+  });
+
+  it("morphs the bubble with a mid-flight liquid stretch (FLIP + spring)", () => {
+    expect(tabTsx).toMatch(/stretch/);
+    expect(tabTsx).toMatch(/squash/);
+    expect(tabTsx).toMatch(/cubic-bezier\(0\.32, 1\.45, 0\.45, 1\)/);
+  });
+
+  it("jumps instantly under prefers-reduced-motion (no morph)", () => {
+    expect(tabTsx).toMatch(/prefers-reduced-motion/);
+    expect(tabTsx).toMatch(/reduceMotion/);
   });
 });
 
@@ -58,49 +107,45 @@ describe("tab bar styling (Game.css)", () => {
     expect(block).not.toMatch(/repeat\(\s*9\s*,/);
   });
 
-  it("renders the liquid active-tab pill inside the tab bar", () => {
-    // The pill is a single sliding indicator behind the buttons (FLIP
-    // animation lives in Game.tsx); it must exist in the nav exactly once.
-    const nav = gameTsx.match(/<nav className="eko-tabs"[\s\S]*?<\/nav>/);
-    expect(nav).not.toBeNull();
-    const pills = nav![0].match(/className="eko-tabs__pill"/g) ?? [];
-    expect(pills).toHaveLength(1);
+  it("stacks icon above label in the content column", () => {
+    const block = ruleBlock(gameCss, ".eko-tabs__content");
+    expect(block).toMatch(/flex-direction:\s*column/);
   });
 
-  it("marks the active tab with white text — the sliding pill carries the green identity", () => {
-    const block = ruleBlock(gameCss, ".eko-tabs__btn--active");
-    expect(block).toMatch(/color:\s*#fff/);
-    // The button itself must not paint a background: the liquid pill sits
-    // behind it and would double-render.
-    expect(block).not.toMatch(/background:\s*var\(--success\)/);
+  it("zooms the active tab's content to 1.28x via transform (no layout shift)", () => {
+    const block = ruleBlock(gameCss, ".eko-tabs__btn--active .eko-tabs__content");
+    expect(block).toMatch(/transform:\s*scale\(1\.28\)/);
   });
 
-  it("positions the liquid pill absolutely behind the tab buttons", () => {
-    const pill = ruleBlock(gameCss, ".eko-tabs__pill");
-    expect(pill).toMatch(/position:\s*absolute/);
-    expect(pill).toMatch(/pointer-events:\s*none/);
-    const btn = ruleBlock(gameCss, ".eko-tabs__btn");
-    expect(btn).toMatch(/position:\s*relative/);
-    expect(btn).toMatch(/z-index:\s*1/);
-  });
-
-  it("gives the liquid pill the green glass material in glass.css", () => {
-    const m = glassCss.match(/\.eko-game\s+\.eko-tabs__pill\s*\{([^}]*)\}/s);
-    expect(m).not.toBeNull();
-    expect(m![1]).toMatch(/var\(--glass-tint-green\)/);
-  });
-
-  it("keeps active and inactive buttons the same size (no layout shift on switch)", () => {
+  it("keeps active and inactive buttons the same box metrics (no layout shift on switch)", () => {
     const active = ruleBlock(gameCss, ".eko-tabs__btn--active");
     expect(active).not.toMatch(/(^|;)\s*padding\s*:/);
     expect(active).not.toMatch(/(^|;)\s*border(?!-radius)\s*:/);
     expect(active).not.toMatch(/min-height/);
+    expect(active).not.toMatch(/height/);
+    const btn = ruleBlock(gameCss, ".eko-tabs__btn");
+    // Fixed button height: the zoom is a transform, so the dock never resizes.
+    expect(btn).toMatch(/height:\s*62px/);
+  });
+
+  it("gives the active tab the green accent identity at readable contrast", () => {
+    const block = ruleBlock(gameCss, ".eko-tabs__btn--active");
+    expect(block).toMatch(/color:\s*var\(--palm-700\)/);
+  });
+
+  it("renders the bubble as a single absolutely-positioned lens", () => {
+    const pill = ruleBlock(gameCss, ".eko-tabs__pill");
+    expect(pill).toMatch(/position:\s*absolute/);
+    expect(pill).toMatch(/pointer-events:\s*none/);
+    expect(pill).toMatch(/transform-origin:\s*left top/);
+    const nav = tabTsx.match(/<nav className="eko-tabs"[\s\S]*?<\/nav>/);
+    const pills = nav![0].match(/className="eko-tabs__pill"/g) ?? [];
+    expect(pills).toHaveLength(1);
   });
 
   it("respects the bottom safe-area inset and sits low", () => {
     const block = ruleBlock(gameCss, ".eko-tabs");
     expect(block).toMatch(/var\(--sab\)/);
-    // Lowered dock: no extra floating gap beyond the safe-area inset.
     expect(block).not.toMatch(/calc\(\s*var\(--space-2\)\s*\+\s*var\(--sab\)\s*\)/);
   });
 
@@ -110,26 +155,35 @@ describe("tab bar styling (Game.css)", () => {
     expect(m).not.toBeNull();
     expect(Number(m![1])).toBeGreaterThanOrEqual(44);
   });
+});
 
-  it("renders icon-only buttons: no visible labels, labels exposed via aria-label", () => {
-    const nav = gameTsx.match(/<nav className="eko-tabs"[\s\S]*?<\/nav>/);
-    expect(nav).not.toBeNull();
-    // No visible label elements in the dock.
-    expect(nav![0]).not.toMatch(/eko-tabs__label/);
-    // Every button announces its label to assistive tech.
-    expect(nav![0]).toMatch(/aria-label=\{t\.label\}/);
+describe("bubble material (glass.css)", () => {
+  it("renders the bubble as a clear refractive lens, not a solid pill", () => {
+    const m = glassCss.match(/\.eko-game\s+\.eko-tabs__pill\s*\{([^}]*)\}/s);
+    expect(m).not.toBeNull();
+    expect(m![1]).toMatch(/backdrop-filter/);
+    // Inner specular highlights = the refraction approximation.
+    expect(m![1]).toMatch(/inset 0 1px 1px/);
+    // Near-clear tint: the lens magnifies, it doesn't paint.
+    expect(m![1]).not.toMatch(/var\(--glass-tint-green\)/);
   });
 
-  it("sizes the liquid pill from the icon, not the full button cell", () => {
-    // The dock is icon-only, so the pill hugs the glyph.
-    expect(gameTsx).toMatch(/querySelector\("\.eko-tabs__icon"\)/);
+  it("adds a faint prismatic edge ring to the lens", () => {
+    expect(glassCss).toMatch(/\.eko-game\s+\.eko-tabs__pill::before/);
+    expect(glassCss).toMatch(/conic-gradient/);
   });
 
-  it("uses larger icons now that labels are gone", () => {
-    const m = ruleBlock(gameCss, ".eko-tabs__icon").match(
-      /font-size:\s*([\d.]+)rem/
+  it("dims the lens appropriately for the night theme", () => {
+    expect(glassCss).toMatch(
+      /\[data-theme="night"\]\s+\.eko-game\s+\.eko-tabs__pill\s*\{/
+    );
+  });
+
+  it("gives the active tab a night-theme accent that stays readable", () => {
+    const m = glassCss.match(
+      /\[data-theme="night"\]\s+\.eko-game\s+\.eko-tabs__btn--active\s*\{([^}]*)\}/s
     );
     expect(m).not.toBeNull();
-    expect(Number(m![1])).toBeGreaterThanOrEqual(1.4);
+    expect(m![1]).toMatch(/color:\s*#4ade80/);
   });
 });

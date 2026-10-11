@@ -46,6 +46,7 @@ export type { Tab };
 import { Phone } from "./phone/Phone";
 import { BuyView } from "./buy/BuyView";
 import { Walkthrough, WALKTHROUGH_KEY } from "./Walkthrough";
+import { ThemePicker } from "../theme/theme";
 import "./Walkthrough.css";
 import "./Admin.css";
 import "./Game.css";
@@ -594,6 +595,7 @@ function MeTab({
         >
           🎬 Replay walkthrough
         </Button>
+        <ThemePicker />
       </Card>
 
       <LedgerSheet token={token} open={ledgerOpen} onClose={() => setLedgerOpen(false)} />

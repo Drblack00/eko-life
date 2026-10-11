@@ -505,36 +505,38 @@
   margin-top: var(--space-2);
 }
 
-/* ---- Bottom tab bar: floating icon-only dock ---- */
+/* ---- Bottom tab bar: floating dock, icon above label ---- */
 .eko-tabs {
   display: grid;
-  /* 4 icon-only tabs in one row — the liquid pill (eko-tabs__pill) hugs the
-     active icon, so it adapts automatically. */
+  /* 4 tabs in one row — the magnifying bubble (eko-tabs__pill) hugs the
+     active tab's content column (icon above label), so it adapts
+     automatically. */
   grid-template-columns: repeat(4, 1fr);
   /* Sit low: just the iOS safe-area inset plus a whisper of margin, so the
      dock never collides with the home indicator. */
   margin: 0 var(--space-2) calc(var(--sab) + 2px);
-  padding: var(--space-1);
+  padding: var(--space-2);
   border-radius: var(--radius-pill);
   background: var(--surface);
   box-shadow: var(--shadow-md);
   z-index: 10;
-  /* Liquid-pill anchor: the indicator is absolutely positioned against the bar. */
+  /* Bubble anchor: the lens is absolutely positioned against the bar. */
   position: relative;
 }
 
-/* Liquid active-tab indicator: a single green glass pill that FLIP-slides
-   between tab buttons (see the effect in Game.tsx). Material comes from
-   glass.css (.eko-game .eko-tabs__pill); this is geometry only. transform is
-   the only animated property — never layout. */
+/* Magnifying active-tab bubble: a single clear liquid-glass lens that
+   FLIP-morphs between tab buttons (see the effect in TabBar.tsx). Material
+   comes from glass.css (.eko-game .eko-tabs__pill); this is geometry only.
+   JS sets width/height once per switch; the animation itself is
+   transform-only — never layout. */
 .eko-tabs__pill {
   position: absolute;
-  top: var(--space-1);
-  bottom: var(--space-1);
   left: 0;
-  width: 48px; /* JS sets the exact width of the active button. */
+  top: 0;
+  width: 64px; /* JS sets the exact box around the active tab's content. */
+  height: 56px;
   border-radius: var(--radius-pill);
-  transform-origin: left center;
+  transform-origin: left top;
   pointer-events: none;
   z-index: 0;
 }
@@ -542,12 +544,14 @@
 .eko-tabs__btn {
   position: relative;
   z-index: 1;
-  min-height: 52px;
+  /* Fixed height: the active tab's content zooms (transform scale), so the
+     dock never changes size when switching tabs — no layout shift. */
+  min-height: 62px;
+  height: 62px;
   min-width: 0;
   border: none;
   border-radius: var(--radius-pill);
   background: none;
-  /* Icon-only: single centered glyph per button. */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -556,14 +560,29 @@
   cursor: pointer;
 }
 
-/* Active tab: the liquid pill carries the green identity (it slides behind
-   this button), so the button itself only needs contrast text. Same box
-   metrics as the inactive state — switching tabs never shifts layout.
-   Under prefers-reduced-motion the pill jumps instantly (Game.tsx), so the
-   state never depends on animation. */
+/* Content column: icon ABOVE label (iOS reference). The active tab's column
+   zooms to TAB_ZOOM (1.28) with a spring — the magnification the bubble lens
+   implies. transform-only, so siblings never move. */
+.eko-tabs__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  transition: transform 0.38s cubic-bezier(0.32, 1.45, 0.45, 1);
+}
+
+/* Active tab: content zooms inside the bubble and takes the accent identity.
+   Day: palm-700 (5.0:1 on the frosted dock); night is overridden in
+   glass.css. Under prefers-reduced-motion the bubble jumps instantly
+   (TabBar.tsx) and the global reduced-motion rule kills this transition,
+   so the state never depends on animation. */
 .eko-tabs__btn--active {
   background: none;
-  color: #fff;
+  color: var(--palm-700);
+}
+.eko-tabs__btn--active .eko-tabs__content {
+  transform: scale(1.28);
 }
 
 .eko-tabs__btn:focus-visible {
@@ -572,19 +591,30 @@
 }
 
 .eko-tabs__icon {
-  /* Larger now that labels are gone — the glyphs carry the dock. */
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   line-height: 1;
+}
+
+.eko-tabs__label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 /* Short viewports (e.g. landscape phones): slim the bar but keep >=44px targets. */
 @media (max-height: 540px) {
   .eko-tabs__btn {
-    min-height: 44px;
+    min-height: 48px;
+    height: 48px;
     padding: 4px 1px;
   }
   .eko-tabs__icon {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
+  }
+  .eko-tabs__label {
+    font-size: 0.62rem;
   }
 }
 
