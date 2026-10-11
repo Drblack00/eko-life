@@ -169,7 +169,7 @@ export function createSocial({ online, broadcast, getDay, isGovernor }) {
   async function pushRoomMembers(roomId) {
     const members = await roomMembers(roomId);
     const enriched = members.map(x => ({ ...x, online: online.has(x.player_id) }));
-    for (const mb of members) sendTo(mb.player_id, { t: 'room_members', roomId, members: enriched });
+    for (const mb of members) sendTo(mb.player_id, { t: 'room_members', roomId, room_members: enriched });
   }
 
   // campaign room for a governor candidate ("X's Campaign", owner auto-joined)
@@ -289,6 +289,7 @@ export function createSocial({ online, broadcast, getDay, isGovernor }) {
       }
       sendTo(id, { t: 'room_joined', roomId, history: visible });
       await refreshRooms();
+      await pushRoomMembers(roomId);
       return true;
     }
     if (t === 'leave_room') {
@@ -297,6 +298,7 @@ export function createSocial({ online, broadcast, getDay, isGovernor }) {
       roomRead.delete(`${id}:${roomId}`);
       sendTo(id, { t: 'room_left', roomId });
       await refreshRooms();
+      await pushRoomMembers(roomId);
       return true;
     }
     if (t === 'room_chat') {
@@ -341,7 +343,7 @@ export function createSocial({ online, broadcast, getDay, isGovernor }) {
       const members = await roomMembers(roomId);
       sendTo(id, {
         t: 'room_members', roomId,
-        members: members.map(x => ({ ...x, online: online.has(x.player_id) })),
+        room_members: members.map(x => ({ ...x, online: online.has(x.player_id) })),
       });
       return true;
     }
