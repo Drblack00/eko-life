@@ -508,9 +508,9 @@
 /* ---- Bottom tab bar: floating icon-only dock ---- */
 .eko-tabs {
   display: grid;
-  /* 9 icon-only tabs in one row — the liquid pill (eko-tabs__pill) hugs the
+  /* 4 icon-only tabs in one row — the liquid pill (eko-tabs__pill) hugs the
      active icon, so it adapts automatically. */
-  grid-template-columns: repeat(9, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   /* Sit low: just the iOS safe-area inset plus a whisper of margin, so the
      dock never collides with the home indicator. */
   margin: 0 var(--space-2) calc(var(--sab) + 2px);
@@ -757,3 +757,149 @@
     font-size: 0.85rem;
   }
 }
+
+/* ---- Home tab: goals card + room wrapper with overlaid needs bar ---- */
+
+.eko-home__roomwrap {
+  position: relative;
+  width: 100%;
+}
+
+/* Compact needs bar — overlaid bottom-left on the room, reference-style:
+   6 needs as mini bars. Taps open the detail panel. */
+.eko-needsbar {
+  position: absolute;
+  left: var(--space-3);
+  bottom: var(--space-3);
+  z-index: 5;
+  display: flex;
+  gap: 7px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.eko-needsbar__need {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.eko-needsbar__icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.eko-needsbar__track {
+  width: 26px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.eko-needsbar__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--success);
+  transition: width 0.4s ease;
+}
+
+.eko-needsbar__track.is-mid .eko-needsbar__fill {
+  background: var(--warning, #f5a623);
+}
+
+.eko-needsbar__track.is-low .eko-needsbar__fill {
+  background: var(--danger, #e5484d);
+}
+
+.eko-needsbar__sheet .eko-needs {
+  padding-top: 0;
+}
+
+/* Goals card — compact Today's Hustle summary on Home. */
+.eko-goals {
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  width: 100%;
+}
+
+.eko-goals__head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.eko-goals__title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.eko-goals__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.eko-goals__count {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.eko-goals__chev {
+  font-size: 0.9rem;
+}
+
+.eko-goals__list {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-goals__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.9rem;
+}
+
+.eko-goals__item.is-claimed .eko-goals__label {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.eko-goals__label {
+  flex: 1;
+  min-width: 0;
+}
+
+.eko-goals__reward {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.eko-goals__empty {
+  margin: var(--space-2) 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Phone slide-over placeholder styles live in views/phone/Phone.css
+   (Worker B owns the real Phone shell). */

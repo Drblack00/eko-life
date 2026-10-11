@@ -6,27 +6,17 @@ import {
   useRef,
 } from "react";
 
-export type Tab =
-  | "home"
-  | "city"
-  | "jobs"
-  | "needs"
-  | "daily"
-  | "market"
-  | "chat"
-  | "friends"
-  | "me";
+/**
+ * Dock contract (2026-10-11 nav restructure): exactly 4 tabs — Home, Buy,
+ * Map, Phone. Everything else lives inside the Phone slide-over as apps.
+ */
+export type Tab = "home" | "buy" | "map" | "phone";
 
 export const TABS: Array<{ id: Tab; label: string; icon: string }> = [
   { id: "home", label: "Home", icon: "🏠" },
-  { id: "city", label: "City", icon: "🌆" },
-  { id: "jobs", label: "Jobs", icon: "💼" },
-  { id: "needs", label: "Needs", icon: "💚" },
-  { id: "daily", label: "Daily", icon: "🎯" },
-  { id: "market", label: "Market", icon: "💰" },
-  { id: "chat", label: "Chat", icon: "💬" },
-  { id: "friends", label: "Friends", icon: "🤝" },
-  { id: "me", label: "Me", icon: "🧑" },
+  { id: "buy", label: "Buy", icon: "🛒" },
+  { id: "map", label: "Map", icon: "🗺️" },
+  { id: "phone", label: "Phone", icon: "📱" },
 ];
 
 /**

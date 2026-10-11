@@ -1,0 +1,134 @@
+/* Walkthrough — first-launch coach-mark overlay (glass). */
+
+.eko-walk {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 var(--space-4) calc(var(--sab) + var(--space-6));
+}
+
+.eko-walk__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 12, 20, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.eko-walk__card {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  border-radius: var(--radius-md);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  text-align: center;
+  animation: eko-walk-in 0.35s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+
+@keyframes eko-walk-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.eko-walk__icon {
+  font-size: 2.4rem;
+  line-height: 1;
+  margin-bottom: var(--space-2);
+}
+
+.eko-walk__kicker {
+  margin: 0 0 var(--space-1);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.eko-walk__title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+}
+
+.eko-walk__body {
+  margin: 0 0 var(--space-4);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.eko-walk__dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: var(--space-4);
+}
+
+.eko-walk__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  transition: background 0.2s, transform 0.2s;
+}
+
+.eko-walk__dot.is-on {
+  background: var(--success);
+  transform: scale(1.25);
+}
+
+.eko-walk__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.eko-walk__btn {
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 12px 22px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 48px;
+}
+
+.eko-walk__btn--primary {
+  background: var(--success);
+  color: #fff;
+  margin-left: auto;
+}
+
+.eko-walk__btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.eko-walk__skip {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 6px 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eko-walk__card {
+    animation: none;
+  }
+}

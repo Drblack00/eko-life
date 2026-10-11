@@ -17,19 +17,14 @@ const glassCss = readFileSync(join(here, "..", "styles", "glass.css"), "utf8");
 
 const EXPECTED_TABS = [
   { id: "home", label: "Home", icon: "🏠" },
-  { id: "city", label: "City", icon: "🌆" },
-  { id: "jobs", label: "Jobs", icon: "💼" },
-  { id: "needs", label: "Needs", icon: "💚" },
-  { id: "daily", label: "Daily", icon: "🎯" },
-  { id: "market", label: "Market", icon: "💰" },
-  { id: "chat", label: "Chat", icon: "💬" },
-  { id: "friends", label: "Friends", icon: "🤝" },
-  { id: "me", label: "Me", icon: "🧑" },
+  { id: "buy", label: "Buy", icon: "🛒" },
+  { id: "map", label: "Map", icon: "🗺️" },
+  { id: "phone", label: "Phone", icon: "📱" },
 ];
 
 function parseTabs(src: string): Array<{ id: string; label: string; icon: string }> {
   const m = src.match(/const TABS[^=]*=\s*\[(.*?)\];/s);
-  if (!m) throw new Error("TABS array not found in Game.tsx");
+  if (!m) throw new Error("TABS array not found in TabBar.tsx");
   const entries = [
     ...m[1].matchAll(
       /\{\s*id:\s*"([^"]+)"\s*,\s*label:\s*"([^"]+)"\s*,\s*icon:\s*"([^"]+)"\s*\}/g,
@@ -46,7 +41,7 @@ function ruleBlock(css: string, selector: string): string {
 }
 
 describe("tab bar structure (Game.tsx)", () => {
-  it("has exactly the 9 tabs, in order, with unchanged labels and icons", () => {
+  it("has exactly the 4 tabs, in order, with unchanged labels and icons", () => {
     expect(parseTabs(gameTsx)).toEqual(EXPECTED_TABS);
   });
 
@@ -57,10 +52,10 @@ describe("tab bar structure (Game.tsx)", () => {
 });
 
 describe("tab bar styling (Game.css)", () => {
-  it("lays all 9 tabs out in a single row — repeat(9, 1fr), not 8", () => {
+  it("lays all 4 tabs out in a single row — repeat(4, 1fr), not 9", () => {
     const block = ruleBlock(gameCss, ".eko-tabs");
-    expect(block).toMatch(/grid-template-columns:\s*repeat\(\s*9\s*,\s*1fr\s*\)/);
-    expect(block).not.toMatch(/repeat\(\s*8\s*,/);
+    expect(block).toMatch(/grid-template-columns:\s*repeat\(\s*4\s*,\s*1fr\s*\)/);
+    expect(block).not.toMatch(/repeat\(\s*9\s*,/);
   });
 
   it("renders the liquid active-tab pill inside the tab bar", () => {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useGameSocket } from "../hooks/useGameSocket";
 import {
   api,
@@ -6,8 +7,6 @@ import {
   authGet,
   normalizeConfig,
   travelFare,
-  type FoodInfo,
-  type FunInfo,
   type GameConfig,
 } from "../lib/api";
 import { CityMap } from "../game/CityMap";
@@ -27,12 +26,12 @@ import {
 import {
   Button,
   Card,
-  EmptyState,
   Loading,
   Sheet,
   Skeleton,
   StatBar,
 } from "../components";
+import { EatTab } from "./EatTab";
 import { ChatTab } from "./chat/ChatTab";
 import { FriendsPage } from "./Friends";
 import { ElectionSheet } from "./election/ElectionSheet";
@@ -44,6 +43,10 @@ import { AdminView } from "./Admin";
 import { TabBar, TABS, type Tab } from "./TabBar";
 export { TABS };
 export type { Tab };
+import { Phone } from "./phone/Phone";
+import { BuyView } from "./buy/BuyView";
+import { Walkthrough, WALKTHROUGH_KEY } from "./Walkthrough";
+import "./Walkthrough.css";
 import "./Admin.css";
 import "./Game.css";
 // V2 milestones: shifts (M7), needs (M8), daily (M9), economy (M10),
@@ -141,20 +144,20 @@ function Hud({
   );
 }
 
-/** Contextual first-day guidance (audit improvement). */
-function HintBar({ you, onGo }: { you: You; onGo: (t: Tab) => void }) {
-  let hint: { text: string; tab: Tab } | null = null;
+/** Contextual first-day guidance (audit improvement). Deep-links into phone apps. */
+function HintBar({ you, onGo }: { you: You; onGo: (app: string) => void }) {
+  let hint: { text: string; app: string } | null = null;
   if (you.hunger < 30)
-    hint = { text: "You're hungry — grab food in Needs.", tab: "needs" };
+    hint = { text: "You're hungry — grab food in Needs.", app: "needs" };
   else if (you.energy < 30)
-    hint = { text: "You're tired — rest or sleep it off.", tab: "me" };
+    hint = { text: "You're tired — rest or sleep it off.", app: "me" };
   else if (you.money < 1000)
-    hint = { text: "Wallet's light — clock in for a shift in Jobs.", tab: "jobs" };
+    hint = { text: "Wallet's light — clock in for a shift in Jobs.", app: "jobs" };
   else if (you.happiness < 30)
-    hint = { text: "Low spirits — have some fun.", tab: "needs" };
+    hint = { text: "Low spirits — have some fun.", app: "needs" };
   if (!hint) return null;
   return (
-    <button type="button" className="eko-hint" onClick={() => onGo(hint!.tab)}>
+    <button type="button" className="eko-hint" onClick={() => onGo(hint!.app)}>
       <span aria-hidden="true">💡</span> {hint.text}
     </button>
   );
@@ -251,14 +254,14 @@ function LocationActions({
   you,
   config,
   sendAct,
-  onTab,
+  onOpenApp,
   onFocusHome,
 }: {
   locationId: string;
   you: You;
   config: GameConfig;
   sendAct: (a: ActName, params?: Record<string, unknown>) => void;
-  onTab: (t: Tab) => void;
+  onOpenApp: (app: string) => void;
   onFocusHome: (s: Exclude<HomeFocus, null>) => void;
 }) {
   const loc = asList(config.locations).find((l) => l.id === locationId);
@@ -279,10 +282,10 @@ function LocationActions({
     <div className="eko-pin__actions">
       {has("market") && (
         <div className="eko-pin__btnrow">
-          <Button size="md" variant="accent" onClick={() => onTab("jobs")}>
+          <Button size="md" variant="accent" onClick={() => onOpenApp("jobs")}>
             💼 Find work
           </Button>
-          <Button size="md" variant="accent" onClick={() => onTab("needs")}>
+          <Button size="md" variant="accent" onClick={() => onOpenApp("needs")}>
             🍲 Find food
           </Button>
         </div>
@@ -358,162 +361,6 @@ function LocationActions({
   );
 }
 
-
-function EatTab({
-  you,
-  config,
-  onEat,
-  onFun,
-  onStudy,
-}: {
-  you: You;
-  config: GameConfig | null;
-  onEat: (item: FoodInfo) => void;
-  onFun: (item: FunInfo) => void;
-  onStudy: () => void;
-}) {
-  const campus = useMemo(
-    () =>
-      asList(config?.locations).find((l) => (l.tags ?? []).includes("campus")),
-    [config]
-  );
-  const atCampus = !!campus && you.locationId === campus.id;
-  const studyCost = config?.studyCost ?? 5000;
-  const canStudy = atCampus && you.cert <= 0 && you.money >= studyCost;
-
-  if (!config) {
-    return (
-      <div className="eko-tabpad" aria-label="Loading food">
-        <Skeleton height={72} rounded={16} />
-        <Skeleton height={72} rounded={16} />
-        <Skeleton height={40} />
-        <Skeleton height={72} rounded={16} />
-      </div>
-    );
-  }
-  const food = asList(config.food);
-  const fun = asList(config.fun);
-  const locName = (id: string) =>
-    asList(config.locations).find((l) => l.id === id)?.name ?? "Lagos";
-
-  return (
-    <div className="eko-tabpad eko-eat">
-      {campus && (
-        <Card className="eko-eat__study">
-          <div className="eko-food__head">
-            <span className="eko-food__icon" aria-hidden="true">
-              📚
-            </span>
-            <div className="eko-food__meta">
-              <strong>Study at {campus.name}</strong>
-              <span className="eko-food__fx">
-                Earn a certificate — unlocks corporate jobs
-              </span>
-            </div>
-          </div>
-          <Button
-            size="md"
-            variant="accent"
-            disabled={!canStudy}
-            onClick={onStudy}
-            aria-label={
-              you.cert > 0
-                ? "Certificate already earned"
-                : !atCampus
-                  ? `Study: travel to ${campus!.name} first`
-                  : you.money < studyCost
-                    ? `Study costs ${naira(studyCost)}`
-                    : `Study for certificate, ${naira(studyCost)}`
-            }
-          >
-            {you.cert > 0
-              ? "🎓 Certificate earned"
-              : !atCampus
-                ? `Go to ${campus.name}`
-                : you.money < studyCost
-                  ? `Need ${naira(studyCost - you.money)} more`
-                  : `Study now · ${naira(studyCost)}`}
-          </Button>
-        </Card>
-      )}
-
-      <h2 className="eko-tabh">Chop &amp; refuel</h2>
-      {food.length === 0 ? (
-        <EmptyState emoji="🍲" title="Kitchen's closed" body="No food on the menu right now." />
-      ) : (
-        food.map((f) => {
-          const afford = you.money >= f.cost;
-          return (
-            <Card key={f.id} className="eko-food">
-              <div className="eko-food__head">
-                <span className="eko-food__icon" aria-hidden="true">
-                  {f.icon}
-                </span>
-                <div className="eko-food__meta">
-                  <strong>{f.name}</strong>
-                  <span className="eko-food__fx">
-                    +{f.hunger} hunger · +{f.energy} energy · +{f.happy} happy
-                  </span>
-                </div>
-                <span className="eko-food__cost">{naira(f.cost)}</span>
-              </div>
-              <Button
-                size="md"
-                disabled={!afford}
-                onClick={() => onEat(f)}
-                aria-label={afford ? `Eat ${f.name}` : `Eat ${f.name}: need ${naira(f.cost)}`}
-              >
-                {afford ? "Eat" : `Need ${naira(f.cost)}`}
-              </Button>
-            </Card>
-          );
-        })
-      )}
-
-      <h2 className="eko-tabh">Have fun</h2>
-      {fun.length === 0 ? (
-        <EmptyState emoji="🎉" title="Nothing planned" body="The city hasn't scheduled any fun yet." />
-      ) : (
-        fun.map((f) => {
-          const here = you.locationId === f.locationId;
-          const afford = you.money >= f.cost;
-          const disabled = !here || !afford;
-          const reason = !here
-            ? `📍 Go to ${locName(f.locationId)}`
-            : !afford
-              ? `Need ${naira(f.cost)}`
-              : `Enjoy (+${f.happy} happy)`;
-          return (
-            <Card key={f.id} className="eko-food">
-              <div className="eko-food__head">
-                <span className="eko-food__icon" aria-hidden="true">
-                  {f.icon}
-                </span>
-                <div className="eko-food__meta">
-                  <strong>{f.name}</strong>
-                  <span className="eko-food__fx">
-                    +{f.happy} happiness
-                    {f.energyDelta < 0 && ` · ${f.energyDelta} energy`}
-                  </span>
-                </div>
-                <span className="eko-food__cost">{naira(f.cost)}</span>
-              </div>
-              <Button
-                size="md"
-                disabled={disabled}
-                onClick={() => onFun(f)}
-                aria-label={disabled ? `${f.name}: ${reason}` : `${f.name}: ${reason}`}
-              >
-                {reason}
-              </Button>
-            </Card>
-          );
-        })
-      )}
-    </div>
-  );
-}
-
 /** City leaderboard — top 10 by money. Hides itself until GET /api/leaderboard lands. */
 function LeaderboardCard({ token, you }: { token: string; you: You }) {
   const [leaders, setLeaders] = useState<LeaderEntry[] | null | undefined>(undefined);
@@ -574,6 +421,7 @@ function MeTab({
   onSignOut,
   onUpgrade,
   onOpenAdmin,
+  onReplayWalkthrough,
   sendAct,
 }: {
   you: You;
@@ -584,6 +432,7 @@ function MeTab({
   onSignOut: () => void;
   onUpgrade: () => void;
   onOpenAdmin: () => void;
+  onReplayWalkthrough: () => void;
   sendAct: (a: ActName, params?: Record<string, unknown>) => void;
 }) {
   const [ledgerOpen, setLedgerOpen] = useState(false);
@@ -733,6 +582,20 @@ function MeTab({
         Sign out
       </Button>
 
+      <Card className="eko-me__card">
+        <h2 className="eko-tabh" style={{ marginTop: 0 }}>
+          ⚙️ Settings
+        </h2>
+        <Button
+          size="md"
+          variant="ghost"
+          onClick={onReplayWalkthrough}
+          className="eko-me__ledger"
+        >
+          🎬 Replay walkthrough
+        </Button>
+      </Card>
+
       <LedgerSheet token={token} open={ledgerOpen} onClose={() => setLedgerOpen(false)} />
     </div>
   );
@@ -748,8 +611,25 @@ export function Game({
   onUpgrade: () => void;
 }) {
   const sock = useGameSocket(token);
-  const [tab, setTab] = useState<Tab>("city");
+  const [tab, setTab] = useState<Tab>("home");
   const [adminOpen, setAdminOpen] = useState(false);
+  // Phone slide-over: opens WITHOUT changing the dock tab.
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  const [phoneApp, setPhoneApp] = useState<string | null>(null);
+  const openPhoneApp = useCallback((app: string) => {
+    setPhoneApp(app);
+    setPhoneOpen(true);
+  }, []);
+  // First-launch walkthrough (skippable, replayable from Me → Settings).
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false);
+  const replayWalkthrough = useCallback(() => {
+    try {
+      localStorage.removeItem(WALKTHROUGH_KEY);
+    } catch {
+      /* private mode — the overlay just opens */
+    }
+    setWalkthroughOpen(true);
+  }, []);
   const [pinSheet, setPinSheet] = useState<PinLocation | null>(null);
   const [dayBanner, setDayBanner] = useState<number | null>(null);
   const [electionOpen, setElectionOpen] = useState(false);
@@ -834,8 +714,114 @@ export function Game({
   const focusHome = useCallback((s: Exclude<HomeFocus, null>) => {
     setPinSheet(null);
     setHomeFocus(s);
-    setTab("me"); // Home lives under the Me tab in v2
+    setTab("home"); // Home lives on the Home dock tab
   }, []);
+
+  // First-launch walkthrough: show once, right after login, unless the
+  // seen-flag is set (the overlay sets it on skip/finish).
+  useEffect(() => {
+    if (!sock.you) return;
+    let seen = false;
+    try {
+      seen = localStorage.getItem(WALKTHROUGH_KEY) === "1";
+    } catch {
+      /* private mode — show it */
+    }
+    if (!seen) setWalkthroughOpen(true);
+  }, [sock.you]);
+
+  /**
+   * Phone app content. The old dock tabs (jobs/needs/daily/market/chat/
+   * friends/me) live here now — the JSX is copied verbatim from the old
+   * tab branches with the same props.
+   * NOTE: this hook sits ABOVE the `if (!sock.you)` early return (hooks
+   * must run unconditionally) — `you` is read inside and null-guarded.
+   */
+  const renderPhoneApp = useCallback(
+    (appId: string): ReactNode => {
+      const you = sock.you;
+      if (!you) return null;
+      const send = (a: string, params?: Record<string, unknown>) =>
+        sock.sendAct(a as ActName, params);
+      switch (appId) {
+        case "jobs":
+          return (
+            <div className="eko-tabpad">
+              <JobsTab
+                you={you}
+                send={(msg) => {
+                  const { a, ...rest } = msg as { t?: string; a: ActName } & Record<string, unknown>;
+                  sock.sendAct(a, rest);
+                }}
+                careerTracks={(config as unknown as { careerTracks?: ShiftTrackInfo[] } | null)?.careerTracks}
+                skillLabels={(config as unknown as { skillLabels?: Record<string, string> } | null)?.skillLabels}
+                locationName={(id: string) => asList(config?.locations).find((l) => l.id === id)?.name ?? id}
+              />
+              <SkillsPanel you={you} send={send} />
+              <AcademyView you={you} send={send} />
+            </div>
+          );
+        case "needs":
+          return (
+            <div className="eko-tabpad">
+              <NeedsPanel you={you} sock={sock} />
+              <EatTab
+                you={you}
+                config={config}
+                onEat={(f) => sock.sendAct("eat", { item: f.id })}
+                onFun={(f) => sock.sendAct("fun", { what: f.id })}
+                onStudy={() => sock.sendAct("study")}
+              />
+            </div>
+          );
+        case "daily":
+          return (
+            <DailyTab
+              you={you}
+              send={send}
+              api={{
+                get: (path: string) => authGet(path, token),
+              }}
+            />
+          );
+        case "market":
+          return <EconomyTab token={token} sock={sock} you={you} />;
+        case "chat":
+          return <ChatTab sock={sock} you={you} />;
+        case "friends":
+          return <FriendsPage token={token} />;
+        case "me":
+        default:
+          return (
+            <>
+              <MeTab
+                you={you}
+                config={config}
+                token={token}
+                onSleep={() => sock.sendAct("sleep")}
+                onRest={() => sock.sendAct("rest")}
+                onSignOut={onSignOut}
+                onUpgrade={onUpgrade}
+                onOpenAdmin={() => setAdminOpen(true)}
+                onReplayWalkthrough={replayWalkthrough}
+                sendAct={sock.sendAct}
+              />
+              {config && (
+                <HomeTab
+                  you={you}
+                  config={config}
+                  sendAct={sock.sendAct}
+                  travelTo={travelTo}
+                  focus={homeFocus}
+                  onClearFocus={() => setHomeFocus(null)}
+                />
+              )}
+            </>
+          );
+      }
+    },
+    [config, token, sock, travelTo, homeFocus, onSignOut, onUpgrade, replayWalkthrough]
+  );
 
   if (!sock.you) {
     return (
@@ -861,8 +847,8 @@ export function Game({
   }
 
   const you = sock.you;
-  const isSpawnPin = pinSheet?.id.startsWith("spawn:") ?? false;
-  const spawn = isSpawnPin
+
+  const isSpawnPin = pinSheet?.id.startsWith("spawn:") ?? false;  const spawn = isSpawnPin
     ? sock.spawns.find((s) => `spawn:${s.id}` === pinSheet!.id)
     : undefined;
   const pinIsHere =
@@ -907,7 +893,7 @@ export function Game({
         </div>
       )}
 
-      {!buySheetOpen && <HintBar you={you} onGo={setTab} />}
+      {!buySheetOpen && <HintBar you={you} onGo={openPhoneApp} />}
 
       <ElectionSheet
         open={electionOpen}
@@ -925,82 +911,27 @@ export function Game({
           <HomeView
             you={you}
             config={config}
+            token={token}
+            sock={sock}
             sendAct={sock.sendAct}
             onBuySheetOpen={setBuySheetOpen}
           />
         )}
-        {tab === "city" && (
+        {tab === "buy" && config && (
+          <BuyView
+            you={you}
+            config={config}
+            sendAct={sock.sendAct}
+            onBuySheetOpen={setBuySheetOpen}
+          />
+        )}
+        {tab === "map" && (
           <CityTab
             you={you}
             config={config}
             spawns={sock.spawns}
             onPinSelect={handlePinSelect}
           />
-        )}
-        {tab === "jobs" && (
-          <div className="eko-tabpad">
-            <JobsTab
-              you={you}
-              send={(msg) => {
-                const { a, ...rest } = msg as { t?: string; a: ActName } & Record<string, unknown>;
-                sock.sendAct(a, rest);
-              }}
-              careerTracks={(config as unknown as { careerTracks?: ShiftTrackInfo[] } | null)?.careerTracks}
-              skillLabels={(config as unknown as { skillLabels?: Record<string, string> } | null)?.skillLabels}
-              locationName={(id: string) => asList(config?.locations).find((l) => l.id === id)?.name ?? id}
-            />
-            <SkillsPanel you={you} send={(a: string, params?: Record<string, unknown>) => sock.sendAct(a as ActName, params)} />
-            <AcademyView you={you} send={(a: string, params?: Record<string, unknown>) => sock.sendAct(a as ActName, params)} />
-          </div>
-        )}
-        {tab === "needs" && (
-          <div className="eko-tabpad">
-            <NeedsPanel you={you} sock={sock} />
-            <EatTab
-              you={you}
-              config={config}
-              onEat={(f) => sock.sendAct("eat", { item: f.id })}
-              onFun={(f) => sock.sendAct("fun", { what: f.id })}
-              onStudy={() => sock.sendAct("study")}
-            />
-          </div>
-        )}
-        {tab === "daily" && (
-          <DailyTab
-            you={you}
-            send={(a: string, params?: Record<string, unknown>) => sock.sendAct(a as ActName, params)}
-            api={{
-              get: (path: string) => authGet(path, token),
-            }}
-          />
-        )}
-        {tab === "market" && <EconomyTab token={token} sock={sock} you={you} />}
-        {tab === "chat" && <ChatTab sock={sock} you={you} />}
-        {tab === "friends" && <FriendsPage token={token} />}
-        {tab === "me" && (
-          <>
-            <MeTab
-              you={you}
-              config={config}
-              token={token}
-              onSleep={() => sock.sendAct("sleep")}
-              onRest={() => sock.sendAct("rest")}
-              onSignOut={onSignOut}
-              onUpgrade={onUpgrade}
-              onOpenAdmin={() => setAdminOpen(true)}
-              sendAct={sock.sendAct}
-            />
-            {config && (
-              <HomeTab
-                you={you}
-                config={config}
-                sendAct={sock.sendAct}
-                travelTo={travelTo}
-                focus={homeFocus}
-                onClearFocus={() => setHomeFocus(null)}
-              />
-            )}
-          </>
         )}
       </main>
 
@@ -1038,7 +969,7 @@ export function Game({
                 you={you}
                 config={config}
                 sendAct={(a, p) => sock.sendAct(a, p)}
-                onTab={setTab}
+                onOpenApp={openPhoneApp}
                 onFocusHome={focusHome}
               />
             )}
@@ -1069,7 +1000,26 @@ export function Game({
         )}
       </Sheet>
 
-      <TabBar tab={tab} onTab={setTab} />
+      <Walkthrough
+        open={walkthroughOpen}
+        onDone={() => setWalkthroughOpen(false)}
+      />
+
+      <Phone
+        open={phoneOpen}
+        onClose={() => {
+          setPhoneOpen(false);
+          setPhoneApp(null);
+        }}
+        activeApp={phoneApp}
+        onSelectApp={setPhoneApp}
+        renderApp={renderPhoneApp}
+      />
+
+      <TabBar
+        tab={tab}
+        onTab={(t) => (t === "phone" ? setPhoneOpen(true) : setTab(t))}
+      />
         </>
       )}
     </div>
