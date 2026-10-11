@@ -298,8 +298,10 @@ test('rooms: create, join, chat, members, leave', async () => {
   assert.ok(Array.isArray(j2.history));
   send(R1.ws, { t: 'room_members', roomId });
   const mem = await waitFor(R1.msgs, m => m.t === 'room_members' && m.roomId === roomId);
-  assert.equal(mem.members.length, 2);
-  assert.ok(mem.members.some(x => x.role === 'owner' && x.username === R1.username));
+  assert.ok(Array.isArray(mem.room_members), 'server sends room_members (client contract)');
+  assert.equal(mem.room_members.length, 2);
+  assert.ok(mem.room_members.some(x => x.role === 'owner' && x.username === R1.username));
+  assert.ok(mem.room_members.some(x => x.username === R2.username));
   // chat reaches members
   send(R2.ws, { t: 'room_chat', roomId, text: 'hello room' });
   const rm = await waitFor(R1.msgs, m => m.t === 'room_msg' && m.roomId === roomId && m.text === 'hello room');
@@ -311,6 +313,13 @@ test('rooms: create, join, chat, members, leave', async () => {
   send(R2.ws, { t: 'leave_room', roomId });
   const left = await waitFor(R2.msgs, m => m.t === 'room_left' && m.roomId === roomId);
   assert.ok(left);
+  // members list reflects the leave
+  send(R1.ws, { t: 'room_members', roomId });
+  const mem2 = await waitFor(
+    R1.msgs,
+    m => m.t === 'room_members' && m.roomId === roomId && Array.isArray(m.room_members) && m.room_members.length === 1
+  );
+  assert.equal(mem2.room_members[0].username, R1.username);
 });
 
 test('rooms: kick + mute by owner', async () => {
