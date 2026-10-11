@@ -786,6 +786,10 @@ export async function initDb() {
     await ensureColumn('characters', 'avatar_look', 'TEXT', 'TEXT');
     await ensureColumn('characters', 'home_wall', 'TEXT', 'TEXT');
     await ensureColumn('characters', 'home_floor', 'TEXT', 'TEXT');
+    // M6: appearance revision counter for optimistic-concurrency saves
+    // (existing rows keep rev 0; legacy flat JSON stays until the client
+    // migrates on read — this migration never rewrites user data)
+    await ensureColumn('characters', 'appearance_rev', 'INTEGER NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0');
     // W3: friends page — status-change timestamp on friendships (no-op on fresh DBs)
     await ensureColumn('friendships', 'updated_ts', 'INTEGER NOT NULL DEFAULT 0', 'BIGINT NOT NULL DEFAULT 0');
     console.log('[db] PostgreSQL connected');
@@ -827,6 +831,8 @@ export async function initDb() {
     await ensureColumn('characters', 'avatar_look', 'TEXT', '');
     await ensureColumn('characters', 'home_wall', 'TEXT', '');
     await ensureColumn('characters', 'home_floor', 'TEXT', '');
+    // M6: appearance revision counter for optimistic-concurrency saves
+    await ensureColumn('characters', 'appearance_rev', 'INTEGER NOT NULL DEFAULT 0', '');
     // W3: friends page — status-change timestamp on friendships (no-op on fresh DBs)
     await ensureColumn('friendships', 'updated_ts', 'INTEGER NOT NULL DEFAULT 0', '');
     console.log(`[db] SQLite connected (${dbPath === ':memory:' ? 'in-memory' : 'local file'})`);
@@ -967,6 +973,15 @@ export async function getCharacter(userId) {
     [userId]);
 }
 
+// M6: character lookup by character id (appearance endpoints —
+// ownership is always verified against the session user id).
+export async function getCharacterById(id) {
+  return getOne(
+    'SELECT * FROM characters WHERE id = ?',
+    'SELECT * FROM characters WHERE id = $1',
+    [id]);
+}
+
 // Returns the character, creating a default one if missing (self-healing).
 export async function ensureCharacter(userId, displayName) {
   let c = await getCharacter(userId);
@@ -986,6 +1001,10 @@ export async function saveCharacter(c) {
   const skillsUsedJson = typeof c.skills_used === 'string' ? c.skills_used : (c.skills_used == null ? null : JSON.stringify(c.skills_used));
   // M15: avatar look is JSON text (null until the player saves a look)
   const avatarLookJson = typeof c.avatar_look === 'string' ? c.avatar_look : (c.avatar_look == null ? null : JSON.stringify(c.avatar_look));
+  // M6: appearance_rev stays in lockstep with avatar_look — the in-memory
+  // row carries the last persisted rev so saveCharacter never clobbers a
+  // newer revision with a stale JSON payload.
+  const appearanceRev = Math.max(0, Math.floor(Number(c.appearance_rev ?? 0) || 0));
   const params = [c.name, c.class, c.avatar, c.color, c.money, c.energy, c.health,
     c.happiness, c.hunger, c.housing, c.property, c.vehicle, c.biz ?? null, c.savings, c.loan,
     c.cert, c.location_id, c.x ?? null, c.y ?? null, c.rent_misses || 0,
@@ -995,6 +1014,7 @@ export async function saveCharacter(c) {
     Math.max(0, Math.floor(Number(c.perk_stars) || 0)), perksJson,
     Number(c.housing_owned) ? 1 : 0, skillsJson, skillsUsedJson,
     avatarLookJson, c.home_wall ?? null, c.home_floor ?? null,
+    appearanceRev,
     Date.now(), c.user_id];
   await runQ(
     `UPDATE characters SET name=?, class=?, avatar=?, color=?, money=?, energy=?, health=?,
@@ -1003,14 +1023,14 @@ export async function saveCharacter(c) {
       loan_free=?, shift_job=?, shift_started_at=?, shift_ends_at=?,
       fun=?, social=?, hygiene=?, bladder=?, perk_stars=?, perks=?,
       housing_owned=?, skills=?, skills_used=?,
-      avatar_look=?, home_wall=?, home_floor=?, updated_at=? WHERE user_id=?`,
+      avatar_look=?, home_wall=?, home_floor=?, appearance_rev=?, updated_at=? WHERE user_id=?`,
     `UPDATE characters SET name=$1, class=$2, avatar=$3, color=$4, money=$5, energy=$6, health=$7,
       happiness=$8, hunger=$9, housing=$10, property=$11, vehicle=$12, biz=$13, savings=$14, loan=$15,
       cert=$16, location_id=$17, x=$18, y=$19, rent_misses=$20, customized=$21,
       starter_loan_available=$22, loan_free=$23, shift_job=$24, shift_started_at=$25, shift_ends_at=$26,
       fun=$27, social=$28, hygiene=$29, bladder=$30, perk_stars=$31, perks=$32,
       housing_owned=$33, skills=$34, skills_used=$35,
-      avatar_look=$36, home_wall=$37, home_floor=$38, updated_at=$39 WHERE user_id=$40`,
+      avatar_look=$36, home_wall=$37, home_floor=$38, appearance_rev=$39, updated_at=$40 WHERE user_id=$41`,
     params);
 }
 
