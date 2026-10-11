@@ -7,6 +7,8 @@
 /** Authoritative character snapshot pushed by the server (`init` / `you`). */
 export interface You {
   id: number;
+  /** Character row id (server youSnapshot/characterBody; for /api/characters/:id/appearance). */
+  character_id?: number;
   username: string;
   name: string;
   class: string;
