@@ -19,9 +19,14 @@ import {
   layoutPlaced,
   overlaps,
   useActFor,
+  clampToWalkArea,
+  cellCenterWorld,
+  nearestWalkableCell,
+  planWalkPath,
   ROOM_GRID,
   type GridCell,
   type Footprint,
+  type WalkPoint,
 } from "./roomGrid";
 import {
   roomSizeFor,
@@ -398,6 +403,291 @@ export function buildModel(id: string, p: Palette): THREE.Group {
   }
 }
 
+/* ============ Bugfix C: room shell (wider room, windows, door, trim) ============ */
+
+/** Procedural canvas texture — no external assets. */
+function makeCanvasTexture(
+  size: number,
+  draw: (ctx: CanvasRenderingContext2D, s: number) => void
+): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d");
+  if (ctx) draw(ctx, size);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+/** Grayscale plank pattern — multiplies the floor style color. */
+function drawPlanks(ctx: CanvasRenderingContext2D, s: number) {
+  const rnd = mulberry32(7);
+  ctx.fillStyle = "#c4c4c4";
+  ctx.fillRect(0, 0, s, s);
+  const rows = 4;
+  const rh = s / rows;
+  for (let r = 0; r < rows; r++) {
+    const y = r * rh;
+    const shade = 178 + Math.floor(rnd() * 44);
+    ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
+    ctx.fillRect(0, y, s, rh);
+    // Grain streaks.
+    ctx.strokeStyle = "rgba(95,95,95,0.35)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 7; i++) {
+      const gy = y + 4 + rnd() * (rh - 8);
+      ctx.beginPath();
+      ctx.moveTo(0, gy);
+      ctx.bezierCurveTo(s * 0.3, gy + rnd() * 5 - 2.5, s * 0.7, gy + rnd() * 5 - 2.5, s, gy);
+      ctx.stroke();
+    }
+    // Plank gap + staggered butt joint.
+    ctx.fillStyle = "rgba(70,70,70,0.6)";
+    ctx.fillRect(0, y, s, 2);
+    ctx.fillRect((r * 97) % s, y, 2, rh);
+  }
+}
+
+/** Subtle plaster noise — multiplies the wall style color. */
+function drawWallNoise(ctx: CanvasRenderingContext2D, s: number) {
+  const rnd = mulberry32(21);
+  ctx.fillStyle = "#d9d9d9";
+  ctx.fillRect(0, 0, s, s);
+  for (let i = 0; i < 900; i++) {
+    const v = 200 + Math.floor(rnd() * 55);
+    ctx.fillStyle = `rgba(${v},${v},${v},0.5)`;
+    ctx.fillRect(rnd() * s, rnd() * s, 1 + rnd() * 3, 1 + rnd() * 3);
+  }
+}
+
+/** Soft radial daylight patch for the floor under a window. */
+function drawGlowPatch(ctx: CanvasRenderingContext2D, s: number) {
+  const g = ctx.createRadialGradient(s / 2, s / 2, 4, s / 2, s / 2, s / 2);
+  g.addColorStop(0, "rgba(255,244,220,0.85)");
+  g.addColorStop(0.6, "rgba(255,244,220,0.35)");
+  g.addColorStop(1, "rgba(255,244,220,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+}
+
+interface RoomShell {
+  group: THREE.Group;
+  wallMat: THREE.MeshStandardMaterial;
+  floorMat: THREE.MeshStandardMaterial;
+  floorMesh: THREE.Mesh;
+  dispose(): void;
+}
+
+/**
+ * Static room shell: 8×8 plank floor, two walls with procedural texture,
+ * two windows (frame + mullions + sill + emissive daylight glass), a door
+ * on the left wall, baseboards, and ceiling coving. All original geometry.
+ */
+function buildRoomShell(): RoomShell {
+  const group = new THREE.Group();
+  const disposables: Array<{ dispose(): void }> = [];
+  const track = <T extends { dispose(): void }>(d: T): T => {
+    disposables.push(d);
+    return d;
+  };
+
+  const plankTex = track(makeCanvasTexture(256, drawPlanks));
+  plankTex.repeat.set(3, 3);
+  const noiseTex = track(makeCanvasTexture(128, drawWallNoise));
+  noiseTex.repeat.set(4, 2);
+  const glowTex = track(makeCanvasTexture(128, drawGlowPatch));
+
+  const wallMat = track(
+    new THREE.MeshStandardMaterial({
+      color: 0xf3e5cd,
+      roughness: 0.96,
+      map: noiseTex,
+    })
+  );
+  const floorMat = track(
+    new THREE.MeshStandardMaterial({
+      color: 0xb5854f,
+      roughness: 0.75,
+      map: plankTex,
+    })
+  );
+  // Neutral trim/glass tones — read well in any UI theme.
+  const trimMat = track(
+    new THREE.MeshStandardMaterial({ color: 0xf7f1e5, roughness: 0.6 })
+  );
+  const revealMat = track(
+    new THREE.MeshStandardMaterial({ color: 0x2b3442, roughness: 0.9 })
+  );
+  const glassMat = track(
+    new THREE.MeshStandardMaterial({
+      color: 0xd8ecff,
+      emissive: 0xbfe0ff,
+      emissiveIntensity: 0.85,
+      roughness: 0.25,
+      metalness: 0.1,
+    })
+  );
+  const doorMat = track(
+    new THREE.MeshStandardMaterial({ color: 0x7c5230, roughness: 0.7 })
+  );
+  const doorInsetMat = track(
+    new THREE.MeshStandardMaterial({ color: 0x5e3d22, roughness: 0.75 })
+  );
+  const knobMat = track(
+    new THREE.MeshStandardMaterial({
+      color: 0xd9a441,
+      roughness: 0.35,
+      metalness: 0.8,
+    })
+  );
+  const patchMat = track(
+    new THREE.MeshStandardMaterial({
+      map: glowTex,
+      transparent: true,
+      opacity: 0.5,
+      roughness: 1,
+      depthWrite: false,
+    })
+  );
+
+  const add = (m: THREE.Mesh, shadow = true): THREE.Mesh => {
+    m.castShadow = shadow;
+    m.receiveShadow = true;
+    group.add(m);
+    return m;
+  };
+  const bar = (
+    w: number,
+    h: number,
+    d: number,
+    mat: THREE.Material,
+    x: number,
+    y: number,
+    z: number
+  ): THREE.Mesh => {
+    const m = add(new THREE.Mesh(track(new THREE.BoxGeometry(w, h, d)), mat));
+    m.position.set(x, y, z);
+    return m;
+  };
+
+  // Floor.
+  const floorMesh = add(
+    new THREE.Mesh(track(new THREE.BoxGeometry(ROOM_GRID, 0.2, ROOM_GRID)), floorMat),
+    false
+  );
+  floorMesh.position.y = -0.1;
+
+  // Faint construction grid + rug.
+  const grid = new THREE.GridHelper(ROOM_GRID, ROOM_GRID, 0x8a6238, 0x9a6f42);
+  grid.position.y = 0.012;
+  track(grid.geometry);
+  const gridMat = grid.material as THREE.Material;
+  gridMat.transparent = true;
+  (gridMat as THREE.MeshBasicMaterial).opacity = 0.35;
+  track(gridMat);
+  group.add(grid);
+  const rug = add(
+    new THREE.Mesh(
+      track(new THREE.CircleGeometry(1.6, 28)),
+      track(
+        new THREE.MeshStandardMaterial({ color: 0xc96f4a, roughness: 1 })
+      )
+    ),
+    false
+  );
+  rug.rotation.x = -Math.PI / 2;
+  rug.position.y = 0.006;
+
+  // Walls: back + left.
+  const backWall = bar(ROOM_GRID + 0.4, WALL_H, 0.2, wallMat, 0, WALL_H / 2, -HALF - 0.1);
+  backWall.castShadow = false;
+  const leftWall = bar(0.2, WALL_H, ROOM_GRID + 0.4, wallMat, -HALF - 0.1, WALL_H / 2, 0);
+  leftWall.castShadow = false;
+
+  // Windows on the back wall (inner face z = -HALF).
+  const addWindow = (x: number) => {
+    const zF = -HALF;
+    const yC = 1.75;
+    const wW = 1.7;
+    const wH = 1.4;
+    // Dark reveal = the "opening".
+    const reveal = add(
+      new THREE.Mesh(track(new THREE.PlaneGeometry(wW, wH)), revealMat),
+      false
+    );
+    reveal.position.set(x, yC, zF + 0.012);
+    // Daylight glass, slightly proud of the reveal.
+    const glass = add(
+      new THREE.Mesh(track(new THREE.PlaneGeometry(wW - 0.16, wH - 0.16)), glassMat),
+      false
+    );
+    glass.position.set(x, yC, zF + 0.03);
+    // Frame (4 trim bars).
+    const ft = 0.1;
+    bar(wW + 0.06, ft, 0.12, trimMat, x, yC + wH / 2 - ft / 2 + 0.03, zF + 0.045);
+    bar(wW + 0.06, ft, 0.12, trimMat, x, yC - wH / 2 + ft / 2 - 0.03, zF + 0.045);
+    bar(ft, wH + 0.06, 0.12, trimMat, x - wW / 2 + ft / 2 - 0.03, yC, zF + 0.045);
+    bar(ft, wH + 0.06, 0.12, trimMat, x + wW / 2 - ft / 2 + 0.03, yC, zF + 0.045);
+    // Mullions: vertical + horizontal cross.
+    bar(0.05, wH - 0.14, 0.07, trimMat, x, yC, zF + 0.05);
+    bar(wW - 0.14, 0.05, 0.07, trimMat, x, yC, zF + 0.05);
+    // Sill.
+    bar(wW + 0.3, 0.07, 0.24, trimMat, x, yC - wH / 2 - 0.065, zF + 0.09);
+    // Soft daylight patch on the floor below.
+    const patch = add(
+      new THREE.Mesh(track(new THREE.PlaneGeometry(2.4, 1.7)), patchMat),
+      false
+    );
+    patch.rotation.x = -Math.PI / 2;
+    patch.position.set(x, 0.015, zF + 1.15);
+    patch.receiveShadow = false;
+  };
+  addWindow(-2.2);
+  addWindow(2.2);
+
+  // Door on the left wall (inner face x = -HALF), front area.
+  const doorZ = 2.2;
+  const doorW = 1.1;
+  const doorH = 2.2;
+  bar(0.12, doorH, 0.14, trimMat, -HALF + 0.06, doorH / 2, doorZ - doorW / 2 - 0.07);
+  bar(0.12, doorH, 0.14, trimMat, -HALF + 0.06, doorH / 2, doorZ + doorW / 2 + 0.07);
+  bar(0.12, 0.14, doorW + 0.28, trimMat, -HALF + 0.06, doorH - 0.07, doorZ);
+  bar(0.07, doorH - 0.16, doorW, doorMat, -HALF + 0.035, (doorH - 0.16) / 2 + 0.02, doorZ);
+  // Panel inset detail: two recessed-look rectangles, darker wood.
+  bar(0.03, doorH - 0.9, doorW - 0.4, doorInsetMat, -HALF + 0.075, doorH / 2 + 0.22, doorZ);
+  bar(0.03, 0.55, doorW - 0.4, doorInsetMat, -HALF + 0.075, 0.6, doorZ);
+  const knob = add(new THREE.Mesh(track(new THREE.SphereGeometry(0.055, 12, 10)), knobMat));
+  knob.position.set(-HALF + 0.12, 1.05, doorZ + doorW / 2 - 0.26);
+
+  // Baseboards along wall bases (left wall split around the door).
+  bar(ROOM_GRID + 0.4, 0.14, 0.06, trimMat, 0, 0.07, -HALF + 0.03);
+  const doorLo = doorZ - doorW / 2 - 0.14;
+  const doorHi = doorZ + doorW / 2 + 0.14;
+  const seg1Len = doorLo - (-HALF - 0.2);
+  bar(0.06, 0.14, seg1Len, trimMat, -HALF + 0.03, 0.07, -HALF - 0.2 + seg1Len / 2);
+  const seg2Len = HALF + 0.2 - doorHi;
+  bar(0.06, 0.14, seg2Len, trimMat, -HALF + 0.03, 0.07, doorHi + seg2Len / 2);
+
+  // Ceiling coving along the tops of both walls.
+  bar(ROOM_GRID + 0.4, 0.12, 0.14, trimMat, 0, WALL_H - 0.06, -HALF + 0.07);
+  bar(0.14, 0.12, ROOM_GRID + 0.4, trimMat, -HALF + 0.07, WALL_H - 0.06, 0);
+
+  return {
+    group,
+    wallMat,
+    floorMat,
+    floorMesh,
+    dispose() {
+      // Every geometry/material/texture above went through track().
+      for (const d of disposables) d.dispose();
+      disposables.length = 0;
+    },
+  };
+}
+
 /* ============ M15: avatar look + home style ============ */
 
 /**
@@ -509,9 +799,18 @@ export interface RoomSceneApi {
   setStyle(wall: string, floor: string): void;
   setAvatar(look: AvatarLook, cell: GridCell | null): void;
   rotateCamera(): void;
+  /** Bugfix C: walk the avatar to a world-space floor point (clamped to the
+   *  walkable area, routed around furniture). */
+  requestWalk(x: number, z: number): void;
+  /** Bugfix C: note a user interaction — cancels idle ambience immediately. */
+  poke(): void;
 }
 
-const HALF = ROOM_GRID / 2; // floor spans -3..3
+const HALF = ROOM_GRID / 2; // floor spans -4..4
+const WALL_H = 3.2;
+
+/** Wall-clock seconds, for idle timers. */
+const nowSec = () => performance.now() / 1000;
 
 /** World center of a grid anchor cell's footprint. */
 function footprintCenter(size: Footprint, rot: number, x: number, z: number): [number, number] {
@@ -552,7 +851,7 @@ function RoomCanvas({
   avatarLook: AvatarLook;
   avatarCell: GridCell | null;
   onTapItem: (key: string) => void;
-  onTapCell: (cell: GridCell) => void;
+  onTapCell: (cell: GridCell, x: number, z: number) => void;
   onTapEmpty: () => void;
   apiRef: { current: RoomSceneApi | null };
 }) {
@@ -627,51 +926,18 @@ function RoomCanvas({
       sun.position.set(6, 10, 4);
       sun.castShadow = true;
       sun.shadow.mapSize.set(1024, 1024);
-      sun.shadow.camera.left = -6;
-      sun.shadow.camera.right = 6;
-      sun.shadow.camera.top = 6;
-      sun.shadow.camera.bottom = -6;
+      sun.shadow.camera.left = -8;
+      sun.shadow.camera.right = 8;
+      sun.shadow.camera.top = 8;
+      sun.shadow.camera.bottom = -8;
       sun.shadow.camera.far = 30;
       scene.add(sun);
 
-      // Wood floor: 6×6 cells, subtle grid lines.
-      const floorMat = new THREE.MeshStandardMaterial({
-        color: 0xb5854f,
-        roughness: 0.9,
-      });
-      const floorMesh = new THREE.Mesh(new THREE.BoxGeometry(6, 0.2, 6), floorMat);
-      floorMesh.position.y = -0.1;
-      floorMesh.receiveShadow = true;
-      scene.add(floorMesh);
-      const grid = new THREE.GridHelper(6, 6, 0x8a6238, 0x9a6f42);
-      grid.position.y = 0.012;
-      (grid.material as THREE.Material).transparent = true;
-      (grid.material as THREE.Material).opacity = 0.35;
-      scene.add(grid);
-      // Rug for warmth.
-      const rug = new THREE.Mesh(
-        new THREE.CircleGeometry(1.25, 28),
-        new THREE.MeshStandardMaterial({ color: 0xc96f4a, roughness: 1 })
-      );
-      rug.rotation.x = -Math.PI / 2;
-      rug.position.y = 0.006;
-      rug.receiveShadow = true;
-      scene.add(rug);
-
-      // Two walls: back + left, warm plaster.
-      const wallMat = new THREE.MeshStandardMaterial({
-        color: 0xf3e5cd,
-        roughness: 1,
-      });
-      const wallH = 3;
-      const backWall = new THREE.Mesh(new THREE.BoxGeometry(6.4, wallH, 0.2), wallMat);
-      backWall.position.set(0, wallH / 2, -HALF - 0.1);
-      backWall.receiveShadow = true;
-      scene.add(backWall);
-      const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, wallH, 6.4), wallMat);
-      leftWall.position.set(-HALF - 0.1, wallH / 2, 0);
-      leftWall.receiveShadow = true;
-      scene.add(leftWall);
+      // Bugfix C: wider 8×8 room shell — plank floor, textured walls, two
+      // windows with daylight glass, a door, baseboards, ceiling coving.
+      const shell = buildRoomShell();
+      scene.add(shell.group);
+      const { wallMat, floorMat, floorMesh } = shell;
 
       const palette = makePalette();
       const ghostGreen = new THREE.MeshStandardMaterial({
@@ -702,12 +968,151 @@ function RoomCanvas({
       scene.add(avatarLayer);
       let avatarGroup: THREE.Group | null = null;
 
+      // ---- Bugfix C: tap-to-walk + idle life ----
+      // walk.* is the avatar locomotion state; blockedCells mirrors the
+      // furniture footprints from setPlaced. Everything below avoids
+      // per-frame allocation (iPhone perf bar).
+      const WALK_SPEED = 1.6; // world units / second
+      const WALK_TURN = 9; // rad / second
+      const BOB_AMP = 0.055;
+      const ARRIVE_DIST = 0.08;
+      const IDLE_AFTER_S = 25; // ~20–30s of no interaction → ambient mode
+
+      interface WalkState {
+        active: boolean;
+        /** Ambient (idle-life) wander vs a user-commanded walk. */
+        idle: boolean;
+        destX: number;
+        destZ: number;
+        path: WalkPoint[];
+        leg: number;
+        /** Stride phase driving the walk bob. */
+        phase: number;
+        heading: number;
+      }
+      const walk: WalkState = {
+        active: false,
+        idle: false,
+        destX: 0,
+        destZ: 0,
+        path: [],
+        leg: 0,
+        phase: 0,
+        heading: Math.PI / 4,
+      };
+      let blockedCells: GridCell[] = [];
+      let lastInteract = nowSec();
+      let idleMode = false;
+      let idlePhase: "wander" | "look" | "pause" = "wander";
+      let lookStart = 0;
+      let lookDur = 0;
+      let lookFrom = 0;
+      let lookTo = 0;
+      let pauseUntil = 0;
+
+      function turnToward(cur: number, target: number, maxStep: number): number {
+        let d = (target - cur) % (Math.PI * 2);
+        if (d > Math.PI) d -= Math.PI * 2;
+        if (d < -Math.PI) d += Math.PI * 2;
+        return cur + Math.max(-maxStep, Math.min(maxStep, d));
+      }
+
+      /** Clamp a tap point onto a free walkable spot (never inside furniture). */
+      function resolveWalkDest(x: number, z: number): WalkPoint | null {
+        const p = clampToWalkArea(x, z);
+        const cell: GridCell = [
+          Math.max(0, Math.min(ROOM_GRID - 1, Math.floor(p.x + HALF))),
+          Math.max(0, Math.min(ROOM_GRID - 1, Math.floor(p.z + HALF))),
+        ];
+        const blockedSet = new Set(blockedCells.map(([bx, bz]) => `${bx},${bz}`));
+        if (!blockedSet.has(`${cell[0]},${cell[1]}`)) return p;
+        const free = nearestWalkableCell(blockedCells, cell[0], cell[1]);
+        return free ? cellCenterWorld(free) : null;
+      }
+
+      function startWalk(tx: number, tz: number, isIdle: boolean) {
+        if (!avatarGroup) return;
+        const dest = resolveWalkDest(tx, tz);
+        if (!dest) return; // nowhere walkable
+        const from: WalkPoint = {
+          x: avatarGroup.position.x,
+          z: avatarGroup.position.z,
+        };
+        walk.active = true;
+        walk.idle = isIdle;
+        walk.destX = dest.x;
+        walk.destZ = dest.z;
+        walk.path = planWalkPath(from, dest, blockedCells);
+        walk.leg = 0;
+      }
+
+      function stopWalk() {
+        walk.active = false;
+        if (avatarGroup) {
+          avatarGroup.position.y = 0;
+          avatarGroup.rotation.z = 0;
+        }
+      }
+
+      /**
+       * Any user interaction: leave idle mode immediately, reset the idle
+       * timer, and cancel ambient wandering (a user-commanded walk keeps
+       * going — orbiting the camera must not yank the avatar).
+       */
+      function noteInteraction() {
+        lastInteract = nowSec();
+        if (idleMode) {
+          idleMode = false;
+          if (walk.active && walk.idle) stopWalk();
+        }
+      }
+
+      function randomFreePoint(): WalkPoint | null {
+        const blockedSet = new Set(blockedCells.map(([bx, bz]) => `${bx},${bz}`));
+        for (let tries = 0; tries < 24; tries++) {
+          const x = Math.floor(Math.random() * ROOM_GRID);
+          const z = Math.floor(Math.random() * ROOM_GRID);
+          if (!blockedSet.has(`${x},${z}`)) return cellCenterWorld([x, z]);
+        }
+        return null;
+      }
+
+      function beginIdleWander() {
+        const p = randomFreePoint();
+        if (!p) {
+          idlePhase = "pause";
+          pauseUntil = nowSec() + 6;
+          return;
+        }
+        idlePhase = "wander";
+        startWalk(p.x, p.z, true);
+        if (!walk.active) {
+          idlePhase = "pause";
+          pauseUntil = nowSec() + 6;
+        }
+      }
+
+      function beginIdleLook() {
+        idlePhase = "look";
+        lookStart = nowSec();
+        lookDur = 2 + Math.random() * 2;
+        lookFrom = walk.heading;
+        lookTo =
+          walk.heading + (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random() * 0.8);
+      }
+
       function placeAvatar(look: AvatarLook, cell: GridCell | null) {
+        // A rebuild (new look / re-seat) must not strand a walk in progress:
+        // resume it from the avatar's new position.
+        const resume = walk.active
+          ? { x: walk.destX, z: walk.destZ, idle: walk.idle }
+          : null;
         if (avatarGroup) {
           avatarLayer.remove(avatarGroup);
           disposeGroupDeep(avatarGroup);
           avatarGroup = null;
         }
+        walk.active = false;
         if (!cell) {
           renderOnce();
           return;
@@ -721,8 +1126,10 @@ function RoomCanvas({
         }
         g.position.set(cell[0] - HALF + 0.5, 0, cell[1] - HALF + 0.5);
         g.rotation.y = Math.PI / 4;
+        walk.heading = Math.PI / 4;
         avatarGroup = g;
         avatarLayer.add(g);
+        if (resume) startWalk(resume.x, resume.z, resume.idle);
         renderOnce();
       }
 
@@ -789,6 +1196,7 @@ function RoomCanvas({
         setPlaced(entries: PlacedSceneEntry[]) {
           clearLayer(itemLayer);
           spinners = [];
+          blockedCells = [];
           for (const e of entries) {
             const g = buildModel(e.itemId, palette);
             const [wx, wz] = footprintCenter(e.size, e.rot, e.x, e.z);
@@ -798,6 +1206,7 @@ function RoomCanvas({
             const spin = g.userData.spin as THREE.Object3D[] | undefined;
             if (spin) spinners.push(...spin);
             itemLayer.add(g);
+            blockedCells.push(...footprintCells(e.size, e.rot, e.x, e.z));
           }
           api.setSelected(currentSelected);
           renderOnce();
@@ -886,6 +1295,24 @@ function RoomCanvas({
             renderOnce();
           }
         },
+        requestWalk(x: number, z: number) {
+          noteInteraction();
+          if (!avatarGroup) return;
+          if (reducedMotion) {
+            // No animation loop under reduced motion: place the avatar on a
+            // free spot directly instead of animating the walk.
+            const dest = resolveWalkDest(x, z);
+            if (dest) {
+              avatarGroup.position.set(dest.x, 0, dest.z);
+              renderOnce();
+            }
+            return;
+          }
+          startWalk(x, z, false);
+        },
+        poke() {
+          noteInteraction();
+        },
       };
       apiBox.current = api;
       apiRef.current = api;
@@ -935,7 +1362,7 @@ function RoomCanvas({
           const cx = Math.floor(pt.x + HALF);
           const cz = Math.floor(pt.z + HALF);
           if (cx >= 0 && cx < ROOM_GRID && cz >= 0 && cz < ROOM_GRID) {
-            cbRef.current.onTapCell([cx, cz]);
+            cbRef.current.onTapCell([cx, cz], pt.x, pt.z);
             return;
           }
         }
@@ -948,6 +1375,8 @@ function RoomCanvas({
         } catch {
           /* noop */
         }
+        // Any touch on the room ends idle ambience at once.
+        noteInteraction();
         const now = performance.now();
         pointers.set(e.pointerId, {
           x: e.clientX,
@@ -1075,6 +1504,7 @@ function RoomCanvas({
       };
       const onWheel = (e: WheelEvent) => {
         e.preventDefault();
+        noteInteraction();
         camT.dist = zoomDist(camT.dist, 1 + e.deltaY * 0.001);
         if (reducedMotion) {
           cam.dist = camT.dist;
@@ -1139,6 +1569,69 @@ function RoomCanvas({
             if (Math.abs(velP) < 0.02) velP = 0;
           }
           placeCamera();
+          // Bugfix C: tap-to-walk — steer the avatar along its planned path.
+          // Turn-then-glide with a gentle stride bob (the rig has no walk
+          // cycle, so the bob + sway sells the walk). No allocations here.
+          if (walk.active && avatarGroup) {
+            const wp = walk.path[walk.leg];
+            if (!wp) {
+              stopWalk();
+            } else {
+              const px = avatarGroup.position.x;
+              const pz = avatarGroup.position.z;
+              const dx = wp.x - px;
+              const dz = wp.z - pz;
+              const dist = Math.sqrt(dx * dx + dz * dz);
+              if (dist < ARRIVE_DIST) {
+                walk.leg++;
+                if (walk.leg >= walk.path.length) {
+                  const wasIdle = walk.idle;
+                  stopWalk();
+                  if (wasIdle && idleMode) beginIdleLook();
+                }
+              } else {
+                walk.heading = turnToward(
+                  walk.heading,
+                  Math.atan2(dx, dz),
+                  WALK_TURN * dt
+                );
+                avatarGroup.rotation.y = walk.heading;
+                const step = Math.min(dist, WALK_SPEED * dt);
+                walk.phase += step * 7;
+                avatarGroup.position.set(
+                  px + (dx / dist) * step,
+                  Math.abs(Math.sin(walk.phase)) * BOB_AMP,
+                  pz + (dz / dist) * step
+                );
+                avatarGroup.rotation.z = Math.sin(walk.phase) * 0.035;
+              }
+            }
+          }
+          // Bugfix C: idle life — after ~25s with no interaction the avatar
+          // wanders to random free spots, pauses, and looks around, until any
+          // user interaction cancels it (see noteInteraction).
+          if (!walk.active && avatarGroup) {
+            const now = nowSec();
+            if (!idleMode) {
+              if (now - lastInteract > IDLE_AFTER_S) {
+                idleMode = true;
+                beginIdleWander();
+              }
+            } else if (idlePhase === "look") {
+              const p = (now - lookStart) / lookDur;
+              if (p >= 1) {
+                idlePhase = "pause";
+                pauseUntil = now + 4 + Math.random() * 4;
+              } else {
+                const s = p * p * (3 - 2 * p);
+                walk.heading = lookFrom + (lookTo - lookFrom) * s;
+                avatarGroup.rotation.y = walk.heading;
+              }
+            } else if (idlePhase === "pause") {
+              if (now >= pauseUntil) beginIdleWander();
+            }
+            // idlePhase === "wander": the walk block above is driving.
+          }
           for (const s of spinners) s.rotation.z += dt * 5;
           // M16: drive the avatar's idle life (blink, breathing, sway) via the
           // update hook stashed on group.userData by buildAvatarLook. The
@@ -1169,15 +1662,7 @@ function RoomCanvas({
           (ring.material as THREE.Material).dispose();
           ring = null;
         }
-        floorMesh.geometry.dispose();
-        (floorMesh.material as THREE.Material).dispose();
-        (grid.material as THREE.Material).dispose();
-        grid.geometry.dispose();
-        rug.geometry.dispose();
-        (rug.material as THREE.Material).dispose();
-        backWall.geometry.dispose();
-        leftWall.geometry.dispose();
-        (wallMat as THREE.Material).dispose();
+        shell.dispose();
         ghostGreen.dispose();
         ghostRed.dispose();
         ghostPlane.dispose();
@@ -1216,9 +1701,13 @@ function RoomCanvas({
   useEffect(() => {
     apiBox.current?.setStyle(wallHex, floorHex);
   }, [wallHex, floorHex]);
+  // Bugfix C: compare the avatar cell by value — furniture changes rebuild
+  // the tuple identity, which must not teleport a walking avatar back.
+  const avatarCellKey = avatarCell ? `${avatarCell[0]},${avatarCell[1]}` : "none";
   useEffect(() => {
     apiBox.current?.setAvatar(avatarLook, avatarCell);
-  }, [avatarLook, avatarCell]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [avatarLook, avatarCellKey]);
 
   return <div ref={hostRef} className="eko-room__canvas" aria-label="3D home room" />;
 }
@@ -1507,7 +1996,7 @@ export function HomeRoomSection({
     return null;
   };
 
-  // Free tile near the "door" (front row, biased to front-center) for the avatar.
+  // Free tile near the door (front-left, where the door sits) for the avatar.
   const avatarCell: GridCell | null = useMemo(() => {
     const taken = takenCells();
     const cells: GridCell[] = [];
@@ -1515,9 +2004,9 @@ export function HomeRoomSection({
       for (let x = 0; x < ROOM_GRID; x++) cells.push([x, z]);
     cells.sort(
       (a, b) =>
-        Math.abs(a[1] - (ROOM_GRID - 1)) * 2 +
-        Math.abs(a[0] - 2.5) -
-        (Math.abs(b[1] - (ROOM_GRID - 1)) * 2 + Math.abs(b[0] - 2.5))
+        Math.abs(a[1] - (ROOM_GRID - 2)) * 2 +
+        Math.abs(a[0] - 1) -
+        (Math.abs(b[1] - (ROOM_GRID - 2)) * 2 + Math.abs(b[0] - 1))
     );
     for (const c of cells) {
       if (!overlaps([c], taken)) return c;
@@ -1682,6 +2171,7 @@ export function HomeRoomSection({
   };
 
   const enterPlacing = (entry: FurnitureEntry) => {
+    apiRef.current?.poke();
     setSelectedKey(null);
     setConfirmSell(false);
     // Placement gets the full room: auto-collapse the buy sheet.
@@ -1709,9 +2199,13 @@ export function HomeRoomSection({
     cancelPlacing();
   };
 
-  const handleTapCell = (cell: GridCell) => {
+  const handleTapCell = (cell: GridCell, x: number, z: number) => {
     if (!placing) {
+      // Bugfix C: tap-to-walk — a floor tap walks the avatar there.
+      // (Placement taps keep the ghost flow below.)
       setSelectedKey(null);
+      setConfirmSell(false);
+      apiRef.current?.requestWalk(x, z);
       return;
     }
     if (ghostCell && ghostCell[0] === cell[0] && ghostCell[1] === cell[1]) {
@@ -1856,7 +2350,8 @@ export function HomeRoomSection({
             ⟳ Turn room
           </button>
           <span className="eko-room__hint">
-            Drag to orbit • pinch to zoom • double-tap to reset
+            Tap the floor to walk • drag to orbit • pinch to zoom • double-tap
+            to reset
           </span>
         </div>
 
