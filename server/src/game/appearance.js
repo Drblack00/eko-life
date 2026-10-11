@@ -621,18 +621,22 @@ export async function persistAppearance({ userId, characterId, appearance, expec
       throw new AppearanceConflictError(Number(fresh?.appearance_rev ?? 0) || 0);
     }
   } else {
-    // PG runQ cannot report affected rows: write, then verify the rev
-    // landed exactly on `next` (a raced write leaves it higher).
+    // PG runQ cannot report affected rows: write, then verify BOTH the
+    // revision and the payload landed exactly. A raced concurrent write can
+    // leave the revision at `next` with a DIFFERENT payload (both writers
+    // read the same `current`) — without the payload check that lost race
+    // would falsely report success.
     await dbRun(
       'UPDATE characters SET avatar_look = ?, appearance_rev = ?, updated_at = ? WHERE id = ? AND appearance_rev = ?',
       'UPDATE characters SET avatar_look = $1, appearance_rev = $2, updated_at = $3 WHERE id = $4 AND appearance_rev = $5',
       [canonicalJson, next, now, cid, current]);
     const fresh = await dbGet(
-      'SELECT appearance_rev FROM characters WHERE id = ?',
-      'SELECT appearance_rev FROM characters WHERE id = $1',
+      'SELECT appearance_rev, avatar_look FROM characters WHERE id = ?',
+      'SELECT appearance_rev, avatar_look FROM characters WHERE id = $1',
       [cid]);
-    if (Number(fresh?.appearance_rev ?? 0) !== next) {
-      throw new AppearanceConflictError(Number(fresh?.appearance_rev ?? 0) || 0);
+    const freshRev = Number(fresh?.appearance_rev ?? 0) || 0;
+    if (freshRev !== next || fresh?.avatar_look !== canonicalJson) {
+      throw new AppearanceConflictError(freshRev);
     }
   }
 
