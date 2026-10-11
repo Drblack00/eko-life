@@ -3,8 +3,9 @@
 //   rejects bad body/skin/hair/outfit/fabric/topColor/bottomColor/missing
 // - /config exposes avatarLook {bodies,skins,hairs,outfits,fabrics,
 //   topColors,bottomColors,defaults}, walls (5), floors (4)
-// - WS save_avatar: persists valid look, client sees it in `you`,
-//   invalid look rejected
+// - WS save_avatar: legacy flat look migrates to v1 server-side + rev
+//   bumps (M6); client sees the canonical v1 in `you`;
+//   invalid legacy fields fall back to defaults (migrate policy)
 // - WS buy_home_style: charges + persists wall/floor, ledger row;
 //   rejects unknown id/kind and insufficient funds
 // - init `you` payload carries avatar_look/home_wall/home_floor
@@ -171,7 +172,7 @@ test('M15 /config: avatarLook + walls + floors exposed', async () => {
   assert.deepEqual(al.skins.map(s => s.name), [
     'Deep Espresso', 'Dark Cocoa', 'Burnt Caramel', 'Mahogany', 'Walnut',
     'Cocoa', 'Coffee', 'Latte', 'Honey', 'Sand', 'Amber', 'Cream']);
-  assert.deepEqual(al.hairs.map(h => h.id), ['lowcut', 'bald', 'curls', 'afro', 'locs', 'braids', 'classic']);
+  assert.deepEqual(al.hairs.map(h => h.id), ['lowcut', 'bald', 'curls', 'afro', 'locs', 'braids', 'classic', 'hair_taper_fade_01', 'hair_waves_01']);
   assert.deepEqual(al.outfits.map(o => o.id), ['casual', 'hoodie', 'office', 'chill', 'sitework']);
   assert.deepEqual(al.fabrics.map(f => f.id), ['plain', 'ankara', 'adire', 'asoke']);
   assert.equal(al.topColors.length, 10);
@@ -215,7 +216,7 @@ test('M15 POST /characters: accepts valid avatar_look, 400 on invalid', async ()
   assert.equal(Number(c.customized), 0);
 });
 
-// ---------------- WS save_avatar ----------------
+// ---------------- WS save_avatar (M6: legacy flat look migrates to v1 + rev bump) ----------------
 test('M15 save_avatar: persists valid look and pushes it in `you`', async () => {
   const A = await seedGuest();
   await setChar(A.userId, { money: 10000 });
@@ -227,28 +228,35 @@ test('M15 save_avatar: persists valid look and pushes it in `you`', async () => 
   assert.equal(init.you.home_floor, null);
 
   act(ws, { a: 'save_avatar', avatar: LOOK });
-  const you = await waitFor(msgs, m => m.t === 'you' && m.you.avatar_look && m.you.avatar_look.body === 'man');
-  assert.deepEqual(you.you.avatar_look, {
-    body: 'man', skin: 'mahogany', hair: 'locs', outfit: 'office',
-    fabric: 'ankara', topColor: '#f472b6', bottomColor: '#111827',
-  });
+  // M6: the legacy flat look is migrated server-side to canonical v1.
+  const you = await waitFor(msgs, m => m.t === 'you' && m.you.avatar_look && m.you.avatar_look.schemaVersion === 1);
+  assert.equal(you.you.avatar_look.base.bodyPresetId, 'man');
+  assert.equal(you.you.avatar_look.base.skinToneId, 'mahogany');
+  assert.equal(you.you.avatar_look.hair.styleId, 'locs');
+  assert.equal(you.you.avatar_look.clothing.topId, 'top_shirt_office_01'); // office decomposition
+  assert.equal(you.you.avatar_look.clothing.shoeId, 'shoe_oxford_01');
+  assert.equal(you.you.avatar_look.clothing.fabricId, 'ankara');
+  assert.equal(you.you.avatar_look.clothing.topColor, '#f472b6'); // normalized
+  assert.equal(you.you.avatar_look.clothing.bottomColor, '#111827');
   assert.match(you.note || '', /new look is saved/i);
-  // DB-level persistence: avatar_look stored as JSON text
+  // DB-level persistence: canonical v1 JSON text + rev bumped
   const row = await db.getCharacter(A.userId);
   assert.deepEqual(JSON.parse(row.avatar_look), you.you.avatar_look);
+  assert.equal(Number(row.appearance_rev), 1);
   // free: money untouched
   assert.equal(you.you.money, 10000);
   ws.close();
 });
 
-test('M15 save_avatar: invalid look rejected, old look kept', async () => {
+test('M15 save_avatar: invalid legacy fields fall back per migrate policy (no err)', async () => {
   const A = await seedGuest();
   const { ws, msgs } = await connectAs(A);
   act(ws, { a: 'save_avatar', avatar: { ...data.DEFAULT_AVATAR, hair: 'mohawk' } });
-  const err = await waitFor(msgs, m => m.t === 'err');
-  assert.match(err.text, /hair/);
+  // M6: unknown legacy ids fall back field-by-field to defaults (never rejected, never garbage)
+  const you = await waitFor(msgs, m => m.t === 'you' && m.you.avatar_look && m.you.avatar_look.schemaVersion === 1);
+  assert.equal(you.you.avatar_look.hair.styleId, 'lowcut');
   const row = await db.getCharacter(A.userId);
-  assert.equal(row.avatar_look, null); // nothing persisted
+  assert.equal(Number(row.appearance_rev), 1);
   ws.close();
 });
 
