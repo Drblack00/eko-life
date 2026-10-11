@@ -147,6 +147,37 @@ function pickColor(value: unknown, palette: readonly string[], fallback: string)
 }
 
 /**
+ * Defect 4 — v1 repair migration: facial hair is masculine-only.
+ *
+ * Cleans saves written before the compatibility rule existed: a
+ * feminine body (`woman` preset) with a styled facial-hair id falls
+ * back to clean-shaven (`facialhair_none_01`). Everything else passes
+ * through untouched.
+ *
+ * Never throws and never invalidates: the input is expected to be a
+ * validated AppearanceV1 (validateAppearance fills defaults), so the
+ * output is validated again before return — on any surprise, the input
+ * is returned unchanged rather than risk corrupting a save.
+ */
+export function repairAppearanceV1(appearance: AppearanceV1): AppearanceV1 {
+  try {
+    const hair = appearance?.hair;
+    const base = appearance?.base;
+    if (!hair || !base) return appearance;
+    const isFeminine = base.bodyType === "feminine";
+    const hasBeard =
+      typeof hair.facialHairId === "string" &&
+      hair.facialHairId !== "facialhair_none_01";
+    if (!isFeminine || !hasBeard) return appearance;
+    const repaired: AppearanceV1 = JSON.parse(JSON.stringify(appearance));
+    repaired.hair.facialHairId = "facialhair_none_01";
+    const v = validateAppearance(repaired);
+    return v.ok && v.appearance ? v.appearance : appearance;
+  } catch {
+    return appearance;
+  }
+}
+/**
  * Migrate a legacy flat AvatarLook (or null/garbage) to AppearanceV1.
  * Never throws; output always passes validateAppearance().
  */

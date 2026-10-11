@@ -265,7 +265,19 @@ export function resolveAvatarAssets(
   // Optional — fallback chains, then per-slot safe defaults.
   const hairStyle = lenient(appearance.hair.styleId, "hairStyle", notes);
   const hairColor = lenient(appearance.hair.colorId, "hairColor", notes);
-  const facialHair = lenient(appearance.hair.facialHairId, "facialHair", notes);
+  // Defect 4 (defense in depth): facial hair is masculine-only per the
+  // manifest's compatibleBodyTypes. A feminine body with facial hair set
+  // (e.g. an old save, or a body switch that kept the draft value) falls
+  // back to clean-shaven here — the render path can never draw a beard
+  // on the Woman body, no matter what the caller passes.
+  let facialHair = lenient(appearance.hair.facialHairId, "facialHair", notes);
+  if (!facialHair.compatibleBodyTypes.includes(appearance.base.bodyType)) {
+    notes.push(
+      `facialHair "${facialHair.id}" is not compatible with bodyType ` +
+        `"${appearance.base.bodyType}" → clean-shaven (facialhair_none_01)`
+    );
+    facialHair = resolveAsset("facialhair_none_01");
+  }
   const top = lenient(appearance.clothing.topId, "top", notes);
   const bottom = lenient(appearance.clothing.bottomId, "bottom", notes);
   const shoe = lenient(appearance.clothing.shoeId, "shoe", notes);
@@ -827,30 +839,31 @@ export function createAnimationController(
     rig.eyeL.rotation.x = saccPitch * eyeDamp;
     rig.eyeR.rotation.x = saccPitch * eyeDamp;
 
-    // ---- breathing: torso shell ±1.6% ----
+    // ---- breathing: torso shell ±2.5% (visible but calm) ----
     const br = Math.sin((TAU * t) / 4.4);
-    rig.torso.scale.x = 1 + 0.016 * br;
-    rig.torso.scale.z = 0.74 * (1 + 0.016 * br);
+    rig.torso.scale.x = 1 + 0.025 * br;
+    rig.torso.scale.z = 0.74 * (1 + 0.025 * br);
 
     // ---- legs: hip-pendulum walk swing (rigid segments — no knees) ----
     const legSwing = wW * LEG_SWING * Math.sin(phase);
     rig.legL.rotation.x = rig.baseLegLX - legSwing;
     rig.legR.rotation.x = rig.baseLegRX + legSwing;
 
-    // ---- arms: idle micro-sway + walk counter-swing, wave overrides R ----
+    // ---- arms: idle micro-sway + relaxed drift, walk counter-swing,
+    // wave overrides R ----
     const swayDamp = 1 - wW * 0.7;
     const armSwing = wW * ARM_SWING * Math.sin(phase);
     let armLx =
-      rig.baseArmLX + 0.038 * Math.sin((TAU * t) / 4.9) * swayDamp + armSwing;
+      rig.baseArmLX + 0.045 * Math.sin((TAU * t) / 4.9) * swayDamp + armSwing;
     let armRx =
       rig.baseArmRX +
-      0.038 * Math.sin((TAU * t) / 4.9 + Math.PI) * swayDamp -
+      0.045 * Math.sin((TAU * t) / 4.9 + Math.PI) * swayDamp -
       armSwing;
     let armLz =
-      rig.baseArmLZ + 0.018 * Math.sin((TAU * t) / 7.1) + wW * 0.06;
+      rig.baseArmLZ + 0.025 * Math.sin((TAU * t) / 7.1) + wW * 0.06;
     let armRz =
       rig.baseArmRZ +
-      0.018 * Math.sin((TAU * t) / 7.1 + 1.4) +
+      0.025 * Math.sin((TAU * t) / 7.1 + 1.4) +
       wW * 0.06;
     if (waveEnv > 0) {
       // Blend toward the raised wave pose — eased by waveEnv, never a pop.
@@ -865,7 +878,7 @@ export function createAnimationController(
     rig.armR.rotation.z = armRz;
 
     // ---- head: bob + slow turn (steadied in walk), tilt into the wave ----
-    rig.head.rotation.x = 0.03 * Math.sin((TAU * t) / 5.9 + 0.8) - wW * 0.03;
+    rig.head.rotation.x = 0.045 * Math.sin((TAU * t) / 5.9 + 0.8) - wW * 0.03;
     rig.head.rotation.y =
       0.15 *
       Math.sin((TAU * t) / 21 + 1.2) *
@@ -876,8 +889,8 @@ export function createAnimationController(
     // ---- weight shift + walk lean/bob on the hip pivot ----
     const wsDamp = 1 - wW * 0.5;
     const ws = Math.sin((TAU * t) / 8.6);
-    rig.upper.rotation.z = 0.02 * ws * wsDamp;
-    rig.upper.position.x = 0.016 * Math.sin((TAU * t) / 8.6 + 0.3) * wsDamp;
+    rig.upper.rotation.z = 0.03 * ws * wsDamp;
+    rig.upper.position.x = 0.024 * Math.sin((TAU * t) / 8.6 + 0.3) * wsDamp;
     rig.upper.rotation.y = 0.01 * Math.sin((TAU * t) / 13.5);
     rig.upper.rotation.x = wW * WALK_LEAN;
     rig.upper.position.y =

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { migrateAvatarLookToV1 } from "./migrate";
+import { migrateAvatarLookToV1, repairAppearanceV1 } from "./migrate";
 import { validateAppearance, DEFAULT_APPEARANCE_V1 } from "./validation";
+import type { AppearanceV1 } from "./schema";
 
 const LEGACY = {
   body: "man",
@@ -92,5 +93,55 @@ describe("migrateAvatarLookToV1", () => {
     const a = migrateAvatarLookToV1({ ...LEGACY, hornStyle: "big", glb: "x" });
     expect(validateAppearance(a).ok).toBe(true);
     expect(a.hair.styleId).toBe("afro");
+  });
+});
+
+describe("repairAppearanceV1 (defect 4: facial hair is masculine-only)", () => {
+  function womanWithBeard(): AppearanceV1 {
+    const a = JSON.parse(
+      JSON.stringify(DEFAULT_APPEARANCE_V1)
+    ) as AppearanceV1;
+    a.base.bodyPresetId = "woman";
+    a.base.bodyType = "feminine";
+    a.hair.facialHairId = "facialhair_beard_short_01";
+    return a;
+  }
+
+  it("cleans a feminine body + styled facial hair to clean-shaven", () => {
+    for (const id of [
+      "facialhair_mustache_01",
+      "facialhair_goatee_01",
+      "facialhair_beard_short_01",
+    ] as const) {
+      const a = womanWithBeard();
+      a.hair.facialHairId = id;
+      const repaired = repairAppearanceV1(a);
+      expect(repaired.hair.facialHairId).toBe("facialhair_none_01");
+      // Nothing else touched.
+      expect(repaired.base.bodyPresetId).toBe("woman");
+      expect(repaired.hair.styleId).toBe(a.hair.styleId);
+      expect(validateAppearance(repaired).ok).toBe(true);
+    }
+  });
+
+  it("leaves valid combos untouched (same reference)", () => {
+    const cleanWoman = JSON.parse(
+      JSON.stringify(DEFAULT_APPEARANCE_V1)
+    ) as AppearanceV1;
+    expect(repairAppearanceV1(cleanWoman)).toBe(cleanWoman);
+
+    const beardedMan = womanWithBeard();
+    beardedMan.base.bodyPresetId = "man";
+    beardedMan.base.bodyType = "masculine";
+    expect(repairAppearanceV1(beardedMan)).toBe(beardedMan);
+  });
+
+  it("never throws on garbage and returns the input", () => {
+    for (const bad of [null, undefined, "nope", 42, {}, { hair: null }]) {
+      expect(() =>
+        repairAppearanceV1(bad as unknown as AppearanceV1)
+      ).not.toThrow();
+      expect(repairAppearanceV1(bad as unknown as AppearanceV1)).toBe(bad);
+    }
   });
 });

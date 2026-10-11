@@ -244,8 +244,14 @@ export const AVATAR_MANIFEST: AvatarAsset[] = [
   /* ---------------- facial hair ----------------
    * NOTE: kind is "hair" (there is no "facialHair" kind) with the
    * "facialHair" slot — this is what validation.ts checks, and it
-   * matches the existing facialhair_none_01 entry. The styles are
-   * styling choices, not anatomy: available to both body types.
+   * matches the existing facialhair_none_01 entry.
+   *
+   * Compatibility (defect 4, 2026-10-11): the three styled options are
+   * masculine-only — a beard on the feminine body renders as a dark
+   * patch under the chin, so the metadata marks them ["masculine"] and
+   * the editor hides them for the Woman body, the assembler falls back
+   * to clean-shaven, and migrate.ts repairs old saves. "No facial hair"
+   * stays available to both body types.
    */
   proc("facialhair_none_01", "No facial hair", "hair", "hair_mat_01", {
     slots: ["facialHair"],
@@ -256,16 +262,19 @@ export const AVATAR_MANIFEST: AvatarAsset[] = [
     slots: ["facialHair"],
     proceduralRef: "parts/facialHair.ts:buildFacialHair (tapered tubes, ~160 tris)",
     fallbackAssetId: "facialhair_none_01",
+    compatibleBodyTypes: ["masculine"],
   }),
   proc("facialhair_goatee_01", "Mustache + chin goatee", "hair", "hair_mat_01", {
     slots: ["facialHair"],
     proceduralRef: "parts/facialHair.ts:buildFacialHair (mustache + soul patch + chin tuft, ~420 tris)",
     fallbackAssetId: "facialhair_none_01",
+    compatibleBodyTypes: ["masculine"],
   }),
   proc("facialhair_beard_short_01", "Short boxed beard", "hair", "hair_mat_01", {
     slots: ["facialHair"],
     proceduralRef: "parts/facialHair.ts:buildFacialHair (goatee + curved jaw shells, ~560 tris)",
     fallbackAssetId: "facialhair_none_01",
+    compatibleBodyTypes: ["masculine"],
   }),
 
   /* ---------------- skin tones (texture entries) ---------------- */

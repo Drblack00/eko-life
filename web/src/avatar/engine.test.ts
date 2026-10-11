@@ -236,6 +236,48 @@ describe("assembler", () => {
     a.dispose();
   });
 
+  it("defect 4: feminine body + facial hair falls back to clean-shaven", () => {
+    const app = cloneApp();
+    app.base.bodyPresetId = "woman";
+    app.base.bodyType = "feminine";
+    app.hair.facialHairId = "facialhair_beard_short_01";
+    const a = assembleAppearance(THREE, app) as AssembledAvatarInternal;
+    // No facial-hair group built; the fallback is reported honestly.
+    expect(a.stages.facialHair).toBeNull();
+    expect(a.resolved.facialHair.id).toBe("facialhair_none_01");
+    expect(
+      a.notes.some((n) => n.includes("clean-shaven"))
+    ).toBe(true);
+    a.dispose();
+
+    // Control: the same beard on a masculine body renders fine.
+    const man = cloneApp();
+    man.base.bodyPresetId = "man";
+    man.base.bodyType = "masculine";
+    man.hair.facialHairId = "facialhair_beard_short_01";
+    const b = assembleAppearance(THREE, man) as AssembledAvatarInternal;
+    expect(b.stages.facialHair).not.toBeNull();
+    expect(b.resolved.facialHair.id).toBe("facialhair_beard_short_01");
+    b.dispose();
+  });
+
+  it("defect 4: diff to a feminine body drops a kept beard via the fallback", () => {
+    const man = cloneApp();
+    man.base.bodyPresetId = "man";
+    man.base.bodyType = "masculine";
+    man.hair.facialHairId = "facialhair_goatee_01";
+    const a = assembleAppearance(THREE, man) as AssembledAvatarInternal;
+    expect(a.stages.facialHair).not.toBeNull();
+    const woman = JSON.parse(JSON.stringify(man)) as AppearanceV1;
+    woman.base.bodyPresetId = "woman";
+    woman.base.bodyType = "feminine";
+    const summary = diffUpdateAssembled(a, man, woman);
+    expect(summary.rebuilt).toBe(true);
+    expect(a.stages.facialHair).toBeNull();
+    expect(a.resolved.facialHair.id).toBe("facialhair_none_01");
+    a.dispose();
+  });
+
   it("dispose() fires dispose events on its own objects only", () => {
     const a1 = assembleAppearance(THREE, cloneApp());
     const a2 = assembleAppearance(THREE, cloneApp());
