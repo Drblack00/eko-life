@@ -28,7 +28,9 @@
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: 0.9rem;
-  background: var(--chip-bg, #f1f5f9);
+  /* Theme chip: the old hardcoded light chip left light text unreadable in
+     the night theme. Text inherits the theme ink. */
+  background: var(--surface-2);
   border-radius: 999px;
   padding: 4px 10px;
 }
@@ -42,7 +44,7 @@
   color: #92400e;
 }
 
-.m9-muted { color: var(--muted, #475569); font-size: 0.85rem; margin: 4px 0; }
+.m9-muted { color: var(--text-muted); font-size: 0.85rem; margin: 4px 0; }
 
 .m9-riddle {
   font-size: 1.02rem;
@@ -52,6 +54,8 @@
 }
 
 .m9-found { font-weight: 700; color: #15803d; }
+/* Dark green fails on the dark panel — lighten at night (8.6:1). */
+[data-theme="night"] .m9-found { color: var(--palm-400); }
 
 .m9-cta { width: 100%; min-height: 48px; margin: 8px 0; }
 
@@ -61,7 +65,7 @@
 .m9-tiers { list-style: none; margin: 4px 0 0; padding: 0; }
 .m9-tiers li {
   display: flex; justify-content: space-between;
-  padding: 6px 0; border-top: 1px solid var(--hairline, #e2e8f0);
+  padding: 6px 0; border-top: 1px solid var(--glass-border);
 }
 
 .m9-leaders { margin-top: 10px; }
@@ -69,16 +73,17 @@
 .m9-leaders ol { list-style: none; margin: 0; padding: 0; }
 .m9-leaders li {
   display: flex; gap: 10px; align-items: center;
-  padding: 6px 0; border-top: 1px solid var(--hairline, #e2e8f0);
+  padding: 6px 0; border-top: 1px solid var(--glass-border);
   font-size: 0.92rem;
 }
 .m9-place { font-weight: 800; min-width: 34px; color: #b45309; }
+[data-theme="night"] .m9-place { color: #fbbf24; }
 .m9-who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .m9-missions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .m9-mission {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 10px; border: 1px solid var(--hairline, #e2e8f0); border-radius: 12px;
+  padding: 10px; border: 1px solid var(--glass-border); border-radius: 12px;
 }
 .m9-mission.is-claimed { opacity: 0.65; }
 .m9-mission-main { display: flex; gap: 10px; align-items: center; min-width: 0; }
@@ -93,21 +98,26 @@
   margin-top: 8px;
 }
 .m9-perk {
-  border: 1px solid var(--hairline, #e2e8f0);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 10px;
   display: flex;
   gap: 10px;
 }
 .m9-perk.is-owned { border-color: #fbbf24; background: #fffbeb; }
+/* The owned card is a light amber card in both themes — keep the light
+   text legible at night with a dark amber wash instead. */
+[data-theme="night"] .m9-perk.is-owned { background: rgb(251 191 36 / 0.14); }
 .m9-perk-icon { font-size: 1.6rem; line-height: 1; }
 .m9-perk-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .m9-perk-name { margin: 0; font-weight: 700; font-size: 0.92rem; }
-.m9-perk-desc { margin: 0; font-size: 0.8rem; color: var(--muted, #475569); line-height: 1.35; }
+.m9-perk-desc { margin: 0; font-size: 0.8rem; color: var(--text-muted); line-height: 1.35; }
 .m9-perk-foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 6px; }
 .m9-perk-cost { font-weight: 800; color: #b45309; }
+[data-theme="night"] .m9-perk-cost { color: #fbbf24; }
 .m9-perk-foot .eko-btn { min-height: 44px; }
 .m9-owned { font-weight: 700; color: #15803d; font-size: 0.85rem; }
+[data-theme="night"] .m9-owned { color: var(--palm-400); }
 
 @media (prefers-reduced-motion: reduce) {
   .m9-daily * { animation: none !important; transition: none !important; }
