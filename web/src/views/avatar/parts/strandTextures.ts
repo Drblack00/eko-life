@@ -169,6 +169,71 @@ export function paintStrandFlow(
   ctx.globalAlpha = 1;
 }
 
+export interface WavesOpts {
+  seed: number;
+  rings?: number;
+  base?: string;
+  dark?: string;
+  light?: string;
+}
+
+/**
+ * 360-waves: concentric ripple rings radiating from the crown, with a
+ * slight spiral wobble so they read as brushed waves rather than a
+ * target print. Drawn dark-on-base with light ripple highlights.
+ */
+export function paintWaves(
+  ctx: PaintCtx,
+  size: number,
+  opts: WavesOpts
+): void {
+  const {
+    seed,
+    base = "#171110",
+    dark = "#0a0605",
+    light = "#4a3a2c",
+  } = opts;
+  const rings = opts.rings ?? 9;
+  const rand = mulberry32(seed);
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, size, size);
+  const cx = size * 0.5;
+  const cy = size * 0.42;
+  const maxR = size * 0.52;
+  for (let ri = 0; ri < rings; ri++) {
+    const rr = ((ri + 0.7) / rings) * maxR;
+    // Dark trough.
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 2.6;
+    ctx.globalAlpha = 0.55 + rand() * 0.2;
+    ctx.beginPath();
+    for (let k = 0; k <= 48; k++) {
+      const a = (k / 48) * TAU;
+      const wob = 1 + 0.05 * Math.sin(a * 3 + ri * 1.7 + seed);
+      const x = cx + Math.cos(a) * rr * wob;
+      const y = cy + Math.sin(a) * rr * wob;
+      if (k === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    // Light ripple highlight just inside the trough.
+    ctx.strokeStyle = light;
+    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    for (let k = 0; k <= 48; k++) {
+      const a = (k / 48) * TAU;
+      const wob = 1 + 0.05 * Math.sin(a * 3 + ri * 1.7 + seed);
+      const x = cx + Math.cos(a) * (rr - 2.2) * wob;
+      const y = cy + Math.sin(a) * (rr - 2.2) * wob;
+      if (k === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
 export interface FrizzOpts {
   seed: number;
   strokes?: number;
