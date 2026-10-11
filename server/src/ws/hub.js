@@ -124,6 +124,7 @@ export function createHub({ getDay }) {
     const c = conn.character;
     return {
       id: conn.user.id,
+      character_id: c.id,
       username: conn.user.username,
       name: c.name,
       class: c.class,
