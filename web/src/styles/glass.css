@@ -240,40 +240,16 @@
   color: #4ade80;
 }
 
-/* ============ Phone slide-over contrast scoping (Bug 3) ============
- * The phone panel is an always-dark glass surface (color-scheme: dark,
- * near-white text), but its children were styled with day-theme semantic
- * tokens — white cards with white text ("Delete my data", "How to play"),
- * dark helper text on dark glass (the Sleep tip), grey-on-grey rankings.
- * Scoping the semantic tokens to the panel fixes every phone app
- * (Chat / Friends / Me / Jobs / Daily / Market) in both themes at once.
- * Color values only — no layout, no DOM changes.
+/* ============ Phone slide-over theming (Fix Round 2) ============
+ * The phone panel follows data-theme like every other surface now: the
+ * old always-dark token scoping was removed because it left the whole
+ * panel (cards, settings, picker) stuck dark when the user picked Light.
+ * Only the scrim behind the panel stays dark-translucent (it's a dimmer).
+ * Panel children use the global theme tokens (--text, --surface, ...), so
+ * every phone app (Jobs, Daily, Market, Chat, Friends, Me) follows the
+ * theme in both modes. Color values only — no layout, no DOM changes.
+ * (The panel's own material lives in views/phone/Phone.css.)
  */
-.eko-phone__panel {
-  --text: #eef3fa;
-  --text-muted: #a9bcd2; /* 8.3:1 on the dark panel */
-  --surface: rgb(16 32 50 / 0.94);
-  --surface-2: rgb(255 255 255 / 0.07);
-  --bg: #0b1220;
-  /* Lagoon tints are used as row/card backgrounds with light text inside
-     the panel — scope them dark so the pairs keep >=4.5:1. */
-  --lagoon-100: #16405f;
-  --lagoon-700: #a5d8f5;
-  --lagoon-50: #10293d;
-  --primary-strong: #7dd3fc;
-}
-/* Leaderboard money + any success-tinted text inside the panel: the day
-   #16a34a fails on dark, so lighten it here (scoped, panel only). */
-.eko-phone__panel .eko-leaders__money {
-  color: #4ade80;
-}
-/* The "light" glass button renders a LIGHT card in the day theme — but the
-   panel scopes --text to near-white, so its label would go white-on-light.
-   Dark ink here, day theme only (scoped, panel only). At night the card is
-   dark and the scoped light --text is already correct. */
-[data-theme="day"] .eko-phone__panel .eko-btn.eko-btn--light {
-  color: #1c1814;
-}
 
 /* ============ Theme picker (Me → Settings) ============
  * Segmented radio control for Light / Dark / Automatic. Glass material,
