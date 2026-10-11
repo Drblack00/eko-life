@@ -1,0 +1,263 @@
+/* Èkó Life — Phone slide-over.
+ *
+ * Original dark-glass panel holding the secondary sections as apps.
+ * Right-side slide-over on wide screens, bottom sheet on narrow phones.
+ * Glass material comes from styles/glass.css (the .glass classes are
+ * global); geometry, entrance motion and the app grid live here.
+ */
+
+.eko-phone__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  background: rgb(2 6 16 / 0.55);
+  animation: eko-phone-fade 0.22s ease-out;
+}
+
+.eko-phone__panel {
+  position: fixed;
+  z-index: 76;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #f1f5f9;
+  color-scheme: dark;
+  background:
+    linear-gradient(180deg, var(--glass-sheen, rgb(255 255 255 / 0.14)), transparent 38%),
+    var(--glass-tint-dark-strong, rgb(6 12 22 / 0.9));
+  -webkit-backdrop-filter: blur(26px) saturate(150%);
+  backdrop-filter: blur(26px) saturate(150%);
+  border: 1px solid var(--glass-border, rgb(255 255 255 / 0.16));
+  box-shadow:
+    0 24px 70px rgb(0 0 0 / 0.55),
+    0 4px 18px rgb(0 0 0 / 0.35),
+    inset 0 1px 1px rgb(255 255 255 / 0.18);
+}
+
+/* ---- Wide screens: right-side slide-over ---- */
+@media (min-width: 700px) {
+  .eko-phone__panel {
+    top: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: min(400px, calc(100vw - 24px));
+    border-radius: 28px;
+    animation: eko-phone-slide-right 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .eko-phone__homebar {
+    display: none;
+  }
+}
+
+/* ---- Narrow phones: bottom sheet ---- */
+@media (max-width: 699px) {
+  .eko-phone__panel {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: min(88vh, 88dvh);
+    border-radius: 28px 28px 0 0;
+    border-bottom: none;
+    animation: eko-phone-slide-up 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+}
+
+@keyframes eko-phone-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes eko-phone-slide-right {
+  from { transform: translateX(105%); opacity: 0.4; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes eko-phone-slide-up {
+  from { transform: translateY(100%); opacity: 0.4; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ---- Header ---- */
+.eko-phone__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  flex: none;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+}
+
+.eko-phone__titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.eko-phone__title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.eko-phone__subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgb(241 245 249 / 0.55);
+}
+
+.eko-phone__back,
+.eko-phone__close {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  color: #f1f5f9;
+  cursor: pointer;
+  /* glass material + tactile press come from .glass in glass.css */
+}
+
+.eko-phone__back {
+  font-size: 24px;
+  line-height: 1;
+  padding-bottom: 3px;
+}
+
+.eko-phone__app-icon {
+  flex: none;
+  font-size: 24px;
+  filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.4));
+}
+
+.eko-phone__back:focus-visible,
+.eko-phone__close:focus-visible,
+.eko-phone__tile:focus-visible {
+  outline: 2px solid rgb(52 211 153 / 0.9);
+  outline-offset: 2px;
+}
+
+/* ---- App grid ---- */
+.eko-phone__grid {
+  flex: 1;
+  display: grid;
+  gap: 12px;
+  padding: 18px 16px 8px;
+  align-content: start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (min-width: 700px) {
+  .eko-phone__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 699px) {
+  .eko-phone__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.eko-phone__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 118px;
+  padding: 14px 8px;
+  border-radius: 22px;
+  color: #f1f5f9;
+  cursor: pointer;
+  font: inherit;
+  /* glass material + tactile press come from .glass in glass.css */
+}
+
+.eko-phone__tile-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  font-size: 30px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0.06));
+  border: 1px solid rgb(255 255 255 / 0.22);
+  box-shadow:
+    inset 0 1px 1px rgb(255 255 255 / 0.35),
+    0 6px 16px rgb(0 0 0 / 0.35);
+}
+
+.eko-phone__tile--jobs .eko-phone__tile-icon {
+  background: linear-gradient(145deg, #fbbf24, #b45309);
+}
+.eko-phone__tile--daily .eko-phone__tile-icon {
+  background: linear-gradient(145deg, #a78bfa, #6d28d9);
+}
+.eko-phone__tile--market .eko-phone__tile-icon {
+  background: linear-gradient(145deg, #34d399, #047857);
+}
+.eko-phone__tile--chat .eko-phone__tile-icon {
+  background: linear-gradient(145deg, #60a5fa, #1d4ed8);
+}
+.eko-phone__tile--friends .eko-phone__tile-icon {
+  background: linear-gradient(145deg, #f472b6, #be185d);
+}
+.eko-phone__tile--me .eko-phone__tile-icon {
+  background: linear-gradient(145deg, #2dd4bf, #0f766e);
+}
+
+.eko-phone__tile-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgb(241 245 249 / 0.92);
+}
+
+/* ---- Open app body ---- */
+.eko-phone__app {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 16px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.25) transparent;
+}
+.eko-phone__app::-webkit-scrollbar {
+  width: 6px;
+}
+.eko-phone__app::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.22);
+  border-radius: 3px;
+}
+
+/* ---- Home indicator ---- */
+.eko-phone__homebar {
+  flex: none;
+  width: 134px;
+  height: 5px;
+  margin: 6px auto calc(8px + env(safe-area-inset-bottom, 0px));
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.32);
+}
+
+/* ---- Reduced motion: no slide/fade — state changes are instant ---- */
+@media (prefers-reduced-motion: reduce) {
+  .eko-phone__scrim,
+  .eko-phone__panel {
+    animation: none;
+  }
+}
+
+/* ---- Reduced transparency: solid dark panel ---- */
+@media (prefers-reduced-transparency: reduce) {
+  .eko-phone__panel {
+    background: #0b1220;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
