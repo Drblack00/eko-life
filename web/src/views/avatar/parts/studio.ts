@@ -77,6 +77,15 @@ export const BODY_PRESET: CameraFraming = { distance: 3.4, targetY: 0.98 };
 /** Default framing when the studio first mounts (full body, head included). */
 export const DEFAULT_FRAMING: CameraFraming = { distance: 3.4, targetY: 0.98 };
 
+/**
+ * Default figure rotation (radians) — the front 3/4 view the studio opens
+ * with. The camera stays on the studio's center axis (the FIGURE spins, not
+ * the camera), so "Reset view" must restore this angle together with the
+ * default framing; resetting the camera alone leaves the figure facing
+ * wherever the user spun it (e.g. 180° away).
+ */
+export const DEFAULT_SPIN_ANGLE = 0.6;
+
 /** Clamp a requested camera distance into the zoom range. */
 export function clampZoom(distance: number): number {
   if (!Number.isFinite(distance)) return DEFAULT_FRAMING.distance;
