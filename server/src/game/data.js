@@ -362,6 +362,20 @@ export const AVATAR_HAIRS = [
   { id: 'locs',    name: 'Locs' },
   { id: 'braids',  name: 'Braids' },
   { id: 'classic', name: 'Classic' },
+  { id: 'hair_taper_fade_01', name: 'Taper fade' },
+  { id: 'hair_waves_01',      name: 'Waves' },
+];
+// v1 slots (served via /api/avatar/catalog; validated by game/appearance.js).
+export const AVATAR_HAIR_COLORS = [
+  { id: 'hair_black_01',      name: 'Black',      hex: '#171110' },
+  { id: 'hair_dark_brown_01', name: 'Dark brown', hex: '#3b2417' },
+  { id: 'hair_brown_01',      name: 'Brown',      hex: '#5b3a21' },
+];
+export const AVATAR_FACIAL_HAIRS = [
+  { id: 'facialhair_none_01',     name: 'None' },
+  { id: 'facialhair_mustache_01', name: 'Light mustache' },
+  { id: 'facialhair_goatee_01',   name: 'Mustache + chin goatee' },
+  { id: 'facialhair_beard_short_01', name: 'Short boxed beard' },
 ];
 
 export const AVATAR_OUTFITS = [

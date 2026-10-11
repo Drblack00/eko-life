@@ -10,7 +10,7 @@ import {
   CLASSES, JOBS, FOOD, FUN, LOCATIONS, HOUSING,
   PROPERTIES, BIZ, VEHICLES, FURN, FURN_EFFECTS, HOME_SLOTS,
   BANK, STARTER_LOAN_AMOUNT, TRAVEL_FARES, STUDY_COST, COLLECT_RADIUS,
-  cleanText, sanitizeAvatar, WALLS, FLOORS,
+  cleanText, WALLS, FLOORS,
 } from './data.js';
 import { clamp, chargeRent, applyDayEconomy, furnitureEffects, distUnits } from './sim.js';
 import {
@@ -23,6 +23,8 @@ import {
   addFurniture, listFurniture, getFurnitureById, setFurniturePlacement,
   deleteFurniture, countPlacedFurniture,
 } from '../db.js';
+// M6: versioned appearance persistence for the legacy save_avatar intent.
+import { persistAppearance } from './appearance.js';
 // V2 milestones: delegated intent modules (M7 shifts, M8 needs, M9 daily,
 // M10 economy, M11 governance, M12 skills). Wired into handleAct below.
 import { INTENTS as M7_INTENTS } from './v2/m7.js';
@@ -513,12 +515,26 @@ export async function handleAct(ctx, msg) {
     return;
   }
 
-  // ---------- save_avatar (M15: free, validated, persisted as JSON text) ----------
+  // ---------- save_avatar (M6: versioned persist via appearance.js) ----------
+  // Legacy flat look (msg.avatar) → converted to v1 server-side.
+  // Force-write (expectedRev: null) — no optimistic concurrency on the
+  // legacy path — but the revision still bumps atomically.
   if (a === 'save_avatar') {
-    const res = sanitizeAvatar(msg.avatar);
-    if (!res.ok) { err(res.error); return; }
-    c.avatar_look = JSON.stringify(res.avatar);
-    console.log(`[act] ${conn.user.username} saved avatar look (${res.avatar.body}/${res.avatar.skin}/${res.avatar.hair})`);
+    try {
+      const result = await persistAppearance({
+        userId: conn.user.id,
+        characterId: conn.character.id,
+        appearance: msg.avatar,
+        expectedRev: null,
+      });
+      c.avatar_look = JSON.stringify(result.appearance);
+      c.appearance_rev = result.revision; // keep the in-memory row in lockstep
+      console.log(`[act] ${conn.user.username} saved avatar look (rev ${result.revision})`);
+    } catch (e) {
+      if (e.code === 'validation_failed') { err(e.message); return; }
+      if (e.code === 'not_found') { err('Character not found.'); return; }
+      throw e; // conflict is impossible on the force-write path
+    }
     // commit → saveCharacter → fresh `you` snapshot (carries avatar_look via youSnapshot)
     await commit({ note: 'Your new look is saved.' });
     return;
