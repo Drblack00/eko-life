@@ -173,6 +173,162 @@ export function buildIrisImage(size: number, seed: number): PixelImage {
 }
 
 /**
+ * Target roughness for a point on the sculpted skull (skull-local coords,
+ * radius r): natural sheen on the forehead and nose bridge (T-zone),
+ * matte on the cheeks — never a uniform plastic gloss.
+ * Pure (unit-testable): returns 0.3..0.8.
+ */
+export function skinRoughnessAt(
+  x: number,
+  y: number,
+  z: number,
+  r: number
+): number {
+  const ny = y / r;
+  const front = Math.max(0, Math.min(1, (z / r - 0.15) / 0.45));
+  const fore = Math.max(0, Math.min(1, (ny - 0.42) / 0.33)) * front;
+  const bridge =
+    Math.exp(-Math.pow((ny - 0.1) / 0.2, 2)) *
+    front *
+    (1 - Math.min(1, Math.abs(x) / (0.4 * r)));
+  const cheek =
+    Math.exp(-Math.pow((ny - 0.02) / 0.22, 2)) *
+    Math.min(1, Math.abs(x) / r);
+  const rough = 0.6 - 0.24 * fore - 0.2 * bridge + 0.14 * cheek;
+  return Math.max(0.3, Math.min(0.8, rough));
+}
+
+/**
+ * Paint a roughness map for the sculpted skull: splat per-vertex
+ * skinRoughnessAt() values through the geometry's own UVs into a coarse
+ * grid, then bilinear-upsample to the canvas. Deterministic.
+ * Returns null outside a DOM.
+ */
+export function paintSkullRoughnessTexture(
+  T: typeof import("three"),
+  geo: THREE.BufferGeometry,
+  r: number
+): THREE.CanvasTexture | null {
+  if (typeof document === "undefined") return null;
+  const GW = 96;
+  const GH = 48;
+  const sum = new Float32Array(GW * GH);
+  const wgt = new Float32Array(GW * GH);
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  const uv = geo.attributes.uv as THREE.BufferAttribute;
+  const vx = new T.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    vx.fromBufferAttribute(pos, i);
+    const u = Math.min(0.9999, Math.max(0, uv.getX(i)));
+    const v = Math.min(0.9999, Math.max(0, uv.getY(i)));
+    const rough = skinRoughnessAt(vx.x, vx.y, vx.z, r);
+    const gx = u * (GW - 1);
+    const gy = (1 - v) * (GH - 1);
+    const x0 = Math.floor(gx);
+    const y0 = Math.floor(gy);
+    const fx = gx - x0;
+    const fy = gy - y0;
+    for (let dy = 0; dy <= 1; dy++) {
+      for (let dx = 0; dx <= 1; dx++) {
+        const w = (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy);
+        const gi = (y0 + dy) * GW + (x0 + dx);
+        sum[gi] += rough * w;
+        wgt[gi] += w;
+      }
+    }
+  }
+  const CW = 192;
+  const CH = 96;
+  const canvas = document.createElement("canvas");
+  canvas.width = CW;
+  canvas.height = CH;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  const id = ctx.createImageData(CW, CH);
+  for (let y = 0; y < CH; y++) {
+    const gy = (y / (CH - 1)) * (GH - 1);
+    const y0 = Math.min(GH - 2, Math.floor(gy));
+    const fy = gy - y0;
+    for (let x = 0; x < CW; x++) {
+      const gx = (x / (CW - 1)) * (GW - 1);
+      const x0 = Math.min(GW - 2, Math.floor(gx));
+      const fx = gx - x0;
+      let acc = 0;
+      let wsum = 0;
+      for (let dy = 0; dy <= 1; dy++) {
+        for (let dx = 0; dx <= 1; dx++) {
+          const gi = (y0 + dy) * GW + (x0 + dx);
+          const w = (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy);
+          acc += sum[gi] * w;
+          wsum += wgt[gi] * w;
+        }
+      }
+      const rough = wsum > 1e-6 ? acc / wsum : 0.6;
+      const byte = Math.round(rough * 255);
+      const o = (y * CW + x) * 4;
+      id.data[o] = byte;
+      id.data[o + 1] = byte;
+      id.data[o + 2] = byte;
+      id.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(id, 0, 0);
+  const tex = new T.CanvasTexture(canvas);
+  // Roughness data must stay linear (no sRGB decode).
+  tex.wrapS = T.ClampToEdgeWrapping;
+  tex.wrapT = T.ClampToEdgeWrapping;
+  return tex;
+}
+
+export interface SkinMaterialOpts {
+  /** Base roughness (used where no roughness map applies). */
+  roughness?: number;
+  /** Optional zone-painted roughness map (face). Linear data. */
+  roughnessMap?: THREE.Texture | null;
+  /**
+   * Cheap SSS approximation: warm skin-tinted emissive lift so shadowed
+   * areas (ears, nose wings) glow faintly instead of going dead.
+   * Keep ≤ 0.12 or it flattens the shading.
+   */
+  sssGlow?: number;
+}
+
+/**
+ * Shared PBR skin material for face + body so tone stays consistent
+ * across every skin part. Pore multiplier map (never greys dark skin),
+ * subtle pore bump, zone-varying roughness on the face, sheen + a faint
+ * clearcoat for the natural T-zone sheen — not plastic.
+ */
+export function buildSkinMaterial(
+  T: typeof import("three"),
+  skin: string,
+  opts: SkinMaterialOpts = {}
+): THREE.MeshPhysicalMaterial {
+  const seed = hashSeed(skin);
+  const poreTex = toCanvasTexture(T, buildSkinPoreImage(256, seed));
+  const bumpTex = toCanvasTexture(T, buildSkinPoreImage(256, seed), false);
+  const mat = new T.MeshPhysicalMaterial({
+    color: skin,
+    map: poreTex ?? undefined,
+    bumpMap: bumpTex ?? undefined,
+    bumpScale: 0.12,
+    roughnessMap: opts.roughnessMap ?? undefined,
+    roughness: opts.roughness ?? 0.58,
+    metalness: 0,
+    clearcoat: 0.1,
+    clearcoatRoughness: 0.7,
+    sheen: 0.22,
+    sheenRoughness: 0.65,
+    sheenColor: new T.Color(skin),
+  });
+  if (opts.sssGlow) {
+    mat.emissive = new T.Color(skin);
+    mat.emissiveIntensity = opts.sssGlow;
+  }
+  return mat;
+}
+
+/**
  * Upload a PixelImage to a THREE.CanvasTexture. Returns null outside a DOM
  * (node tests / SSR) so pure logic stays importable everywhere.
  */

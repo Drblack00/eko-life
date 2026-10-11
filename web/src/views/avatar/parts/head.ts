@@ -3,8 +3,9 @@ import { mesh, mulberry32 } from "./util";
 import { shade, type AvatarMaterials } from "./materials";
 import {
   buildIrisImage,
-  buildSkinPoreImage,
+  buildSkinMaterial,
   hashSeed,
+  paintSkullRoughnessTexture,
   toCanvasTexture,
 } from "./faceTextures";
 
@@ -46,6 +47,16 @@ export interface BuiltHead {
   group: THREE.Group;
   eyeL: THREE.Group;
   eyeR: THREE.Group;
+  /**
+   * M7: upper-lid pivots, one per eye, hinged near the TOP of the eye
+   * opening (like a real eyelid). The lid shell, lash line, lashes and
+   * crease live inside these groups (nothing moved in eye-local space —
+   * the inner offset group keeps the net transform identity), so rotating
+   * a lid pivot about X performs a real lid-based blink instead of the
+   * old whole-eye Y-scale squash. The lower lid stays static.
+   */
+  upperLidL: THREE.Group;
+  upperLidR: THREE.Group;
 }
 
 /* ------------------------------------------------------------------ */
@@ -98,9 +109,14 @@ export function distToSeg(
  * taper, slimmer masseter, softer brow ridge, fuller-but-smooth cheeks,
  * shallower folds. Head proportions grow separately via the head-group
  * scale in avatarModel (HEAD_GROUP_SCALE).
+ *
+ * M3 visual-fidelity pass: keeps the friendly direction but restores
+ * anatomical believability — a defined (not angular) jawline tapering to
+ * the chin, a readable jaw angle, a stronger brow ridge, and clearer
+ * cheekbone structure.
  */
 export function sculptSkull(T: typeof import("three"), r: number): THREE.BufferGeometry {
-  const geo = new T.SphereGeometry(r, 34, 24);
+  const geo = new T.SphereGeometry(r, 30, 22);
   const pos = geo.attributes.position as THREE.BufferAttribute;
   const v = new T.Vector3();
   for (let i = 0; i < pos.count; i++) {
@@ -109,24 +125,28 @@ export function sculptSkull(T: typeof import("three"), r: number): THREE.BufferG
     const front = sstep(0.12, 0.55, v.z / r); // 0 at back → 1 at face
     const side = Math.min(1, Math.abs(v.x) / r);
 
-    // Jaw taper + masseter fullness at the jaw angle — softened so the
-    // jaw reads round rather than angular.
+    // Jawline: defined taper toward the chin (readable jawline, still
+    // rounded — not a hard angle), plus a hint of the jaw angle where
+    // the masseter sits.
     const k = jawTaperK(ny);
     if (k > 0) {
-      const p = Math.pow(k, 1.35);
-      v.x *= 1 - 0.24 * p;
-      v.z *= 1 - 0.16 * p;
+      const p = Math.pow(k, 1.3);
+      v.x *= 1 - 0.3 * p;
+      v.z *= 1 - 0.18 * p;
       const mass = Math.exp(-Math.pow((ny + 0.38) / 0.13, 2)) * side;
       v.x *= 1 + 0.035 * mass;
+      // Jaw angle: slight outward read at the back of the jaw.
+      const angle = Math.exp(-Math.pow((ny + 0.42) / 0.09, 2)) * side * front;
+      v.x *= 1 + 0.022 * angle;
     }
-    // Cheekbones: soft fullness at the sides, less forward push.
+    // Cheekbones: lateral fullness with a touch more structure.
     const ch = cheekBoost(ny) * front * side;
-    v.x *= 1 + 0.04 * ch;
-    v.z += 0.003 * ch;
+    v.x *= 1 + 0.052 * ch;
+    v.z += 0.0032 * ch;
     // Temples: gentle narrowing.
     v.x *= 1 - 0.028 * Math.exp(-Math.pow((ny - 0.34) / 0.12, 2));
-    // Brow ridge: softened so the eyes read open and friendly.
-    v.z += 0.0022 * Math.exp(-Math.pow((ny - 0.3) / 0.1, 2)) * front;
+    // Brow ridge: present enough to seat deep-set eyes, still open.
+    v.z += 0.0038 * Math.exp(-Math.pow((ny - 0.3) / 0.1, 2)) * front;
     // Eye sockets: shallow hollows so the eyes sit *in* the face.
     for (const ex of [-0.0415, 0.0415]) {
       const dx = v.x - ex;
@@ -140,11 +160,12 @@ export function sculptSkull(T: typeof import("three"), r: number): THREE.BufferG
       const d = distToSeg(v.x, v.y, sx * 0.016, -0.027, sx * 0.042, -0.069);
       v.z -= 0.0016 * Math.exp(-Math.pow(d / 0.011, 2)) * front;
     }
-    // Chin: forward + down, with a subtle cleft — softened.
+    // Chin: forward + down, tapering from the jawline, subtle cleft.
     if (ny < -0.6) {
       const c = (-0.6 - ny) / 0.4;
-      v.z += 0.009 * c * front;
+      v.z += 0.0105 * c * front;
       v.y -= 0.0035 * c;
+      v.x *= 1 - 0.05 * c * front; // taper into the chin
       if (Math.abs(v.x) < 0.009 && front > 0.5) v.z -= 0.0012 * c * front;
     }
     // Forehead slopes gently back.
@@ -186,17 +207,23 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
   const head = new T.Group();
 
   /* ---------------- local enhanced materials ---------------- */
-  const poreTex = toCanvasTexture(T, buildSkinPoreImage(256, hashSeed(skin)));
-  const skinPhys = new T.MeshPhysicalMaterial({
-    color: skin,
-    map: poreTex ?? undefined,
-    roughness: 0.5,
-    metalness: 0,
-    clearcoat: 0.25,
-    clearcoatRoughness: 0.5,
-    sheen: 0.25,
-    sheenRoughness: 0.7,
-    sheenColor: new T.Color(skin),
+  // Zone-varying roughness (T-zone sheen, matte cheeks) is painted from
+  // the sculpted skull's own vertices, so the sheen lands on the real
+  // forehead/nose bridge of this exact head.
+  const skullGeo = sculptSkull(T, HEAD_R);
+  const roughTex = paintSkullRoughnessTexture(T, skullGeo, HEAD_R);
+  const skinPhys = buildSkinMaterial(T, skin, {
+    roughnessMap: roughTex,
+    roughness: 0.58,
+    sssGlow: 0.055,
+  });
+  // Nose: its own skin material WITHOUT the skull's zone roughness map —
+  // the nose meshes carry sphere UVs, so sampling the skull-painted map
+  // would land on arbitrary gloss zones (bleached nose on light skins).
+  // The nose bridge keeps a natural T-zone sheen via a plain 0.48.
+  const noseSkin = buildSkinMaterial(T, skin, {
+    roughness: 0.48,
+    sssGlow: 0.07,
   });
   // Double-sided variant for open shells (eyelids, ear bowls).
   const skinPhysDS = skinPhys.clone();
@@ -259,24 +286,31 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
   };
 
   /* ---------------- skull ---------------- */
-  head.add(hm(sculptSkull(T, HEAD_R), skinPhys, "skull", 0, HC, 0));
+  head.add(hm(skullGeo, skinPhys, "skull", 0, HC, 0));
+  // Ears read slightly translucent in life — a touch more SSS glow there.
+  const earSkin = buildSkinMaterial(T, skin, {
+    roughness: 0.62,
+    sssGlow: 0.1,
+  });
 
-  /* ---------------- ears: helix / antihelix / concha / tragus / lobe ---------------- */
+  /* ---------------- ears: helix / antihelix / concha / tragus / lobe ----------------
+   * Seated at eye-to-nose level: the ear top ≈ the eye line (0.115), the
+   * lobe ≈ halfway to the nose base — matching the reference anatomy.   */
   for (const sx of [-1, 1]) {
     const ear = new T.Group();
-    ear.position.set(sx * 0.1035, 0.103, -0.005);
+    ear.position.set(sx * 0.1035, 0.106, -0.005);
     ear.rotation.y = (sx * Math.PI) / 2; // local +z → outward, +x → back of head
     const add = (m: THREE.Mesh) => {
       ear.add(m);
       return m;
     };
     // Helix: outer rim curling from top-back around to the lobe.
-    const helix = hm(new T.TorusGeometry(0.023, 0.0062, 8, 18, 3.9), skinPhys, "ear");
+    const helix = hm(new T.TorusGeometry(0.023, 0.0062, 8, 14, 3.9), earSkin, "ear");
     helix.rotation.z = 0.4;
     helix.position.set(0, 0.004, 0);
     add(helix);
     // Antihelix: inner ridge.
-    const anti = hm(new T.TorusGeometry(0.013, 0.004, 6, 12, 2.6), skinPhys, "ear");
+    const anti = hm(new T.TorusGeometry(0.013, 0.004, 6, 10, 2.6), earSkin, "ear");
     anti.rotation.z = 0.9;
     anti.position.set(0.003, 0.003, 0.0035);
     add(anti);
@@ -288,12 +322,12 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
     bowl.scale.set(0.8, 1, 0.4);
     add(bowl);
     // Tragus: small bump toward the face.
-    const tragus = hm(new T.ConeGeometry(0.0042, 0.009, 8), skinPhys, "ear", -0.0075, -0.004, 0.004);
+    const tragus = hm(new T.ConeGeometry(0.0042, 0.009, 8), earSkin, "ear", -0.0075, -0.004, 0.004);
     tragus.rotation.x = Math.PI / 2 - 0.35;
     tragus.rotation.z = 0.3;
     add(tragus);
     // Lobe.
-    const lobe = hm(new T.SphereGeometry(0.0085, 8, 6), skinPhys, "ear", -0.001, -0.021, 0.001);
+    const lobe = hm(new T.SphereGeometry(0.0085, 8, 6), earSkin, "ear", -0.001, -0.021, 0.001);
     lobe.scale.set(0.85, 1.15, 0.6);
     add(lobe);
     head.add(ear);
@@ -306,39 +340,40 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
     // Dorsum: a wide, low ellipsoid hugging the face — the bridge reads via
     // soft shading, not a hard ridge. Top buried in the brow so the nose
     // grows out of the face.
-    const dorsumGeo = shapeGeo(T, new T.SphereGeometry(0.02, 16, 12), (v) => {
+    const dorsumGeo = shapeGeo(T, new T.SphereGeometry(0.02, 14, 10), (v) => {
       const t = v.y / 0.02; // -1 bottom … +1 top
       if (t > 0.2) v.x *= 1 - 0.12 * (t - 0.2); // gentle taper toward the brow
     });
-    const dorsum = hm(dorsumGeo, skinPhys, "nose", 0, 0.098, 0.096);
-    dorsum.scale.set(0.72, 1.6, 0.5);
+    const dorsum = hm(dorsumGeo, noseSkin, "nose", 0, 0.098, 0.096);
+    dorsum.scale.set(0.82, 1.6, 0.5);
     dorsum.rotation.x = -0.1;
     add(dorsum);
     // Tip: soft bulb overlapping the dorsum bottom (no junction gap) —
-    // kept modest for a cuter, less prominent nose.
-    const tipGeo = shapeGeo(T, new T.SphereGeometry(0.0165, 16, 12), (v) => {
+    // broad enough to read naturally, still friendly.
+    const tipGeo = shapeGeo(T, new T.SphereGeometry(0.0165, 14, 10), (v) => {
       if (v.y < -0.004) v.y *= 0.82;
     });
-    const tip = hm(tipGeo, skinPhys, "nose", 0, 0.0695, 0.1025);
-    tip.scale.set(0.96, 0.76, 0.84);
+    const tip = hm(tipGeo, noseSkin, "nose", 0, 0.0695, 0.1025);
+    tip.scale.set(1.04, 0.76, 0.84);
     tip.rotation.x = 0.15;
     add(tip);
     for (const sx of [-1, 1]) {
-      // Nostril wings (alae): embedded in the tip, peeking out at the sides.
-      const ala = hm(new T.SphereGeometry(0.01, 12, 10), skinPhys, "nose", sx * 0.0165, 0.06, 0.0985);
-      ala.scale.set(1.0, 0.6, 1.0);
+      // Nostril wings (alae): broader, clearly flaring past the tip —
+      // the defining read of the reference nose.
+      const ala = hm(new T.SphereGeometry(0.011, 12, 10), noseSkin, "nose", sx * 0.0195, 0.06, 0.0985);
+      ala.scale.set(1.0, 0.62, 1.0);
       ala.rotation.y = sx * 0.5;
       ala.rotation.x = 0.2;
       add(ala);
       // Nostril openings: dark, angled down-forward.
-      const nos = hm(new T.SphereGeometry(0.0062, 10, 8), nostrilMat, "nose", sx * 0.0105, 0.0535, 0.103);
+      const nos = hm(new T.SphereGeometry(0.007, 10, 8), nostrilMat, "nose", sx * 0.0115, 0.0535, 0.103);
       nos.scale.set(0.72, 0.5, 0.6);
       nos.rotation.x = 0.55;
       nos.rotation.z = sx * 0.3;
       add(nos);
     }
     // Columella between the nostrils.
-    const col = hm(new T.CylinderGeometry(0.0032, 0.0042, 0.013, 8), skinPhys, "nose", 0, 0.058, 0.105);
+    const col = hm(new T.CylinderGeometry(0.0032, 0.0042, 0.013, 8), noseSkin, "nose", 0, 0.058, 0.105);
     col.rotation.x = 0.4;
     add(col);
     head.add(nose);
@@ -352,22 +387,32 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
     const cavity = hm(new T.SphereGeometry(0.023, 14, 10), mouthDarkMat, "mouth", 0, 0.0308, 0.0605);
     cavity.scale.set(1.32, 0.4, 0.45);
     add(cavity);
-    // Upper lip with cupid's bow.
+    // Upper lip with cupid's bow — full, with clear upper/lower definition.
     const upperGeo = shapeGeo(T, new T.SphereGeometry(0.0195, 14, 10), (v) => {
       if (v.y > 0.006 && Math.abs(v.x) < 0.007) {
         v.y -= 0.0035 * (1 - Math.abs(v.x) / 0.007); // cupid's bow notch
       }
     });
     const upper = hm(upperGeo, lipPhys, "mouth", 0, 0.0402, 0.0645);
-    upper.scale.set(1.62, 0.5, 0.5);
+    upper.scale.set(1.72, 0.52, 0.5);
     add(upper);
     // Lower lip, fuller in the centre.
     const lowerGeo = shapeGeo(T, new T.SphereGeometry(0.0205, 14, 10), (v) => {
       v.z += 0.0025 * Math.exp(-Math.pow(v.x / 0.011, 2));
     });
     const lower = hm(lowerGeo, lipPhys, "mouth", 0, 0.0232, 0.063);
-    lower.scale.set(1.48, 0.6, 0.5);
+    lower.scale.set(1.62, 0.68, 0.5);
     add(lower);
+    // Philtrum hint: two faint vertical ridges from the nose base to the
+    // cupid's bow, framing the philtral groove.
+    for (const sx of [-1, 1]) {
+      const ridgeCurve = new T.QuadraticBezierCurve3(
+        new T.Vector3(sx * 0.0038, 0.056, 0.0865),
+        new T.Vector3(sx * 0.0042, 0.052, 0.0795),
+        new T.Vector3(sx * 0.0045, 0.0475, 0.07)
+      );
+      add(hm(new T.TubeGeometry(ridgeCurve, 6, 0.0011, 5), skinPhys, "mouth"));
+    }
     // Vermilion border: darker lip-line arcs, upper and lower.
     const borderU = hm(new T.TorusGeometry(0.0235, 0.0026, 5, 18, Math.PI), lipEdgeMat, "mouth", 0, 0.0318, 0.0665);
     borderU.scale.set(1.32, 0.55, 1);
@@ -403,15 +448,29 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
     roughness: 0.3,
   });
 
-  const buildEye = (sx: number, irisMat: THREE.Material): THREE.Group => {
+  const buildEye = (sx: number, irisMat: THREE.Material): { eye: THREE.Group; upperLid: THREE.Group } => {
     const eye = new T.Group();
     eye.position.set(sx * 0.0415, 0.115, 0.0875);
     const add = (m: THREE.Mesh) => eye.add(m);
+    // M7: the upper lid is its own pivot group. It hinges near the TOP of
+    // the eye opening (like a real eyelid), not at the eyeball centre —
+    // rotating about the ball centre dragged the lid's top edge back and
+    // exposed a white sclera crescent above it (seen in m7 screenshots).
+    // The children keep their eye-local coords inside an inner offset
+    // group, so nothing moves in eye-local space (identity net transform).
+    const LID_HINGE_Y = 0.022;
+    const upperLid = new T.Group();
+    upperLid.position.set(0, LID_HINGE_Y, 0);
+    eye.add(upperLid);
+    const lidInner = new T.Group();
+    lidInner.position.set(0, -LID_HINGE_Y, 0);
+    upperLid.add(lidInner);
+    const addLid = (m: THREE.Mesh) => lidInner.add(m);
 
     // Soft orbital shading behind the eyeball.
     add(hm(new T.CircleGeometry(0.0305, 20), skinDarkPhys, "eye", 0, 0, -0.002));
     // Eyeball: larger and rounder than the old almond cut (cuteness pass).
-    const sclera = hm(new T.SphereGeometry(0.0272, 16, 12), scleraMat, "eye", 0, 0, 0.001);
+    const sclera = hm(new T.SphereGeometry(0.0272, 14, 10), scleraMat, "eye", 0, 0, 0.001);
     sclera.scale.set(1.0, 0.92, 0.6);
     add(sclera);
     // Iris + pupil on the front of the ball.
@@ -419,7 +478,7 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
     add(hm(new T.CircleGeometry(0.0064, 16), pupilMat, "eye", 0, 0, 0.0184));
     // Cornea bulge: clear wet dome over the iris.
     const cornea = hm(
-      new T.SphereGeometry(0.0148, 14, 10, 0, Math.PI * 2, 0, 1.05),
+      new T.SphereGeometry(0.0148, 12, 8, 0, Math.PI * 2, 0, 1.05),
       corneaMat,
       "eye",
       0,
@@ -434,11 +493,11 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
     add(hm(new T.PlaneGeometry(0.0026, 0.0026), catchMat, "eye", -0.0056, -0.0047, 0.022));
     // Upper eyelid: draped shell hugging the top of the ball. The rim of
     // the cap lands just above the iris centre so the eye reads open.
-    const lidGeo = new T.SphereGeometry(0.0315, 16, 8, 0, Math.PI * 2, 0, 1.35);
-    const lid = hm(lidGeo, skinPhysDS, "eye", 0, 0.0045, 0.002);
+    const lidGeo = new T.SphereGeometry(0.0315, 14, 6, 0, Math.PI * 2, 0, 1.42);
+    const lid = hm(lidGeo, skinPhysDS, "eye", 0, 0.003, 0.002);
     lid.rotation.x = 0.12;
     lid.scale.set(1.02, 0.6, 0.7);
-    add(lid);
+    addLid(lid);
     // Lid-rim curve (front arc of the lid edge) — lash line, lashes and
     // crease all follow it so they sit exactly on the lid.
     const rimCurve = (yBase: number, yDip: number, rx: number, rz: number, zOff: number, half: number) => {
@@ -456,8 +515,8 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
       return new T.CatmullRomCurve3(pts);
     };
     // Lash line: dark tube along the lid rim.
-    const LASH_Y = 0.0062;
-    add(hm(new T.TubeGeometry(rimCurve(LASH_Y, 0.0022, 0.0295, 0.022, 0.002, 1.05), 16, 0.0023, 5), lashMat, "eye"));
+    const LASH_Y = 0.005;
+    addLid(hm(new T.TubeGeometry(rimCurve(LASH_Y, 0.0022, 0.0295, 0.022, 0.002, 1.05), 16, 0.0023, 5), lashMat, "eye"));
     // Individual lashes: short tapered cones along the rim, flicking down-forward.
     const lashRand = mulberry32(hashSeed(skin) + (sx > 0 ? 11 : 77));
     const lashDir = new T.Vector3();
@@ -472,15 +531,27 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
       lash.quaternion.setFromUnitVectors(lashUp, lashDir);
       lash.rotateX((lashRand() - 0.5) * 0.2);
       lash.scale.y = 0.8 + lashRand() * 0.5;
-      add(lash);
+      addLid(lash);
     }
     // Lower lid: slim arc under the eye.
-    add(hm(new T.TubeGeometry(rimCurve(-0.0115, -0.0038, 0.027, 0.018, 0.0015, 1.1), 14, 0.0027, 5), skinPhys, "eye"));
+    add(hm(new T.TubeGeometry(rimCurve(-0.0085, -0.0032, 0.027, 0.018, 0.0015, 1.1), 14, 0.0027, 5), skinPhys, "eye"));
+    // Lower-lid shell: a shallow cup under the ball so the eye reads
+    // seated in real lids (upper shell + lower shell), not floating.
+    const lowLid = hm(
+      new T.SphereGeometry(0.0315, 12, 6, 0, Math.PI * 2, 1.8, 0.85),
+      skinPhysDS,
+      "eye",
+      0,
+      -0.002,
+      0.002
+    );
+    lowLid.scale.set(1.0, 0.78, 0.7);
+    add(lowLid);
     // Eyelid crease above.
-    add(hm(new T.TubeGeometry(rimCurve(0.0195, 0.0032, 0.033, 0.0175, -0.002, 1.05), 14, 0.0019, 5), skinDarkPhys, "eye"));
+    addLid(hm(new T.TubeGeometry(rimCurve(0.0195, 0.0032, 0.033, 0.0175, -0.002, 1.05), 14, 0.0019, 5), skinDarkPhys, "eye"));
 
     head.add(eye);
-    return eye;
+    return { eye, upperLid };
   };
   const eyeL = buildEye(-1, irisMat);
   const eyeR = buildEye(1, irisMat);
@@ -490,13 +561,13 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
   // the sculpt terms are negligible on the forehead) and below the hairline.
   // Cuteness pass: slightly thicker, raised, gentler slope — no stern
   // downward pinch at the inner ends.
-  const strandGeo = new T.PlaneGeometry(0.0031, 0.0085);
+  const strandGeo = new T.PlaneGeometry(0.0038, 0.009);
   for (const sx of [-1, 1]) {
     const browRand = mulberry32(hashSeed(skin) + (sx > 0 ? 101 : 202));
-    for (let i = 0; i < 14; i++) {
-      const t = i / 13;
+    for (let i = 0; i < 16; i++) {
+      const t = i / 15;
       const bx = sx * (0.02 + 0.046 * t);
-      const by = 0.1535 + 0.004 * Math.sin(Math.PI * Math.pow(t, 0.85)) - 0.0015 * t;
+      const by = 0.1485 + 0.004 * Math.sin(Math.PI * Math.pow(t, 0.85)) - 0.0015 * t;
       const yl = by - HC; // skull-local y
       const surfZ = Math.sqrt(Math.max(1e-6, HEAD_R * HEAD_R - bx * bx - yl * yl));
       const bz = surfZ + 0.0028;
@@ -511,5 +582,11 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
     }
   }
 
-  return { group: head, eyeL, eyeR };
+  return {
+    group: head,
+    eyeL: eyeL.eye,
+    eyeR: eyeR.eye,
+    upperLidL: eyeL.upperLid,
+    upperLidR: eyeR.upperLid,
+  };
 }

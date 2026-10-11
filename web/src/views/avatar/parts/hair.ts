@@ -8,12 +8,14 @@ import {
   paintScalpSheen,
   paintStrandFlow,
   paintStubble,
+  paintWaves,
 } from "./strandTextures";
 
 /**
- * Seven HD hairstyles, positioned relative to the head group.
+ * Nine HD hairstyles, positioned relative to the head group.
  * Skull centre at local (0, HC, 0) where HC = 0.105, radius ≈ 0.105.
- * Seven ids: lowcut/bald/curls/afro/locs/braids/classic.
+ * Canonical ids: lowcut/bald/curls/afro/locs/braids/classic (stable —
+ * never rename). New M3 ids: hair_taper_fade_01, hair_waves_01.
  * Unknown id → lowcut (never a bare broken head).
  *
  * All geometry is original procedural code. Detail comes from layered
@@ -50,6 +52,36 @@ export function afroNoise(
 
 /** Skull centre height (head-local) — shared with head.ts. */
 export const HAIR_HC = 0.105;
+
+/* ------------------------------------------------------------------ */
+/* Hair colour (Milestone 3b): colorId → tint threaded through the      */
+/* style builders. When no colour is requested the builders use their  */
+/* original M3 literal colours byte-for-byte (default black = HAIR_HEX).*/
+/* ------------------------------------------------------------------ */
+
+/** Registered hair-colour hexes (mirror the manifest texture entries). */
+export const HAIR_COLOR_HEX: Record<string, string> = {
+  hair_black_01: HAIR_HEX,
+  hair_dark_brown_01: "#3b2417",
+  hair_brown_01: "#5b3a21",
+};
+
+export interface HairTint {
+  base: string;
+  dark: string;
+  light: string;
+}
+
+/** Resolve a colorId to its hex (unknown/undefined → HAIR_HEX). */
+export function hairColorHex(colorId?: string): string {
+  return (colorId && HAIR_COLOR_HEX[colorId]) || HAIR_HEX;
+}
+
+/** Tint for a hair colour id (unknown/undefined → default black). */
+export function hairTint(colorId?: string): HairTint {
+  const base = hairColorHex(colorId);
+  return { base, dark: shade(base, -22), light: shade(base, 44) };
+}
 
 /**
  * Face guard: pull mass vertices out of the face zone (front of the head,
@@ -354,28 +386,72 @@ function strandMat(
 /* The seven styles                                                   */
 /* ------------------------------------------------------------------ */
 
-function buildLowcut(
+/**
+ * Clean lineup: a crisp hairline tube hugging the fade-shell rim across
+ * the forehead, with sharp temple corners bridging down to the sideburns.
+ * This is the barber-lineup read from the reference — geometry, not just
+ * texture, so it holds a hard edge at every angle.
+ */
+function buildLineup(
   T: typeof import("three"),
   mats: AvatarMaterials
 ): THREE.Object3D[] {
   const parts: THREE.Object3D[] = [];
+  const R = 0.0948;
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i <= 20; i++) {
+    const a = -1.05 + (i / 20) * 2.1;
+    // Corners drop a touch at the temples for the sharp lineup shape.
+    const drop = 0.005 * Math.pow(Math.abs(a) / 1.05, 3);
+    pts.push(
+      new T.Vector3(
+        R * Math.sin(a),
+        0.1575 - drop,
+        R * Math.cos(a) * 0.99 + 0.002
+      )
+    );
+  }
+  const curve = new T.CatmullRomCurve3(pts);
+  parts.push(new T.Mesh(new T.TubeGeometry(curve, 24, 0.0042, 6, false), mats.hairMat));
+  // Temple corners: short vertical blades under the tube ends.
+  for (const sx of [-1, 1]) {
+    const corner = new T.Mesh(
+      new T.BoxGeometry(0.007, 0.02, 0.006),
+      mats.hairMat
+    );
+    corner.position.set(sx * 0.0835, 0.1465, 0.0465);
+    corner.rotation.y = sx * -0.5;
+    corner.rotation.z = sx * 0.1;
+    parts.push(corner);
+  }
+  return parts;
+}
+
+function buildLowcut(
+  T: typeof import("three"),
+  mats: AvatarMaterials,
+  tint?: HairTint
+): THREE.Object3D[] {
+  const parts: THREE.Object3D[] = [];
   const r = 0.1068; // hug the scalp — the hairline edge must not float
   const p = 0.34;
-  // Solid under-cap ending where the fade shell is still dense — its rim
-  // stays hidden, and the fade shell's alpha edge forms the hairline.
-  parts.push(placeCap(T, capGeo(T, r - 0.002, p * 0.88, 20, 12), mats.hairMat));
-  // Fade shell: stubble speckle field, dense to near the rim then a short
-  // falloff so the hairline reads defined, not ragged.
+  // Solid under-cap backing the fade shell: radius sits BETWEEN the skull
+  // (0.105) and the fade shell (r) — the old r-0.002 was buried inside the
+  // skull and never visible. Runs just past the fade shell's rim; the
+  // lineup tube hides its edge, so no skin window opens at glancing angles.
+  parts.push(placeCap(T, capGeo(T, r - 0.0006, p * 1.0, 20, 12), mats.hairMat));
+  // Fade shell: stubble speckle field with a longer, smoother falloff so
+  // the fade reads barbered; the lineup tube (below) draws the hard edge.
   const fadeTex = canvasTexture(
     T,
     128,
     (c) =>
       paintStubble(c, 128, {
         seed: 11,
-        dots: 1100,
-        hair: HAIR_HEX,
+        dots: 1400,
+        hair: tint?.base ?? HAIR_HEX,
         fadeBottom: true,
-        fadeStart: 0.93,
+        fadeStart: 0.88,
       }),
     { repeat: [3, 1] }
   );
@@ -396,6 +472,119 @@ function buildLowcut(
     sb.rotation.y = sx * 0.35;
     parts.push(sb);
   }
+  // Crisp barber lineup across the forehead.
+  parts.push(...buildLineup(T, mats));
+  return parts;
+}
+
+/**
+ * Taper fade (new id: hair_taper_fade_01): low-cut top with length, faded
+ * down the sides and nape, finished with a sharp lineup. Built from the
+ * same procedural vocabulary as lowcut — no new asset pipeline.
+ */
+function buildTaperFade(
+  T: typeof import("three"),
+  mats: AvatarMaterials,
+  tint?: HairTint
+): THREE.Object3D[] {
+  const parts: THREE.Object3D[] = [];
+  // Top: slightly raised cap with a combed-strand read.
+  const flowTex = canvasTexture(
+    T,
+    128,
+    (c) =>
+      paintStrandFlow(c, 128, {
+        seed: 71,
+        strands: 70,
+        angle: 0.15,
+        dark: tint?.dark ?? "#0b0705",
+        light: tint?.light ?? "#3d2f24",
+        alpha: [0.35, 0.7],
+        lineScale: 0.8,
+      }),
+    { repeat: [3, 2] }
+  );
+  parts.push(
+    placeCap(T, capGeo(T, 0.1082, 0.3, 28, 16), strandMat(T, mats, flowTex, 0.8))
+  );
+  // Sides/nape: aggressive fade — dense at top, gone well before the rim.
+  const fadeTex = canvasTexture(
+    T,
+    128,
+    (c) =>
+      paintStubble(c, 128, {
+        seed: 73,
+        dots: 1500,
+        hair: tint?.base ?? HAIR_HEX,
+        fadeBottom: true,
+        fadeStart: 0.7,
+      }),
+    { repeat: [3, 1] }
+  );
+  const fadeMat = fadeTex
+    ? new T.MeshStandardMaterial({
+        color: "#ffffff",
+        map: fadeTex,
+        transparent: false,
+        alphaTest: 0.38,
+        roughness: 0.92,
+      })
+    : mats.hairMat;
+  parts.push(placeCap(T, capGeo(T, 0.1068, 0.4, 28, 16), fadeMat));
+  // Skin-tight under-cap so no scalp shows through the fade.
+  parts.push(placeCap(T, capGeo(T, 0.1062, 0.34, 20, 12), mats.hairMat));
+  for (const sx of [-1, 1]) {
+    const sb = new T.Mesh(new T.BoxGeometry(0.008, 0.024, 0.007), mats.hairMat);
+    sb.position.set(sx * 0.094, 0.118, 0.014);
+    sb.rotation.y = sx * 0.35;
+    parts.push(sb);
+  }
+  parts.push(...buildLineup(T, mats));
+  return parts;
+}
+
+/**
+ * Waves (new id: hair_waves_01): low cut with a 360-wave ripple pattern
+ * and a soft sheen, finished with a lineup.
+ */
+function buildWaves(
+  T: typeof import("three"),
+  mats: AvatarMaterials,
+  tint?: HairTint
+): THREE.Object3D[] {
+  const parts: THREE.Object3D[] = [];
+  parts.push(placeCap(T, capGeo(T, 0.1062, 0.3, 20, 12), mats.hairMat));
+  const waveTex = canvasTexture(
+    T,
+    128,
+    (c) =>
+      paintWaves(c, 128, {
+        seed: 79,
+        rings: 9,
+        base: tint?.base ?? "#171110",
+        dark: tint?.dark ?? "#0a0605",
+        light: tint?.light ?? "#4a3a2c",
+      }),
+    { repeat: [2, 1] }
+  );
+  const waveMat = waveTex
+    ? new T.MeshStandardMaterial({
+        color: "#ffffff",
+        map: waveTex,
+        transparent: false,
+        alphaTest: 0.3,
+        roughness: 0.55,
+        metalness: 0.05,
+      })
+    : mats.hairMat;
+  parts.push(placeCap(T, capGeo(T, 0.1072, 0.32, 32, 18), waveMat));
+  for (const sx of [-1, 1]) {
+    const sb = new T.Mesh(new T.BoxGeometry(0.01, 0.028, 0.008), mats.hairMat);
+    sb.position.set(sx * 0.094, 0.118, 0.014);
+    sb.rotation.y = sx * 0.35;
+    parts.push(sb);
+  }
+  parts.push(...buildLineup(T, mats));
   return parts;
 }
 
@@ -436,7 +625,8 @@ function buildBald(
 
 function buildCurls(
   T: typeof import("three"),
-  mats: AvatarMaterials
+  mats: AvatarMaterials,
+  tint?: HairTint
 ): THREE.Object3D[] {
   const parts: THREE.Object3D[] = [];
   const rand = mulberry32(1234);
@@ -450,8 +640,8 @@ function buildCurls(
         strands: 90,
         twist: true,
         angle: 0.7,
-        dark: "#0b0705",
-        light: "#3a2c20",
+        dark: tint?.dark ?? "#0b0705",
+        light: tint?.light ?? "#3a2c20",
         alpha: [0.35, 0.65],
         lineScale: 0.7,
       }),
@@ -466,7 +656,7 @@ function buildCurls(
         roughness: 0.92,
       })
     : mats.hairMat;
-  const mass = new T.Mesh(new T.SphereGeometry(0.126, 24, 18), massMat);
+  const mass = new T.Mesh(new T.SphereGeometry(0.126, 20, 16), massMat);
   afroNoise(T, mass.geometry, 21, 0.05);
   clumpDisplace(T, mass.geometry, 9, 34, 0.3, 0.2);
   mass.geometry.translate(0, 0.212, -0.012);
@@ -482,15 +672,15 @@ function buildCurls(
         strands: 60,
         twist: true,
         angle: 0.4,
-        dark: "#0b0705",
-        light: "#3a2c20",
+        dark: tint?.dark ?? "#0b0705",
+        light: tint?.light ?? "#3a2c20",
         alpha: [0.3, 0.6],
         lineScale: 0.6,
       }),
     { repeat: [1, 2] }
   );
   const ringMat = strandMat(T, mats, ringTex, 0.85);
-  const N = 26;
+  const N = 20;
   for (let i = 0; i < N; i++) {
     const [dx, dy, dz] = fibDir(i, N, Math.PI * 0.52);
     const y = 0.212 + dy * 0.126;
@@ -514,7 +704,7 @@ function buildCurls(
       rand() * TAU
     );
     parts.push(
-      new T.Mesh(new T.TubeGeometry(curve, 18, tubeR, 4, false), ringMat)
+      new T.Mesh(new T.TubeGeometry(curve, 12, tubeR, 4, false), ringMat)
     );
   }
   return parts;
@@ -522,7 +712,8 @@ function buildCurls(
 
 function buildAfro(
   T: typeof import("three"),
-  mats: AvatarMaterials
+  mats: AvatarMaterials,
+  tint?: HairTint
 ): THREE.Object3D[] {
   const parts: THREE.Object3D[] = [];
   const frizzTex = canvasTexture(
@@ -532,9 +723,9 @@ function buildAfro(
       paintFrizz(c, 128, {
         seed: 31,
         strokes: 850,
-        base: HAIR_HEX,
-        dark: "#000000",
-        light: "#554130",
+        base: tint?.base ?? HAIR_HEX,
+        dark: tint?.dark ?? "#000000",
+        light: tint?.light ?? "#554130",
       }),
     { repeat: [4, 3] }
   );
@@ -552,7 +743,7 @@ function buildAfro(
   afroNoise(T, inner.geometry, 7, 0.06);
   inner.position.set(0, 0.222, -0.033);
   parts.push(inner);
-  const outer = new T.Mesh(new T.SphereGeometry(0.146, 28, 20), outerMat);
+  const outer = new T.Mesh(new T.SphereGeometry(0.146, 24, 18), outerMat);
   afroNoise(T, outer.geometry, 13, 0.055);
   clumpDisplace(T, outer.geometry, 5, 42, 0.34, 0.16);
   outer.geometry.translate(0, 0.226, -0.035);
@@ -563,7 +754,8 @@ function buildAfro(
 
 function buildLocs(
   T: typeof import("three"),
-  mats: AvatarMaterials
+  mats: AvatarMaterials,
+  tint?: HairTint
 ): THREE.Object3D[] {
   const parts: THREE.Object3D[] = [];
   // Root bed with fuzz texture (new growth).
@@ -585,8 +777,8 @@ function buildLocs(
         strands: 130,
         twist: true,
         angle: 0.35,
-        dark: "#0b0705",
-        light: "#33261c",
+        dark: tint?.dark ?? "#0b0705",
+        light: tint?.light ?? "#33261c",
         alpha: [0.3, 0.6],
         lineScale: 0.6,
       }),
@@ -637,7 +829,8 @@ function buildLocs(
 
 function buildBraids(
   T: typeof import("three"),
-  mats: AvatarMaterials
+  mats: AvatarMaterials,
+  tint?: HairTint
 ): THREE.Object3D[] {
   const parts: THREE.Object3D[] = [];
   const rand = mulberry32(1234);
@@ -654,8 +847,8 @@ function buildBraids(
         strands: 140,
         twist: true,
         angle: 0.9,
-        dark: "#0b0705",
-        light: "#3a2c20",
+        dark: tint?.dark ?? "#0b0705",
+        light: tint?.light ?? "#3a2c20",
         alpha: [0.3, 0.6],
         lineScale: 0.6,
       }),
@@ -715,7 +908,8 @@ function buildBraids(
 
 function buildClassic(
   T: typeof import("three"),
-  mats: AvatarMaterials
+  mats: AvatarMaterials,
+  tint?: HairTint
 ): THREE.Object3D[] {
   const parts: THREE.Object3D[] = [];
   // Base cap with strand-flow texture.
@@ -727,7 +921,7 @@ function buildClassic(
         seed: 61,
         strands: 60,
         angle: -0.55,
-        light: "#4e3d2f",
+        light: tint?.light ?? "#4e3d2f",
       }),
     { repeat: [3, 2] }
   );
@@ -770,29 +964,54 @@ function buildClassic(
   return parts;
 }
 
+/**
+ * Build a hairstyle. `colorId` (optional, M3b) tints the hair: when it is a
+ * registered colour other than hair_black_01, the solid hair material is
+ * re-created in that colour and the strand/frizz/wave painters get the
+ * derived tint. Omitted or default black → the original M3 output,
+ * byte-for-byte (existing callers unaffected).
+ */
 export function buildHair(
   T: typeof import("three"),
   hair: string,
-  mats: AvatarMaterials
+  mats: AvatarMaterials,
+  colorId?: string
 ): THREE.Object3D[] {
+  const custom =
+    !!colorId && colorId !== "hair_black_01" && !!HAIR_COLOR_HEX[colorId];
+  const useMats = custom
+    ? {
+        ...mats,
+        hairMat: new T.MeshStandardMaterial({
+          color: HAIR_COLOR_HEX[colorId as string],
+          roughness: 0.9,
+          metalness: 0.02,
+        }),
+      }
+    : mats;
+  const tint = custom ? hairTint(colorId) : undefined;
   switch (hair) {
     case "bald":
-      return buildBald(T, mats);
+      return buildBald(T, useMats);
     case "lowcut":
-      return buildLowcut(T, mats);
+      return buildLowcut(T, useMats, tint);
     case "curls":
-      return buildCurls(T, mats);
+      return buildCurls(T, useMats, tint);
     case "afro":
-      return buildAfro(T, mats);
+      return buildAfro(T, useMats, tint);
     case "locs":
-      return buildLocs(T, mats);
+      return buildLocs(T, useMats, tint);
     case "braids":
-      return buildBraids(T, mats);
+      return buildBraids(T, useMats, tint);
     case "classic":
-      return buildClassic(T, mats);
+      return buildClassic(T, useMats, tint);
+    case "hair_taper_fade_01":
+      return buildTaperFade(T, useMats, tint);
+    case "hair_waves_01":
+      return buildWaves(T, useMats, tint);
     default:
       // Unknown id → lowcut. Never a bare head.
-      return buildLowcut(T, mats);
+      return buildLowcut(T, useMats, tint);
   }
 }
 

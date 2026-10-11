@@ -244,11 +244,24 @@ function buildFootwear(
   T: typeof import("three"),
   mats: AvatarMaterials,
   gm: GarmentMats,
-  kind: "sneaker" | "oxford" | "boot"
+  kind: "sneaker" | "oxford" | "boot",
+  twoTone?: string
 ): THREE.Group {
   const g = new T.Group();
   const isBoot = kind === "boot";
   const isOxford = kind === "oxford";
+  // Two-tone fashion sneaker (hoodie outfit): colour-blocked upper in the
+  // outfit's top colour with white panels, laces and sole.
+  const accent = twoTone && !isBoot && !isOxford
+    ? new T.MeshStandardMaterial({ color: twoTone, roughness: 0.65 })
+    : null;
+  const panelWhite = accent
+    ? new T.MeshStandardMaterial({ color: "#eef1f4", roughness: 0.55 })
+    : null;
+  const upperMat = accent ?? mats.shoeMat;
+  const toeMat = panelWhite ?? mats.shoeMat;
+  const laceMat = panelWhite ?? (isOxford ? mats.shoeMat : mats.accentMat);
+  const soleMat = panelWhite ?? gm.sole;
 
   // Sole with tread.
   const soleW = isBoot ? 0.115 : 0.105;
@@ -257,12 +270,25 @@ function buildFootwear(
     mesh(
       T,
       new T.BoxGeometry(soleW, soleH, isBoot ? 0.27 : 0.26),
-      gm.sole,
+      soleMat,
       0,
       -0.745 + soleH / 2,
       0.035
     )
   );
+  if (accent) {
+    // Turquoise midsole stripe between the white sole and the upper.
+    g.add(
+      mesh(
+        T,
+        new T.BoxGeometry(soleW + 0.004, 0.009, 0.264),
+        accent,
+        0,
+        -0.745 + soleH + 0.0045,
+        0.035
+      )
+    );
+  }
   // Heel block.
   g.add(
     mesh(
@@ -278,7 +304,7 @@ function buildFootwear(
   const upper = mesh(
     T,
     new T.SphereGeometry(0.075, 14, 12),
-    mats.shoeMat,
+    upperMat,
     0,
     -0.7,
     0.02
@@ -289,13 +315,39 @@ function buildFootwear(
   const toe = mesh(
     T,
     new T.SphereGeometry(0.05, 12, 10),
-    mats.shoeMat,
+    toeMat,
     0,
     -0.702,
     0.125
   );
   toe.scale.set(0.85, 0.62, 1);
   g.add(toe);
+  if (panelWhite) {
+    // Side panel overlays (paneling read on the two-tone sneaker).
+    for (const sx of [-1, 1]) {
+      const panel = mesh(
+        T,
+        new T.BoxGeometry(0.014, 0.052, 0.15),
+        panelWhite,
+        sx * 0.05,
+        -0.7,
+        0.03
+      );
+      panel.rotation.y = sx * -0.12;
+      panel.rotation.z = sx * 0.06;
+      g.add(panel);
+      // Heel counter.
+      const heel = mesh(
+        T,
+        new T.BoxGeometry(0.07, 0.055, 0.02),
+        panelWhite,
+        0,
+        -0.7,
+        -0.088
+      );
+      g.add(heel);
+    }
+  }
 
   if (isBoot) {
     // Shaft up the calf.
@@ -344,7 +396,7 @@ function buildFootwear(
       mesh(
         T,
         new T.CylinderGeometry(0.045, 0.052, isOxford ? 0.05 : 0.07, 12),
-        mats.shoeMat,
+        upperMat,
         0,
         -0.72 + (isOxford ? 0.045 : 0.055),
         -0.01
@@ -352,14 +404,14 @@ function buildFootwear(
     );
     // Tongue + lace crosses.
     g.add(
-      mesh(T, new T.BoxGeometry(0.05, 0.09, 0.016), mats.shoeMat, 0, -0.66, 0.055)
+      mesh(T, new T.BoxGeometry(0.05, 0.09, 0.016), toeMat, 0, -0.66, 0.055)
     );
     const rows = isOxford ? 3 : 4;
     for (let i = 0; i < rows; i++) {
       const lace = mesh(
         T,
         new T.CylinderGeometry(0.0038, 0.0038, 0.062, 6),
-        isOxford ? mats.shoeMat : mats.accentMat,
+        laceMat,
         0,
         -0.635 - i * 0.026,
         0.062 + i * 0.004
@@ -383,10 +435,11 @@ function dressLegs(
   body: BuiltBody,
   ctx: GarmentCtx
 ): void {
-  const { outfit, limbScale } = ctx;
+  const { outfit, limbScale, topColor } = ctx;
   const shorts = outfit === "chill";
-  const cargo = outfit === "sitework";
+  const cargo = outfit === "sitework" || outfit === "hoodie";
   const office = outfit === "office";
+  const footwearKind = outfit === "sitework" ? "boot" : office ? "oxford" : "sneaker";
   const bottomStd = std(mats.bottomMat);
   const creaseMat = new T.MeshStandardMaterial({
     color: "#" + bottomStd.color.clone().offsetHSL(0, 0, 0.08).getHexString(),
@@ -394,7 +447,15 @@ function dressLegs(
   });
 
   for (const legG of [body.legL, body.legR]) {
-    legG.add(buildFootwear(T, mats, gm, cargo ? "boot" : office ? "oxford" : "sneaker"));
+    legG.add(
+      buildFootwear(
+        T,
+        mats,
+        gm,
+        footwearKind,
+        outfit === "hoodie" ? topColor : undefined
+      )
+    );
 
     // Leg shell.
     const prof = trouserProfile(shorts).map(
@@ -644,7 +705,8 @@ function dressTeeTrim(
   collar.rotation.x = Math.PI / 2;
   collar.scale.set(1, 0.82, 1);
   upper.add(collar);
-  // Hem band.
+  // Hem band, double-layered so the hem reads as folded fabric with
+  // real thickness (outer rib + darker inner band peeking below).
   const hem = mesh(
     T,
     new T.CylinderGeometry(0.171 * looseness, 0.175 * looseness, 0.04, 22),
@@ -655,6 +717,16 @@ function dressTeeTrim(
   );
   hem.scale.z = 0.74;
   upper.add(hem);
+  const hemInner = mesh(
+    T,
+    new T.CylinderGeometry(0.169 * looseness, 0.171 * looseness, 0.022, 22),
+    gm.fold,
+    0,
+    LY(0.782),
+    0
+  );
+  hemInner.scale.z = 0.74;
+  upper.add(hemInner);
   // Waist fold wrinkles: small arcs hugging the shirt.
   upper.add(foldArc(T, gm.fold, 0.035, 0.005, -0.09, LY(0.88), 0.1, 0.4, 1.1));
   upper.add(foldArc(T, gm.fold, 0.032, 0.005, 0.09, LY(0.87), 0.1, 0.4, -1.1 + Math.PI));
@@ -675,14 +747,14 @@ function dressHoodieExtras(
   // Draped hood: open cowl behind the neck (opening faces forward).
   // Profile in ascending y for outward lathe normals.
   const hoodPts = [
-    new T.Vector2(0.1, -0.07),
-    new T.Vector2(0.105, -0.032),
-    new T.Vector2(0.085, 0.008),
-    new T.Vector2(0.055, 0.03),
+    new T.Vector2(0.104, -0.075),
+    new T.Vector2(0.11, -0.035),
+    new T.Vector2(0.09, 0.008),
+    new T.Vector2(0.058, 0.032),
   ];
   const hoodGeo = new T.LatheGeometry(hoodPts, 20, 0.6, Math.PI * 2 - 1.2);
   const hood = new T.Mesh(hoodGeo, gm.weave);
-  hood.position.set(0, LY(1.375), -0.052);
+  hood.position.set(0, LY(1.375), -0.055);
   hood.rotation.x = 0.42;
   upper.add(hood);
   // Visible lining inside the hood.
@@ -691,44 +763,91 @@ function dressHoodieExtras(
     mats.accentMat
   );
   lining.scale.set(0.93, 0.93, 0.93);
-  lining.position.set(0, LY(1.375), -0.052);
+  lining.position.set(0, LY(1.375), -0.055);
   lining.rotation.x = 0.42;
   upper.add(lining);
-  // Kangaroo pocket + opening stitch.
+  // Hood roll: the bunched hood reads as a collar ring around the neck
+  // from the front (reference), draping into the back cowl.
+  const roll = mesh(
+    T,
+    new T.TorusGeometry(0.088, 0.023, 8, 18),
+    gm.weave,
+    0,
+    LY(1.352),
+    -0.012
+  );
+  roll.rotation.x = Math.PI / 2 - 0.28;
+  roll.scale.set(1, 0.9, 1);
+  upper.add(roll);
+
+  // Kangaroo pocket: sloped, with angled side openings + top stitch.
   const pocket = mesh(
     T,
     new T.SphereGeometry(0.082, 16, 12),
     gm.weave,
     0,
-    LY(1.07),
-    0.108
+    LY(1.06),
+    0.112
   );
-  pocket.scale.set(1.05, 0.68, 0.42);
+  pocket.scale.set(1.08, 0.66, 0.44);
   upper.add(pocket);
-  upper.add(stitchStrip(T, gm, 0.1, 0.012, 0, LY(1.128), 0.138));
-  // Drawstrings with aglets.
+  upper.add(stitchStrip(T, gm, 0.11, 0.012, 0, LY(1.118), 0.142));
   for (const sx of [-1, 1]) {
-    const ds = mesh(
-      T,
-      new T.CylinderGeometry(0.006, 0.006, 0.11, 6),
-      mats.accentMat,
-      sx * 0.035,
-      LY(1.235),
-      0.126
-    );
-    ds.rotation.x = 0.1;
-    upper.add(ds);
+    // Slanted side openings.
+    const slit = stitchStrip(T, gm, 0.075, 0.011, sx * 0.082, LY(1.085), 0.132);
+    slit.rotation.z = sx * 0.5;
+    upper.add(slit);
+    // Pocket fold shadow at the opening.
     upper.add(
-      mesh(
-        T,
-        new T.CylinderGeometry(0.0075, 0.0075, 0.022, 6),
-        mats.whiteMat,
-        sx * 0.035,
-        LY(1.176),
-        0.132
-      )
+      foldArc(T, gm.fold, 0.028, 0.004, sx * 0.075, LY(1.075), 0.128, 0.5, sx * 0.9)
     );
   }
+
+  // Drawstring eyelets: dark rings the cords emerge from.
+  const eyeletMat = new T.MeshStandardMaterial({
+    color: "#20242a",
+    roughness: 0.5,
+    metalness: 0.4,
+  });
+  for (const sx of [-1, 1]) {
+    const eye = mesh(
+      T,
+      new T.TorusGeometry(0.0085, 0.0032, 6, 12),
+      eyeletMat,
+      sx * 0.036,
+      LY(1.305),
+      0.1295
+    );
+    eye.rotation.x = 0.15;
+    upper.add(eye);
+  }
+  // Drawstrings: cords on a gentle S-curve with metal aglets.
+  for (const sx of [-1, 1]) {
+    const curve = new T.CatmullRomCurve3([
+      new T.Vector3(sx * 0.036, LY(1.302), 0.132),
+      new T.Vector3(sx * 0.039, LY(1.262), 0.137),
+      new T.Vector3(sx * 0.035, LY(1.222), 0.134),
+    ]);
+    upper.add(
+      new T.Mesh(new T.TubeGeometry(curve, 8, 0.0052, 6, false), mats.accentMat)
+    );
+    const tip = curve.getPoint(1);
+    const aglet = mesh(
+      T,
+      new T.CapsuleGeometry(0.0068, 0.016, 3, 8),
+      mats.whiteMat,
+      tip.x,
+      tip.y - 0.012,
+      tip.z
+    );
+    aglet.rotation.x = 0.08;
+    upper.add(aglet);
+  }
+
+  // Waist fabric folds: soft arcs hugging the hoodie body.
+  upper.add(foldArc(T, gm.fold, 0.04, 0.0055, -0.1, LY(0.92), 0.105, 0.45, 1.05));
+  upper.add(foldArc(T, gm.fold, 0.038, 0.0055, 0.1, LY(0.905), 0.105, 0.45, -1.05 + Math.PI));
+  upper.add(foldArc(T, gm.fold, 0.034, 0.005, 0.01, LY(0.945), -0.115, -0.5, 0.25));
 }
 
 function dressOfficeExtras(
@@ -925,10 +1044,10 @@ function dressSleeves(
         12
       );
       arm.add(sl);
-      // Ribbed cuff (+ cuff button for office).
+      // Ribbed cuff (+ cuff button for office). Hoodie cuffs are chunkier.
       const cuff = mesh(
         T,
-        new T.TorusGeometry(0.04 * limbScale, 0.012, 8, 16),
+        new T.TorusGeometry(0.04 * limbScale, outfit === "hoodie" ? 0.017 : 0.012, 8, 16),
         gm.rib,
         0,
         -0.41,

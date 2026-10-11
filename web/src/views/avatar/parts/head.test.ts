@@ -7,8 +7,10 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import {
   buildIrisImage,
+  buildSkinMaterial,
   buildSkinPoreImage,
   hashSeed,
+  skinRoughnessAt,
 } from "./faceTextures";
 import {
   buildHead,
@@ -99,6 +101,50 @@ describe("buildIrisImage", () => {
   });
 });
 
+describe("skinRoughnessAt", () => {
+  const r = 0.105;
+  it("stays in the 0.3..0.8 band", () => {
+    for (const [x, y, z] of [
+      [0, 0.09, 0.05],
+      [0.08, 0.0, 0.06],
+      [0, -0.05, 0.09],
+      [0, 0.0, -0.1],
+    ]) {
+      const v = skinRoughnessAt(x, y, z, r);
+      expect(v).toBeGreaterThanOrEqual(0.3);
+      expect(v).toBeLessThanOrEqual(0.8);
+    }
+  });
+  it("gives the forehead/nose T-zone a sheen and the cheeks a matte read", () => {
+    const forehead = skinRoughnessAt(0, 0.075, 0.07, r);
+    const bridge = skinRoughnessAt(0, 0.01, 0.1, r);
+    const cheek = skinRoughnessAt(0.085, 0.0, 0.055, r);
+    expect(forehead).toBeLessThan(0.5);
+    expect(bridge).toBeLessThan(0.5);
+    expect(cheek).toBeGreaterThan(0.6);
+    expect(cheek).toBeGreaterThan(forehead);
+  });
+});
+
+describe("buildSkinMaterial", () => {
+  it("builds a physical skin material tinted to the tone", () => {
+    const m = buildSkinMaterial(THREE, "#8a5f38", { sssGlow: 0.05 });
+    expect(m.color.getHexString()).toBe("8a5f38");
+    expect(m.emissiveIntensity).toBeCloseTo(0.05, 5);
+    expect(m.roughness).toBeCloseTo(0.58, 5);
+  });
+  it("falls back cleanly when canvas textures are unavailable (node)", () => {
+    // paintSkullRoughnessTexture returns null outside a DOM.
+    const m = buildSkinMaterial(THREE, "#3b2314", {
+      roughnessMap: null,
+      roughness: 0.6,
+    });
+    expect(m.roughness).toBeCloseTo(0.6, 5);
+    expect(m.map).toBeNull();
+    expect(m.bumpMap).toBeNull();
+  });
+});
+
 describe("sculpt math", () => {
   it("sstep clamps and smooths", () => {
     expect(sstep(0, 1, -1)).toBe(0);
@@ -183,6 +229,24 @@ describe("buildHead", () => {
     expect(built.eyeL.position.x).toBeCloseTo(-built.eyeR.position.x, 6);
     expect(built.eyeL.position.y).toBeCloseTo(built.eyeR.position.y, 6);
     expect(built.eyeL.position.z).toBeGreaterThan(0);
+  });
+
+  it("builds the M3 anatomy set (lower-lid shells, philtrum ridges)", () => {
+    const byPart: Record<string, number> = {};
+    built.group.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh && (m.userData as { ws1?: boolean }).ws1) {
+        const p = (m.userData as { part?: string }).part ?? "?";
+        byPart[p] = (byPart[p] ?? 0) + 1;
+      }
+    });
+    // Per eye: orbital disc, sclera, iris, pupil, cornea, 2 catchlights,
+    // upper lid, lash line, 9 lashes, lower-lid arc, lower-lid shell,
+    // lid crease = 21.
+    expect(byPart["eye"]).toBe(42);
+    // Mouth: cavity, upper, lower, 2 vermilion borders, 2 corners,
+    // 2 philtrum ridges = 9.
+    expect(byPart["mouth"]).toBe(9);
   });
 
   it("stays inside the 6–9k head triangle budget", () => {

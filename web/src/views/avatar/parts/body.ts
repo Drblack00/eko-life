@@ -1,6 +1,7 @@
 import type * as THREE from "three";
 import { lathe, mesh } from "./util";
 import type { AvatarMaterials } from "./materials";
+import { buildSkinMaterial } from "./faceTextures";
 
 /**
  * The unclothed skin body: legs, torso, arms, hands, neck.
@@ -38,7 +39,13 @@ export function buildBody(
   const group = new T.Group();
   const LY = (absY: number) => absY - HIP_Y; // abs → upper-local
 
-  /* ---------------- legs (skin; feet planted, static) ---------------- */
+  // Shared PBR skin (same tone/material family as the face in head.ts,
+  // so neck, hands and legs never drift from the face tone).
+  const skinHex =
+    "#" + (mats.skinMat as THREE.MeshStandardMaterial).color.getHexString();
+  const skin = buildSkinMaterial(T, skinHex, { roughness: 0.6, sssGlow: 0.04 });
+
+  /* ---------------- legs (skin; relaxed neutral stance) ---------------- */
   const legX = 0.098;
   const legProfile: Array<[number, number]> = [
     [0.078, 0.03],
@@ -57,7 +64,10 @@ export function buildBody(
   for (const sx of [-1, 1]) {
     const legG = new T.Group();
     legG.position.set(sx * legX, HIP_Y, 0);
-    legG.add(lathe(T, legProfile, mats.skinMat, 14));
+    legG.add(lathe(T, legProfile, skin, 14));
+    // Weight-shifted neutral stance: one foot slightly forward, the other
+    // back — relaxed, not parade-ground. Clothing rides on the same group.
+    legG.position.z = sx < 0 ? 0.02 : -0.02;
     group.add(legG);
     legs.push(legG);
   }
@@ -88,67 +98,115 @@ export function buildBody(
           [0.054, 1.33],
         ]
   ).map(([r, y]) => [r, LY(y)] as [number, number]);
-  const torsoSkin = lathe(T, torsoSkinProfile, mats.skinMat, 18);
+  const torsoSkin = lathe(T, torsoSkinProfile, skin, 18);
   torsoSkin.scale.z = 0.74;
   upper.add(torsoSkin);
 
   /* ---------------- arms + hands (pivot at shoulder) ---------------- */
-  const armX = isMan ? 0.2 : 0.186;
+  const armX = isMan ? 0.205 : 0.188;
   const armProfile: Array<[number, number]> = [
-    [0.056, 0.03],
-    [0.05, -0.08],
-    [0.044, -0.18],
-    [0.04, -0.25],
-    [0.036, -0.33],
-    [0.029, -0.42],
-    [0.027, -0.45],
+    [0.058, 0.03],
+    [0.052, -0.08],
+    [0.046, -0.18],
+    [0.042, -0.25],
+    [0.037, -0.33],
+    [0.03, -0.42],
+    [0.028, -0.45],
   ].map(([r, y]) => [r * limbScale, y] as [number, number]);
+
+  /** One finger: proximal + distal segments with a natural slight curl. */
+  const buildFinger = (i: number, hand: THREE.Group): void => {
+    const fx = (i - 1.5) * 0.0205 * limbScale;
+    const curl = 0.32 + i * 0.04; // index straighter, pinky curls more
+    const prox = mesh(
+      T,
+      new T.CylinderGeometry(0.0092 * limbScale, 0.0084 * limbScale, 0.042, 7),
+      skin,
+      fx,
+      -0.095,
+      0.008
+    );
+    prox.rotation.x = curl * 0.55;
+    hand.add(prox);
+    // Knuckle hint.
+    const knuckle = mesh(
+      T,
+      new T.SphereGeometry(0.0095 * limbScale, 6, 5),
+      skin,
+      fx,
+      -0.115,
+      0.008 + Math.sin(curl * 0.55) * 0.021
+    );
+    hand.add(knuckle);
+    const dist = mesh(
+      T,
+      new T.CylinderGeometry(0.0082 * limbScale, 0.0068 * limbScale, 0.036, 7),
+      skin,
+      fx,
+      -0.115 - Math.cos(curl * 0.55) * 0.018,
+      0.008 + Math.sin(curl * 0.55) * 0.021 + Math.sin(curl) * 0.018
+    );
+    dist.rotation.x = curl;
+    hand.add(dist);
+  };
 
   const buildArm = (sx: number) => {
     const arm = new T.Group();
     arm.position.set(sx * armX, LY(1.3), 0);
-    arm.add(lathe(T, armProfile, mats.skinMat, 12));
-    // Hand: palm + separated fingers + thumb.
+    arm.add(lathe(T, armProfile, skin, 12));
+    // Hand: palm + segmented fingers + two-segment thumb.
     const hand = new T.Group();
     hand.position.set(0, -0.46, 0.004);
-    const palm = mesh(T, new T.SphereGeometry(0.048, 12, 10), mats.skinMat, 0, -0.032, 0);
+    const palm = mesh(T, new T.SphereGeometry(0.048, 12, 10), skin, 0, -0.032, 0);
     palm.scale.set(0.85 * limbScale, 1.2, 0.5);
     hand.add(palm);
-    for (let i = 0; i < 4; i++) {
-      const f = mesh(T,
-        new T.CylinderGeometry(0.009 * limbScale, 0.008 * limbScale, 0.055, 8),
-        mats.skinMat,
-        (i - 1.5) * 0.0205 * limbScale,
-        -0.1,
-        0.008
-      );
-      f.rotation.x = 0.28;
-      hand.add(f);
-    }
-    const thumb = mesh(T,
-      new T.CylinderGeometry(0.0095 * limbScale, 0.008 * limbScale, 0.045, 8),
-      mats.skinMat,
-      -sx * 0.04 * limbScale,
-      -0.032,
-      0.014
+    // Thenar (thumb-base) mound so the palm isn't a flat disc.
+    const thenar = mesh(T, new T.SphereGeometry(0.02, 8, 6), skin, -sx * 0.028 * limbScale, -0.045, 0.012);
+    thenar.scale.set(0.9, 1.3, 0.6);
+    hand.add(thenar);
+    for (let i = 0; i < 4; i++) buildFinger(i, hand);
+    const thumbBase = mesh(
+      T,
+      new T.CylinderGeometry(0.0098 * limbScale, 0.0088 * limbScale, 0.034, 7),
+      skin,
+      -sx * 0.042 * limbScale,
+      -0.035,
+      0.016
     );
-    thumb.rotation.z = sx * 0.6;
-    thumb.rotation.x = 0.3;
-    hand.add(thumb);
+    thumbBase.rotation.z = sx * 0.65;
+    thumbBase.rotation.x = 0.35;
+    hand.add(thumbBase);
+    const thumbTip = mesh(
+      T,
+      new T.CylinderGeometry(0.0086 * limbScale, 0.0072 * limbScale, 0.03, 7),
+      skin,
+      -sx * 0.055 * limbScale,
+      -0.045,
+      0.028
+    );
+    thumbTip.rotation.z = sx * 0.45;
+    thumbTip.rotation.x = 0.55;
+    hand.add(thumbTip);
     arm.add(hand);
 
-    arm.rotation.x = 0.04;
-    arm.rotation.z = sx * 0.06;
+    // Relaxed asymmetric hang (the idle loop adds micro-sway on top).
+    arm.rotation.x = sx < 0 ? 0.055 : 0.03;
+    arm.rotation.z = sx * (sx < 0 ? 0.075 : 0.05);
     upper.add(arm);
     return arm;
   };
   const armL = buildArm(-1);
   const armR = buildArm(1);
 
-  // Neck.
+  // Neck: shorter than before, widening into the trapezius so the head
+  // grows out of the shoulders instead of perching on a stalk.
   upper.add(
-    mesh(T, new T.CylinderGeometry(0.048, 0.056, 0.1, 14), mats.skinMat, 0, LY(1.35), 0)
+    mesh(T, new T.CylinderGeometry(0.05, 0.058, 0.085, 14), skin, 0, LY(1.345), 0)
   );
+  // Trapezius slope: neck → shoulders.
+  const traps = mesh(T, new T.SphereGeometry(0.082, 14, 10), skin, 0, LY(1.295), -0.008);
+  traps.scale.set(isMan ? 1.95 : 1.7, 0.52, 0.95);
+  upper.add(traps);
 
   // Head mount: empty group at the neck top; head.ts fills it.
   const headMount = new T.Group();

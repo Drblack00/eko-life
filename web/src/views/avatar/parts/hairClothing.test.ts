@@ -6,6 +6,7 @@ import {
   paintStrandFlow,
   paintFrizz,
   paintScalpSheen,
+  paintWaves,
 } from "./strandTextures";
 import {
   paintRibKnit,
@@ -109,6 +110,18 @@ describe("hair texture painters", () => {
     expect(count(calls, "fillRect")).toBeGreaterThanOrEqual(2);
     expect(count(calls, "createRadialGradient")).toBe(1);
     expect(count(calls, "arc")).toBe(260);
+  });
+
+  it("paintWaves draws ring pairs (trough + highlight) around the crown", () => {
+    const { ctx, calls } = makeRecorder();
+    paintWaves(ctx, 128, { seed: 79, rings: 9 });
+    // 1 base fill + 2 strokes per ring.
+    expect(count(calls, "fillRect")).toBe(1);
+    expect(count(calls, "stroke")).toBe(18);
+    // Deterministic for a fixed seed.
+    const b = makeRecorder();
+    paintWaves(b.ctx, 128, { seed: 79, rings: 9 });
+    expect(JSON.stringify(calls)).toBe(JSON.stringify(b.calls));
   });
 });
 
@@ -488,6 +501,7 @@ const stubT = {
   CylinderGeometry: FakeGeo,
   BoxGeometry: FakeGeo,
   TorusGeometry: FakeGeo,
+  CapsuleGeometry: FakeGeo,
   IcosahedronGeometry: FakeGeo,
   TubeGeometry: FakeGeo,
   PlaneGeometry: FakeGeo,
@@ -539,12 +553,36 @@ function fakeBody() {
 
 describe("buildHair contracts (stub three)", () => {
   const T = stubT as unknown as typeof import("three");
-  const ids = ["lowcut", "bald", "curls", "afro", "locs", "braids", "classic"];
-  it("builds non-empty parts for all 7 ids", () => {
+  const ids = [
+    "lowcut",
+    "bald",
+    "curls",
+    "afro",
+    "locs",
+    "braids",
+    "classic",
+    "hair_taper_fade_01",
+    "hair_waves_01",
+  ];
+  it("builds non-empty parts for all 9 ids", () => {
     for (const id of ids) {
       const parts = buildHair(T, id, fakeMats() as never);
       expect(parts.length, id).toBeGreaterThan(0);
     }
+  });
+  it("lowcut carries a lineup (hairline tube + 2 temple corners)", () => {
+    const parts = buildHair(T, "lowcut", fakeMats() as never);
+    // under-cap + fade shell + 2 sideburns + tube + 2 corners = 7
+    expect(parts.length).toBe(7);
+  });
+  it("taper fade and waves build distinct part sets with lineups", () => {
+    const mats = fakeMats();
+    const taper = buildHair(T, "hair_taper_fade_01", mats as never);
+    const waves = buildHair(T, "hair_waves_01", mats as never);
+    const lowcut = buildHair(T, "lowcut", mats as never);
+    expect(taper.length).toBeGreaterThan(lowcut.length);
+    expect(waves.length).toBe(lowcut.length); // same vocabulary, wave shell instead of fade shell
+    expect(taper.length).not.toBe(waves.length);
   });
   it("unknown id falls back to lowcut (never a bare head)", () => {
     const mats = fakeMats();
