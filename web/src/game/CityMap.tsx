@@ -7,6 +7,17 @@ import {
   drawBillboardCreative,
   type BillboardCreative,
 } from "./billboardCanvas";
+import {
+  DISTRICT_LABELS,
+  DISTRICT_WORLD_H,
+  PIN_LABEL_ZOOM_DIST,
+  PIN_PILL_DY,
+  PIN_PILL_WORLD_H,
+  pillTextSize,
+  pillWorldScale,
+  resolvePillColors,
+  type PillColors,
+} from "./CityMap.labels";
 import "./CityMap.css";
 
 /**
@@ -67,6 +78,65 @@ function makeLabelTexture(text: string): THREE.CanvasTexture {
   g.fillText(text, 256, 48);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** Read one CSS custom property from <html> (the app's theme tokens). */
+function readThemeVar(name: string): string | null {
+  try {
+    return (
+      getComputedStyle(document.documentElement).getPropertyValue(name) ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Rounded pill/chip texture for a place name. Colors come from the app's
+ * theme tokens (--surface/--text/--ring, day or night) so the chip stays
+ * legible in both themes; the canvas is sized to the text.
+ */
+function makePillTexture(text: string, colors: PillColors): THREE.CanvasTexture {
+  const font = "700 52px 'Baloo 2','Comic Sans MS',system-ui,sans-serif";
+  const measurer = document.createElement("canvas").getContext("2d")!;
+  const { w, h } = pillTextSize(text, (t, f) => {
+    measurer.font = f;
+    return measurer.measureText(t).width;
+  });
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const g = c.getContext("2d")!;
+  // Pill body
+  const pad = 6;
+  const x0 = pad;
+  const y0 = pad;
+  const w0 = w - pad * 2;
+  const h0 = h - pad * 2;
+  const r = h0 / 2;
+  g.beginPath();
+  g.moveTo(x0 + r, y0);
+  g.arcTo(x0 + w0, y0, x0 + w0, y0 + h0, r);
+  g.arcTo(x0 + w0, y0 + h0, x0, y0 + h0, r);
+  g.arcTo(x0, y0 + h0, x0, y0, r);
+  g.arcTo(x0, y0, x0 + w0, y0, r);
+  g.closePath();
+  g.fillStyle = colors.bg;
+  g.fill();
+  g.lineWidth = 6;
+  g.strokeStyle = colors.ring;
+  g.stroke();
+  // Label text
+  g.font = font;
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillStyle = colors.fg;
+  g.fillText(text, w / 2, h / 2 + 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
   return tex;
 }
 
@@ -729,6 +799,38 @@ export function CityMap({
       scene.add(spr);
     }
 
+    // Real Lagos district labels — pill chips with the popular place names at
+    // real-world relative positions (island side east, mainland side west).
+    // Theme-aware: rebuilt whenever data-theme flips so the chips keep their
+    // contrast in both day and night themes.
+    const districtGroup = new THREE.Group();
+    scene.add(districtGroup);
+    const buildDistrictLabels = () => {
+      for (const c of [...districtGroup.children]) {
+        const s = c as THREE.Sprite;
+        s.material.map?.dispose();
+        s.material.dispose();
+      }
+      districtGroup.clear();
+      const colors = resolvePillColors(readThemeVar);
+      for (const d of DISTRICT_LABELS) {
+        const tex = makePillTexture(d.name, colors);
+        const spr = new THREE.Sprite(
+          new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false })
+        );
+        const sc = pillWorldScale(
+          tex.image.width,
+          tex.image.height,
+          DISTRICT_WORLD_H[d.size]
+        );
+        spr.scale.set(sc.x, sc.y, 1);
+        spr.position.set(d.x, 10.5, d.z);
+        spr.userData.district = d.name;
+        districtGroup.add(spr);
+      }
+    };
+    buildDistrictLabels();
+
     // Sailboats on the lagoon — merged hull + mast + triangular sail each
     const boats: THREE.Mesh[] = [];
     const boatMat = new THREE.MeshStandardMaterial({
@@ -757,13 +859,31 @@ export function CityMap({
       boats.push(boat);
     });
 
-    // Pins
+    // Pins + their name pills.
+    // The emoji pin sprites keep the existing tap behavior (raycast targets).
+    // Each pin also gets a pill chip with its name, floating just below the
+    // icon. Pills are label-on-zoom: hidden at the default framing to avoid
+    // clutter, revealed when the user pinches in past PIN_LABEL_ZOOM_DIST.
+    // The district pills above stay visible at every zoom — they are the
+    // always-on place names.
     const pinGroup = new THREE.Group();
     scene.add(pinGroup);
+    const labelGroup = new THREE.Group();
+    scene.add(labelGroup);
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let hovered: THREE.Sprite | null = null;
     const pinSprites: THREE.Sprite[] = [];
+    const pinLabels: THREE.Sprite[] = [];
+    let labelsShown =
+      camera.position.distanceTo(controls.target) < PIN_LABEL_ZOOM_DIST;
+    const syncLabelVisibility = () => {
+      const show =
+        camera.position.distanceTo(controls.target) < PIN_LABEL_ZOOM_DIST;
+      if (show === labelsShown) return;
+      labelsShown = show;
+      for (const l of pinLabels) l.visible = show;
+    };
 
     const buildPins = (list: PinLocation[]) => {
       for (const c of [...pinGroup.children]) {
@@ -772,8 +892,16 @@ export function CityMap({
         s.material.dispose();
       }
       pinGroup.clear();
+      for (const c of [...labelGroup.children]) {
+        const s = c as THREE.Sprite;
+        s.material.map?.dispose();
+        s.material.dispose();
+      }
+      labelGroup.clear();
       pinSprites.length = 0;
+      pinLabels.length = 0;
       hovered = null;
+      const colors = resolvePillColors(readThemeVar);
       for (const pin of list) {
         const spr = new THREE.Sprite(
           new THREE.SpriteMaterial({
@@ -788,10 +916,35 @@ export function CityMap({
         spr.userData.phase = rand() * Math.PI * 2;
         pinGroup.add(spr);
         pinSprites.push(spr);
+        // Name pill beneath the icon (presentational only — travel costs and
+        // pin behavior are untouched).
+        const tex = makePillTexture(pin.name, colors);
+        const pill = new THREE.Sprite(
+          new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false })
+        );
+        const sc = pillWorldScale(tex.image.width, tex.image.height, PIN_PILL_WORLD_H);
+        pill.scale.set(sc.x, sc.y, 1);
+        pill.position.set(pin.x, 10 - PIN_PILL_DY, pin.z);
+        pill.userData.pin = pin;
+        pill.visible = labelsShown;
+        labelGroup.add(pill);
+        pinLabels.push(pill);
       }
     };
     buildPins(pinsRef.current);
     rebuildRef.current = buildPins;
+
+    // Theme flips (day ↔ night) re-skin the theme-aware labels with fresh
+    // token colors. Pin icons are theme-independent, rebuilt for simplicity.
+    const themeObs = new MutationObserver(() => {
+      buildDistrictLabels();
+      buildPins(pinsRef.current);
+    });
+    themeObs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    onCleanup(() => themeObs.disconnect());
 
     // ---- M13 billboards: two posts + a runtime-textured panel (static) ----
     // Geometry is shared across billboards; each panel gets its own
@@ -874,12 +1027,29 @@ export function CityMap({
       tooltip.textContent = (spr.userData.pin as PinLocation).name;
       tooltip.hidden = false;
     };
+    /**
+     * Hit-test pin icons first, then their (visible) name pills. Both carry
+     * userData.pin, so tapping a pill selects the pin exactly like tapping
+     * the icon. Pills are never raycast while hidden (label-on-zoom), and the
+     * 8px tap-vs-drag disambiguation in onUp is unchanged.
+     */
+    const pickPin = (): THREE.Sprite | null => {
+      const hitPin = raycaster.intersectObjects(pinSprites, false)[0];
+      if (hitPin) return hitPin.object as THREE.Sprite;
+      if (labelsShown) {
+        const hitPill = raycaster.intersectObjects(
+          pinLabels.filter((l) => l.visible),
+          false
+        )[0];
+        if (hitPill) return hitPill.object as THREE.Sprite;
+      }
+      return null;
+    };
     const onMove = (e: PointerEvent) => {
       if (e.pointerType === "touch") return;
       setPointer(e);
       raycaster.setFromCamera(pointer, camera);
-      const hit = raycaster.intersectObjects(pinSprites, false)[0];
-      const next = (hit?.object as THREE.Sprite) ?? null;
+      const next = pickPin();
       if (next !== hovered) {
         hovered = next;
         renderer.domElement.style.cursor = hovered ? "pointer" : "";
@@ -899,9 +1069,9 @@ export function CityMap({
       if (Math.hypot(e.clientX - downX, e.clientY - downY) > 8) return;
       setPointer(e);
       raycaster.setFromCamera(pointer, camera);
-      const hit = raycaster.intersectObjects(pinSprites, false)[0];
+      const hit = pickPin();
       if (hit) {
-        const pin = (hit.object as THREE.Sprite).userData.pin as PinLocation;
+        const pin = (hit as THREE.Sprite).userData.pin as PinLocation;
         selectRef.current(pin);
       }
     };
@@ -927,10 +1097,14 @@ export function CityMap({
           pos.setY(i, 0.35 * Math.sin(bx * 0.35 + t * 1.6) + 0.25 * Math.cos(bz * 0.18 + t * 1.1));
         }
         pos.needsUpdate = true;
-        // Pin bobbing
-        for (const s of pinSprites) {
+        // Pin bobbing — name pills ride along just below their icons
+        for (let i = 0; i < pinSprites.length; i++) {
+          const s = pinSprites[i];
           s.position.y = 10 + Math.sin(t * 2 + s.userData.phase) * 0.7;
+          const lbl = pinLabels[i];
+          if (lbl) lbl.position.y = s.position.y - PIN_PILL_DY;
         }
+        syncLabelVisibility();
         // Sailboats drift and bob
         boats.forEach((b, i) => {
           const ph = b.userData.phase as number;
@@ -946,7 +1120,10 @@ export function CityMap({
     animate();
 
     if (reducedMotion) {
-      const onChange = () => render();
+      const onChange = () => {
+        syncLabelVisibility();
+        render();
+      };
       controls.addEventListener("change", onChange);
     }
 
