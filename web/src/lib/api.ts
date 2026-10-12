@@ -748,3 +748,118 @@ export const notificationsApi = {
       body: JSON.stringify(prefs),
     }),
 };
+
+/* ------------------------------------------------------------------ */
+/* Phase 3 — Gist social feed + News tab. Contract: server/src/routes/ */
+/* gists.js. Text is plain (server strips markup); render as text.     */
+/* ------------------------------------------------------------------ */
+
+export type GistTab = "latest" | "trending" | "following" | "me" | "news";
+
+export interface GistEntry {
+  id: number;
+  user_id: number;
+  username: string;
+  avatar: string;
+  color: string;
+  badge: string;
+  text: string;
+  created_at: number;
+  like_count: number;
+  comment_count: number;
+  liked: boolean;
+  mine: boolean;
+}
+
+export interface GistComment {
+  id: number;
+  gist_id: number;
+  user_id: number;
+  username: string;
+  avatar: string;
+  color: string;
+  badge: string;
+  text: string;
+  created_at: number;
+}
+
+export interface HeadlineItem {
+  id: number;
+  source: string;
+  title: string;
+  link: string;
+  snippet: string;
+  published_at: number | null;
+  fetched_at: number;
+}
+
+export const GIST_MAX = 280;
+
+export const gistsApi = {
+  /** Cursor-paged feed for one tab. */
+  list: (token: string, tab: Exclude<GistTab, "news">, cursor?: string | null, limit = 15) => {
+    const q = new URLSearchParams({ tab, limit: String(limit) });
+    if (cursor) q.set("cursor", cursor);
+    return authGet<{ gists: GistEntry[]; next_cursor: string | null; tab: string }>(
+      `/api/gists?${q.toString()}`,
+      token
+    );
+  },
+  /** Post a gist (server validates 1–280 chars, 30s/user rate limit). */
+  create: (token: string, text: string) =>
+    authPost<{ gist: GistEntry }>("/api/gists", token, { text }),
+  /** Idempotent like. */
+  like: (token: string, id: number) =>
+    authPost<{ ok: boolean; liked: boolean; like_count: number }>(
+      `/api/gists/${id}/like`,
+      token,
+      {}
+    ),
+  /** Idempotent unlike. */
+  unlike: (token: string, id: number) =>
+    authDelete<{ ok: boolean; liked: boolean; like_count: number }>(
+      `/api/gists/${id}/like`,
+      token
+    ),
+  /** Delete own gist (admins can delete any). */
+  remove: (token: string, id: number) =>
+    authDelete<{ ok: boolean }>(`/api/gists/${id}`, token),
+  /** Oldest-first comments, cursor paged. */
+  comments: (token: string, id: number, cursor?: string | null, limit = 20) => {
+    const q = new URLSearchParams({ limit: String(limit) });
+    if (cursor) q.set("cursor", cursor);
+    return authGet<{ comments: GistComment[]; next_cursor: string | null }>(
+      `/api/gists/${id}/comments?${q.toString()}`,
+      token
+    );
+  },
+  /** Add a comment (server validates 1–280 chars). */
+  addComment: (token: string, id: number, text: string) =>
+    authPost<{ comment: GistComment }>(`/api/gists/${id}/comments`, token, { text }),
+  /** Report a gist (records a row for admins). */
+  report: (token: string, id: number, reason: string) =>
+    authPost<{ ok: boolean; report_id: number }>(`/api/gists/${id}/report`, token, {
+      reason,
+    }),
+};
+
+export const headlinesApi = {
+  /** Newest-first headlines + cache metadata. */
+  list: (token: string, cursor?: string | null, limit = 20) => {
+    const q = new URLSearchParams({ limit: String(limit) });
+    if (cursor) q.set("cursor", cursor);
+    return authGet<{
+      items: HeadlineItem[];
+      next_cursor: string | null;
+      stale: boolean;
+      updated_minutes_ago: number | null;
+    }>(`/api/headlines?${q.toString()}`, token);
+  },
+  /** Manual refresh (server re-fetches only when the cache is stale). */
+  refresh: (token: string) =>
+    authPost<{ ok: boolean; refreshed: boolean; updated_minutes_ago?: number }>(
+      "/api/headlines/refresh",
+      token,
+      {}
+    ),
+};
