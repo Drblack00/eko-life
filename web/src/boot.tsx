@@ -48,9 +48,15 @@ function BootScreen() {
     }, 15_000);
 
     // Lazy-load the App chunk while the staged loader plays, then swap in.
+    // Also preload GLTF avatar assets so buildAvatarLook can clone synchronously.
     const warm = async () => {
       try {
-        const mod = await import("./App");
+        const [mod] = await Promise.all([
+          import("./App"),
+          import("./avatar/gltf/loader").then((m) =>
+            m.loadAvatarAssets().catch(() => null)
+          ),
+        ]);
         if (mounted) setLoadedApp(() => mod.App);
       } catch (err) {
         if (!mounted) return;
