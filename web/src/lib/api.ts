@@ -1110,3 +1110,34 @@ export const govApi = {
       { title }
     ),
 };
+
+/* ------------------------------------------------------------------ */
+/* Phase 9 — Daily Gem Hunt: riddle clue + search current location.    */
+/* ------------------------------------------------------------------ */
+export interface GemState {
+  day: number;
+  clue: string;
+  nextGemInMs: number;
+  foundCount: number;
+  firstFinders: string[];
+  myFound: boolean;
+  myPrize: number | null;
+  myRank: number | null;
+  nextPrize: number;
+  prizeLadder: { label: string; prize: number }[];
+}
+
+export interface GemSearchResult {
+  ok: boolean;
+  found: boolean;
+  prize: number;
+  rank: number;
+}
+
+export const gemApi = {
+  /** Today's hunt state: clue, countdown, finders, ladder (no location leak). */
+  state: (token: string) => authGet<GemState>("/api/gem", token),
+  /** Search the player's current location for today's gem. */
+  search: (token: string) =>
+    authPost<GemSearchResult>("/api/gem/search", token, {}),
+};
