@@ -52,8 +52,10 @@
 }
 
 .eko-char__h {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .eko-char__sub {
@@ -407,21 +409,33 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  padding: 10px 2px;
+  gap: 14px;
+  padding: 13px 4px;
   font-size: 14px;
   cursor: pointer;
+}
+
+/* Hairline dividers between stacked rows — airier than a flat stack. */
+.eko-char__switchrow + .eko-char__switchrow {
+  border-top: 1px solid var(--glass-border, rgba(128, 128, 128, 0.18));
 }
 
 .eko-char__switchrow > span:first-child {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+}
+
+.eko-char__switchrow strong {
+  font-size: 14.5px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
 }
 
 .eko-char__switchrow small {
   opacity: 0.65;
-  font-size: 12px;
+  font-size: 12.5px;
+  line-height: 1.35;
 }
 
 .eko-char__signout {
