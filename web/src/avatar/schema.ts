@@ -39,7 +39,8 @@ export const BODY_PRESET_TO_TYPE: Record<BodyPresetId, BodyType> = {
 
 export type FacePresetId = "face_default_01";
 
-/** Verbatim legacy skin-tone ids (server AVATAR_SKINS). */
+/** Verbatim legacy skin-tone ids (server AVATAR_SKINS), plus the M8
+ * expansion pack (6 more tones). */
 export type SkinToneId =
   | "deep_espresso"
   | "dark_cocoa"
@@ -52,13 +53,36 @@ export type SkinToneId =
   | "honey"
   | "sand"
   | "amber"
-  | "cream";
+  | "cream"
+  | "onyx"
+  | "truffle"
+  | "sienna"
+  | "caramel"
+  | "butterscotch"
+  | "ivory";
+
+/** M8: selectable eye colours — index into faceTextures IRIS_PALETTES. */
+export type EyeColorId =
+  | "eye_brown_01"
+  | "eye_hazel_01"
+  | "eye_amber_01"
+  | "eye_green_01";
+
+/** M8: procedural eyebrow styles (parts/head.ts brow builder). */
+export type BrowStyleId =
+  | "brow_natural_01"
+  | "brow_bold_01"
+  | "brow_arched_01"
+  | "brow_trimmed_01";
 
 export interface AppearanceBase {
   bodyType: BodyType;
   bodyPresetId: BodyPresetId;
   facePresetId: FacePresetId;
   skinToneId: SkinToneId;
+  /** M8: eye colour + brow style (validated, stored, HONORED by the builder). */
+  eyeColorId: EyeColorId;
+  browStyleId: BrowStyleId;
 }
 
 /* ------------------------------------------------------------------ */
@@ -106,7 +130,8 @@ export type AppearanceMorphInput = Partial<Record<MorphKey, number>>;
 /* ------------------------------------------------------------------ */
 
 /** Verbatim legacy ids (server AVATAR_HAIRS; pipeline unknown → lowcut),
- * plus the M3 procedural styles (taper fade, waves). */
+ * plus the M3 procedural styles (taper fade, waves) and the M8 expansion
+ * pack (bun, ponytail, mohawk, bantu knots). */
 export type HairStyleId =
   | "lowcut"
   | "bald"
@@ -116,15 +141,25 @@ export type HairStyleId =
   | "braids"
   | "classic"
   | "hair_taper_fade_01"
-  | "hair_waves_01";
+  | "hair_waves_01"
+  | "hair_bun_01"
+  | "hair_ponytail_01"
+  | "hair_mohawk_01"
+  | "hair_bantu_knots_01";
 
 /**
  * `hair_black_01` = the default hair colour (HAIR_HEX `#171110` in
  * parts/materials.ts). M3b adds dark brown and brown; buildHair(colorId)
  * in parts/hair.ts tints the hair and the facial hair follows
- * mats.hairMat.
+ * mats.hairMat. M8 adds auburn, blonde, grey.
  */
-export type HairColorId = "hair_black_01" | "hair_dark_brown_01" | "hair_brown_01";
+export type HairColorId =
+  | "hair_black_01"
+  | "hair_dark_brown_01"
+  | "hair_brown_01"
+  | "hair_auburn_01"
+  | "hair_blonde_01"
+  | "hair_grey_01";
 
 /**
  * Procedural facial hair (M3b, parts/facialHair.ts). buildFacialHair()
@@ -155,11 +190,17 @@ export interface AppearanceHair {
  * - Outerwear is null unless the outfit builds one (hoodie → hood/cowl,
  *   sitework → hi-vis vest).
  */
-export type ClothingTopId = "top_tee_01" | "top_shirt_office_01";
+export type ClothingTopId =
+  | "top_tee_01"
+  | "top_shirt_office_01"
+  | "top_tank_01"
+  | "top_agbada_01"
+  | "top_dress_01";
 export type ClothingBottomId =
   | "bottom_trouser_01"
   | "bottom_short_01"
-  | "bottom_cargo_01";
+  | "bottom_cargo_01"
+  | "bottom_skirt_01";
 export type OuterwearId = "outer_hoodie_01" | "outer_hivis_vest_01";
 /** Verbatim legacy ids (server AVATAR_FABRICS). */
 export type FabricId = "plain" | "ankara" | "adire" | "asoke";
@@ -176,7 +217,12 @@ export interface AppearanceClothing {
   bottomColor: string;
 }
 
-export type ShoeId = "shoe_sneaker_01" | "shoe_oxford_01" | "shoe_boot_01";
+export type ShoeId =
+  | "shoe_sneaker_01"
+  | "shoe_oxford_01"
+  | "shoe_boot_01"
+  | "shoe_sandal_01"
+  | "shoe_heel_01";
 
 /* ------------------------------------------------------------------ */
 /* Accessories                                                         */
@@ -186,7 +232,7 @@ export type AccessorySlot = "head" | "face" | "ears" | "neck" | "wrist";
 
 export interface AppearanceAccessory {
   slot: AccessorySlot;
-  /** Manifest asset id (kind "accessory"). No accessory assets ship in M2. */
+  /** Manifest asset id (kind "accessory"). M8 ships 3 procedural ones. */
   assetId: string;
 }
 
