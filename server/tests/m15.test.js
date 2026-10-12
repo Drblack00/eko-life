@@ -175,8 +175,8 @@ test('M15 /config: avatarLook + walls + floors exposed', async () => {
   assert.deepEqual(al.hairs.map(h => h.id), ['lowcut', 'bald', 'curls', 'afro', 'locs', 'braids', 'classic', 'hair_taper_fade_01', 'hair_waves_01']);
   assert.deepEqual(al.outfits.map(o => o.id), ['casual', 'hoodie', 'office', 'chill', 'sitework']);
   assert.deepEqual(al.fabrics.map(f => f.id), ['plain', 'ankara', 'adire', 'asoke']);
-  assert.equal(al.topColors.length, 10);
-  assert.equal(al.bottomColors.length, 10);
+  assert.equal(al.topColors.length, 21); // Phase 6: + boutique signature colors
+  assert.equal(al.bottomColors.length, 20);
   assert.ok(al.topColors.every(c => /^#[0-9a-f]{6}$/i.test(c)));
   assert.ok(al.bottomColors.every(c => /^#[0-9a-f]{6}$/i.test(c)));
   assert.deepEqual(al.defaults, data.DEFAULT_AVATAR);
