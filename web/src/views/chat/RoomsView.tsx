@@ -370,6 +370,14 @@ export function RoomsView({
   const [activeId, setActiveId] = useState<string | number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
+  // M21: notification deep-link — open the tapped room, then clear the nav.
+  useEffect(() => {
+    if (sock.navRoomId != null) {
+      setActiveId(sock.navRoomId);
+      sock.clearRoomNav();
+    }
+  }, [sock.navRoomId, sock]);
+
   const activeRoom = sock.rooms.find((r) => String(r.id) === String(activeId)) ?? null;
   if (activeRoom) {
     return (

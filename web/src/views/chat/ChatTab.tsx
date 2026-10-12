@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, EmptyState, useToast } from "../../components";
 import type { GameSocket } from "../../hooks/useGameSocket";
 import type { You } from "../../game/types";
@@ -117,6 +117,12 @@ export function ChatTab({ sock, you }: { sock: GameSocket; you: You }) {
   const [seg, setSeg] = useState<Segment>("city");
   const [profile, setProfile] = useState<ProfileTarget | null>(null);
   const [dmStart, setDmStart] = useState<{ id: number; username: string } | null>(null);
+
+  // M21: notification deep-link — a tapped room notification jumps straight
+  // to the rooms segment; RoomsView opens the specific room.
+  useEffect(() => {
+    if (sock.navRoomId != null) setSeg("rooms");
+  }, [sock.navRoomId]);
 
   const openProfile = (t: ProfileTarget) => setProfile(t);
   const startDm = (playerId: number, username: string) => {
