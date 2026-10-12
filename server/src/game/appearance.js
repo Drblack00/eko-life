@@ -64,36 +64,50 @@ const BODY_PRESETS = ['woman', 'man'];
 const BODY_PRESET_TO_TYPE = { woman: 'feminine', man: 'masculine' };
 const FACE_PRESETS = ['face_default_01'];
 
-// Skin tones (texture assets, verbatim legacy ids + hexes).
+// Skin tones (texture assets, verbatim legacy ids + hexes, plus M8 pack).
 const SKIN_TONES = [
+  ['onyx', '#291709'],
   ['deep_espresso', '#3b2314'],
   ['dark_cocoa', '#4a2c17'],
+  ['truffle', '#553521'],
   ['burnt_caramel', '#5d3a1f'],
   ['mahogany', '#6f4426'],
   ['walnut', '#7d5330'],
+  ['sienna', '#835c36'],
   ['cocoa', '#8a5f38'],
   ['coffee', '#9a6f45'],
+  ['caramel', '#a37a4e'],
   ['latte', '#ab8054'],
   ['honey', '#bc9066'],
   ['sand', '#cda077'],
+  ['butterscotch', '#d4a878'],
   ['amber', '#dcb07e'],
   ['cream', '#e8cfa3'],
+  ['ivory', '#f2e0bd'],
 ];
 const SKIN_TONE_IDS = SKIN_TONES.map(([id]) => id);
 const SKIN_HEX_TO_ID = Object.fromEntries(SKIN_TONES.map(([id, hex]) => [hex.toLowerCase(), id]));
 
-// Hair styles (hair assets, verbatim legacy ids + v1 procedural ids, slot "hair").
-const HAIR_STYLES = ['lowcut', 'bald', 'curls', 'afro', 'locs', 'braids', 'classic', 'hair_taper_fade_01', 'hair_waves_01'];
+// Eye colours (M8 texture assets — index into IRIS_PALETTES).
+const EYE_COLORS = ['eye_brown_01', 'eye_hazel_01', 'eye_amber_01', 'eye_green_01'];
+// Brow styles (M8 hair-slot assets, slot "brows").
+const BROW_STYLES = ['brow_natural_01', 'brow_bold_01', 'brow_arched_01', 'brow_trimmed_01'];
+
+// Hair styles (hair assets, verbatim legacy ids + v1 procedural ids + M8
+// expansion pack, slot "hair").
+const HAIR_STYLES = ['lowcut', 'bald', 'curls', 'afro', 'locs', 'braids', 'classic', 'hair_taper_fade_01', 'hair_waves_01', 'hair_bun_01', 'hair_ponytail_01', 'hair_mohawk_01', 'hair_bantu_knots_01'];
 // Hair colours (v1 texture assets).
-const HAIR_COLORS = ['hair_black_01', 'hair_dark_brown_01', 'hair_brown_01'];
+const HAIR_COLORS = ['hair_black_01', 'hair_dark_brown_01', 'hair_brown_01', 'hair_auburn_01', 'hair_blonde_01', 'hair_grey_01'];
 // Facial hair (v1 hair-slot assets; none_01 = honestly nothing).
 const FACIAL_HAIRS = ['facialhair_none_01', 'facialhair_mustache_01', 'facialhair_goatee_01', 'facialhair_beard_short_01'];
 
-// Clothing, decomposed from the 5 legacy outfits (mirror manifest.ts).
-const TOPS = ['top_tee_01', 'top_shirt_office_01'];
-const BOTTOMS = ['bottom_trouser_01', 'bottom_short_01', 'bottom_cargo_01'];
+// Clothing, decomposed from the 8 outfits (mirror manifest.ts).
+const TOPS = ['top_tee_01', 'top_shirt_office_01', 'top_tank_01', 'top_agbada_01', 'top_dress_01'];
+const BOTTOMS = ['bottom_trouser_01', 'bottom_short_01', 'bottom_cargo_01', 'bottom_skirt_01'];
 const OUTERWEARS = ['outer_hoodie_01', 'outer_hivis_vest_01'];
-const SHOES = ['shoe_sneaker_01', 'shoe_oxford_01', 'shoe_boot_01'];
+const SHOES = ['shoe_sneaker_01', 'shoe_oxford_01', 'shoe_boot_01', 'shoe_sandal_01', 'shoe_heel_01'];
+// Accessories (M8 procedural assets, kind "accessory").
+const ACCESSORIES = ['acc_glasses_01', 'acc_cap_01', 'acc_earrings_01'];
 // Fabrics (texture assets, verbatim legacy ids).
 const FABRICS = ['plain', 'ankara', 'adire', 'asoke'];
 // Legacy outfits (kept for the catalog + legacy→v1 mapper only).
@@ -146,6 +160,8 @@ export function defaultAppearanceV1(characterId = '') {
       bodyPresetId: 'woman',
       facePresetId: 'face_default_01',
       skinToneId: 'cocoa',
+      eyeColorId: 'eye_brown_01',
+      browStyleId: 'brow_natural_01',
     },
     morphs: defaultMorphs(),
     hair: {
@@ -240,6 +256,20 @@ export function validateAppearanceV1(raw) {
         err('base.skinToneId', `unknown skin tone '${String(rawBase.skinToneId)}'`);
       } else {
         base.skinToneId = rawBase.skinToneId;
+      }
+    }
+    if (rawBase.eyeColorId !== undefined) {
+      if (typeof rawBase.eyeColorId !== 'string' || !EYE_COLORS.includes(rawBase.eyeColorId)) {
+        err('base.eyeColorId', `unknown eye colour '${String(rawBase.eyeColorId)}'`);
+      } else {
+        base.eyeColorId = rawBase.eyeColorId;
+      }
+    }
+    if (rawBase.browStyleId !== undefined) {
+      if (typeof rawBase.browStyleId !== 'string' || !BROW_STYLES.includes(rawBase.browStyleId)) {
+        err('base.browStyleId', `unknown brow style '${String(rawBase.browStyleId)}'`);
+      } else {
+        base.browStyleId = rawBase.browStyleId;
       }
     }
   }
@@ -387,8 +417,13 @@ export function validateAppearanceV1(raw) {
         err(`${path}.slot`, `duplicate accessory slot '${slot}'`);
         return;
       }
-      // M2 ships NO available accessory assets — every assetId rejects.
-      err(`${path}.assetId`, `unknown accessory asset '${String(assetId)}'`);
+      // M8 ships 3 procedural accessory assets — only those are accepted.
+      if (typeof assetId !== 'string' || !ACCESSORIES.includes(assetId)) {
+        err(`${path}.assetId`, `unknown accessory asset '${String(assetId)}'`);
+        return;
+      }
+      seen.add(slot);
+      accessories.push({ slot, assetId });
     });
   }
 
@@ -536,6 +571,8 @@ export function buildCatalog() {
     bodyPresets: ['woman', 'man'],
     facePresets: ['face_default_01'],
     skins: SKIN_TONE_IDS,
+    eyeColors: EYE_COLORS,
+    browStyles: BROW_STYLES,
     hairs: HAIR_STYLES,
     hairColors: HAIR_COLORS,
     facialHair: FACIAL_HAIRS,
@@ -545,7 +582,7 @@ export function buildCatalog() {
     bottoms: BOTTOMS,
     outerwear: OUTERWEARS,
     shoes: SHOES,
-    accessories: [], // M2 ships no accessory assets
+    accessories: ACCESSORIES, // M8 procedural accessories
     morphs: PERMITTED_MORPHS.map((m) => ({
       key: m.key,
       default: m.default,
