@@ -246,6 +246,21 @@ CREATE TABLE IF NOT EXISTS news_items (
   fetched_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_news_items_fetched ON news_items(fetched_at DESC);
+-- Phase 4 (Èkó Reserve bank app): fixed-term savings bonds. Principal is
+-- locked until maturity; maturity settlement credits principal + flat
+-- interest and flips matured 0→1 (atomic claim — never double-pays).
+CREATE TABLE IF NOT EXISTS bank_bonds (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  principal INTEGER NOT NULL,
+  rate REAL NOT NULL,
+  start_day INTEGER NOT NULL,
+  term_days INTEGER NOT NULL,
+  matured INTEGER NOT NULL DEFAULT 0,
+  matured_day INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_bank_bonds_user ON bank_bonds(user_id);
+CREATE INDEX IF NOT EXISTS idx_bank_bonds_due ON bank_bonds(matured, start_day, term_days);
 -- ============================================================
 -- FINTECH FOUNDATION (Worker A) — real-money cash ledger.
 -- ADDITIVE ONLY: no existing game table, game code, or the
@@ -653,6 +668,21 @@ CREATE TABLE IF NOT EXISTS news_items (
   fetched_at BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_news_items_fetched ON news_items(fetched_at DESC);
+-- Phase 4 (Èkó Reserve bank app): fixed-term savings bonds. Principal is
+-- locked until maturity; maturity settlement credits principal + flat
+-- interest and flips matured 0→1 (atomic claim — never double-pays).
+CREATE TABLE IF NOT EXISTS bank_bonds (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  principal INTEGER NOT NULL,
+  rate DOUBLE PRECISION NOT NULL,
+  start_day INTEGER NOT NULL,
+  term_days INTEGER NOT NULL,
+  matured INTEGER NOT NULL DEFAULT 0,
+  matured_day BIGINT
+);
+CREATE INDEX IF NOT EXISTS idx_bank_bonds_user ON bank_bonds(user_id);
+CREATE INDEX IF NOT EXISTS idx_bank_bonds_due ON bank_bonds(matured, start_day, term_days);
 -- ============================================================
 -- FINTECH FOUNDATION (Worker A) — real-money cash ledger.
 -- ADDITIVE ONLY: no existing game table, game code, or the
@@ -860,6 +890,19 @@ export async function dbAll(sqliteSql, pgSql, params = []) {
   return getAll(sqliteSql, pgSql, params);
 }
 
+// Run a statement and report whether it changed anything (atomic claim
+// pattern — e.g. flipping bank_bonds.matured 0→1 exactly once).
+// sqlite: { changes, rows: [] }; postgres: { changes, rows } — pair with a
+// RETURNING clause on the pg variant so rowCount reflects the claim.
+export async function dbRunReturning(sqliteSql, pgSql, params = []) {
+  if (pool) {
+    const r = await pool.query(pgSql, params);
+    return { changes: Number(r.rowCount) || 0, rows: r.rows };
+  }
+  const r = sdb.prepare(sqliteSql).run(...params);
+  return { changes: Number(r.changes) || 0, rows: [] };
+}
+
 // Add a column if missing (for upgrading existing databases)
 // V2: exported so tests can add/verify coordinator-owned columns idempotently.
 export async function ensureColumn(table, col, sqliteDef, pgDef) {
@@ -926,6 +969,8 @@ export async function initDb() {
     await ensureColumn('characters', 'appearance_rev', 'INTEGER NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0');
     // W3: friends page — status-change timestamp on friendships (no-op on fresh DBs)
     await ensureColumn('friendships', 'updated_ts', 'INTEGER NOT NULL DEFAULT 0', 'BIGINT NOT NULL DEFAULT 0');
+    // Phase 4 (Èkó Reserve): unpaid weekly upkeep bills (no interest, no lockouts)
+    await ensureColumn('characters', 'bill_arrears', 'INTEGER NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0');
     console.log('[db] PostgreSQL connected');
   } else {
     const dbPath = process.env.EKO_DB_PATH || path.join(__dirname, 'eko-life.db');
@@ -969,6 +1014,8 @@ export async function initDb() {
     await ensureColumn('characters', 'appearance_rev', 'INTEGER NOT NULL DEFAULT 0', '');
     // W3: friends page — status-change timestamp on friendships (no-op on fresh DBs)
     await ensureColumn('friendships', 'updated_ts', 'INTEGER NOT NULL DEFAULT 0', '');
+    // Phase 4 (Èkó Reserve): unpaid weekly upkeep bills (no interest, no lockouts)
+    await ensureColumn('characters', 'bill_arrears', 'INTEGER NOT NULL DEFAULT 0', '');
     console.log(`[db] SQLite connected (${dbPath === ':memory:' ? 'in-memory' : 'local file'})`);
   }
 }
@@ -1156,6 +1203,9 @@ export async function saveCharacter(c) {
   // stored one (COALESCE guards pre-M6 NULL revs); all gameplay columns
   // keep the old unconditional behavior — the live session still owns them.
   const appearanceRev = Math.max(0, Math.floor(Number(c.appearance_rev ?? 0) || 0));
+  // Phase 4 (Èkó Reserve): weekly-bill arrears — plain gameplay column,
+  // persisted like every other character stat.
+  const billArrears = Math.max(0, Math.floor(Number(c.bill_arrears) || 0));
   const params = [c.name, c.class, c.avatar, c.color, c.money, c.energy, c.health,
     c.happiness, c.hunger, c.housing, c.property, c.vehicle, c.biz ?? null, c.savings, c.loan,
     c.cert, c.location_id, c.x ?? null, c.y ?? null, c.rent_misses || 0,
@@ -1168,6 +1218,7 @@ export async function saveCharacter(c) {
     // (inMemRev, avatarLookJson) then (inMemRev, inMemRev).
     appearanceRev, avatarLookJson, c.home_wall ?? null, c.home_floor ?? null,
     appearanceRev, appearanceRev,
+    billArrears,
     Date.now(), c.user_id];
   await runQ(
     `UPDATE characters SET name=?, class=?, avatar=?, color=?, money=?, energy=?, health=?,
@@ -1179,6 +1230,7 @@ export async function saveCharacter(c) {
       avatar_look=CASE WHEN COALESCE(appearance_rev,0) <= ? THEN ? ELSE avatar_look END,
       home_wall=?, home_floor=?,
       appearance_rev=CASE WHEN COALESCE(appearance_rev,0) <= ? THEN ? ELSE appearance_rev END,
+      bill_arrears=?,
       updated_at=? WHERE user_id=?`,
     `UPDATE characters SET name=$1, class=$2, avatar=$3, color=$4, money=$5, energy=$6, health=$7,
       happiness=$8, hunger=$9, housing=$10, property=$11, vehicle=$12, biz=$13, savings=$14, loan=$15,
@@ -1189,7 +1241,8 @@ export async function saveCharacter(c) {
       avatar_look=CASE WHEN COALESCE(appearance_rev,0) <= $36 THEN $37 ELSE avatar_look END,
       home_wall=$38, home_floor=$39,
       appearance_rev=CASE WHEN COALESCE(appearance_rev,0) <= $40 THEN $41 ELSE appearance_rev END,
-      updated_at=$42 WHERE user_id=$43`,
+      bill_arrears=$42,
+      updated_at=$43 WHERE user_id=$44`,
     params);
 }
 
