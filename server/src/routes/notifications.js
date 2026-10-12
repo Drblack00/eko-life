@@ -67,14 +67,18 @@ export function createNotificationsRouter() {
   });
 
   // PUT /api/notifications/preferences { friend_online?, room_message?, money_received? }
+  // Partial updates MERGE with the stored prefs: keys missing from the body
+  // keep their current value (2026-10-12 bug: missing keys were reset to
+  // true, so turning one toggle off flipped the others back on).
   router.put('/preferences', async (req, res) => {
     try {
       const body = req.body || {};
-      const preferences = await setNotificationPrefs(req.userId, {
-        friend_online: body.friend_online !== false,
-        room_message: body.room_message !== false,
-        money_received: body.money_received !== false,
-      });
+      const current = await getNotificationPrefs(req.userId);
+      const merged = {};
+      for (const k of ['friend_online', 'room_message', 'money_received']) {
+        merged[k] = body[k] === undefined ? current[k] : body[k] !== false;
+      }
+      const preferences = await setNotificationPrefs(req.userId, merged);
       res.json({ preferences });
     } catch (e) {
       console.error('[notifications] prefs set:', e.message);
