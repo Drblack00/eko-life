@@ -1,0 +1,312 @@
+/* Èkó Gov — Phase 8 */
+
+.eko-gov {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px;
+}
+
+.eko-gov__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.eko-gov__title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.eko-gov__sub {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.eko-gov__refresh {
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+}
+
+.eko-gov__refresh:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.eko-gov__notice {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(34, 211, 238, 0.12);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  font-size: 0.85rem;
+}
+
+.eko-gov__loading,
+.eko-gov__error {
+  text-align: center;
+  padding: 28px 12px;
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+.eko-gov__h {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.eko-gov__card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.eko-gov__crown {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.eko-gov__term {
+  opacity: 0.75;
+  font-size: 0.85rem;
+}
+
+.eko-gov__perk {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  opacity: 0.8;
+}
+
+.eko-gov__race-meta {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.eko-gov__empty {
+  margin: 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.eko-gov__note {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  color: #a7f3d0;
+}
+
+.eko-gov__fine {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  opacity: 0.65;
+  line-height: 1.4;
+}
+
+.eko-gov__cands {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.eko-gov__cand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.eko-gov__cand-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eko-gov__cand-votes {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.eko-gov__vote {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.12);
+  color: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.eko-gov__vote:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.eko-gov__run {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(251, 191, 36, 0.12);
+  color: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.eko-gov__run:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.eko-gov__picker {
+  margin-top: 8px;
+}
+
+.eko-gov__policies {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.eko-gov__policy {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.eko-gov__policy:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.eko-gov__appoint {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.eko-gov__appoint select,
+.eko-gov__appoint input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.3);
+  color: inherit;
+  font-size: 0.82rem;
+}
+
+.eko-gov__appoint button {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  background: rgba(34, 211, 238, 0.12);
+  color: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.eko-gov__appoint button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.eko-gov__dialog {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 60;
+  padding: 20px;
+}
+
+.eko-gov__dialog-box {
+  max-width: 340px;
+  width: 100%;
+  padding: 18px;
+  border-radius: 14px;
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.eko-gov__dialog-box h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.eko-gov__dialog-box p {
+  margin: 0 0 14px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  opacity: 0.9;
+}
+
+.eko-gov__dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.eko-gov__dialog-actions button {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.eko-gov__dialog-actions button:last-child {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(251, 191, 36, 0.14);
+  font-weight: 600;
+}
+
+.eko-gov__dialog-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
