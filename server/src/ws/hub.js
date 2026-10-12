@@ -39,6 +39,7 @@ import * as m10 from '../game/v2/m10.js';
 import * as bank from '../game/v2/bank.js';
 import { isCommissioner } from '../game/v2/m11.js';
 import { m12YouSnapshot } from '../game/v2/m12.js';
+import { VENUE_ACTIVITIES } from '../game/v2/venues.js'; // Phase 5: venue activities
 
 const CHAT_COOLDOWN_MS = 1200;
 const CHAT_HISTORY = 40;
@@ -311,6 +312,8 @@ export function createHub({ getDay }) {
           defaults: DEFAULT_AVATAR,
         },
         walls: WALLS, floors: FLOORS,
+        // Phase 5: venue activities (flat list; client matches by location tags).
+        venueActivities: VENUE_ACTIVITIES,
       },
       election: elState,
       governor: governorId ? { id: governorId, name: govName } : null,
