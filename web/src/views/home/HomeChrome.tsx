@@ -4,6 +4,7 @@ import { naira } from "../../game/types";
 import { Button, Dialog } from "../../components";
 import { blip } from "../../lib/sound";
 import { compactNum, moodFor, shiftCountdown, SHORTCUTS } from "./homeChrome";
+import { GemHuntCard } from "./GemHunt";
 import "./HomeChrome.css";
 
 export { compactNum, moodFor };
@@ -237,6 +238,7 @@ function SideCards({
           <span className="eko-sidecard__sub">⭐ {stars} earned</span>
         </span>
       </button>
+      <GemHuntCard token={token} />
       <button
         type="button"
         className="eko-sidecard eko-sidecard--toggle glass"

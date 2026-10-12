@@ -16,6 +16,7 @@ import { createGistsRouter, createNewsRouter } from './gists.js';
 import { createBankRouter } from './bank.js';
 import { createBoutiqueRouter } from './boutique.js';
 import { createGovRouter } from './gov.js';
+import { createGemRouter } from './gem.js';
 import { createCashWalletRouter } from './cashWallet.js';
 import { createCashFlowsRouter } from './cashFlows.js';
 import { createCashAdminRouter } from './cashAdmin.js';
@@ -328,6 +329,9 @@ export function createApiRouter({ hub, getDay }) {
 
   // ---- Phase 8: Èkó Gov — governor election + governance REST ----
   router.use('/gov', createGovRouter({ hub, getDay }));
+
+  // ---- Phase 9: Daily Gem Hunt (gameplay coins only) ----
+  router.use('/gem', createGemRouter({ getDay }));
 
   // ---- Phase 3: News tab headlines (standard in-game session auth).
   // Mounted at /api/headlines — /api/news is the older M5 ticker feed.
