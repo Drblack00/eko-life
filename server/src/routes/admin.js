@@ -8,7 +8,7 @@ import { Router } from 'express';
 import { verifyToken } from '../auth.js';
 import {
   getUserById, getUserByName, setBanned, setAdmin, listRoster,
-  listReports, listCandidates, currentElection, getMeta,
+  listReports, listGistReports, listCandidates, currentElection, getMeta,
 } from '../db.js';
 import { cleanText } from '../game/data.js';
 import { fullElectionState } from '../game/elections.js';
@@ -128,6 +128,12 @@ export function createAdminRouter({ hub, getDay }) {
   router.get('/reports', async (req, res) => {
     const limit = Math.max(1, Math.min(200, Number(req.query.limit) || 50));
     res.json({ reports: await listReports(limit) });
+  });
+
+  // ---- Phase 3: gist reports queue (report-post → admin review) ----
+  router.get('/gist-reports', async (req, res) => {
+    const limit = Math.max(1, Math.min(200, Number(req.query.limit) || 50));
+    res.json({ reports: await listGistReports(limit) });
   });
 
   return router;

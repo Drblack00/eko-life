@@ -12,6 +12,7 @@ import { authMiddleware, createAuthRouter, USER_RE } from '../auth.js';
 import { createAdminRouter } from './admin.js';
 import { createFriendsRouter } from './friends.js';
 import { createNotificationsRouter } from './notifications.js';
+import { createGistsRouter, createNewsRouter } from './gists.js';
 import { createCashWalletRouter } from './cashWallet.js';
 import { createCashFlowsRouter } from './cashFlows.js';
 import { createCashAdminRouter } from './cashAdmin.js';
@@ -276,6 +277,14 @@ export function createApiRouter({ hub, getDay }) {
 
   // ---- M21: notifications (all routes behind Bearer <redacted>) ----
   router.use('/notifications', createNotificationsRouter());
+
+  // ---- Phase 3: Gist social feed (all routes behind Bearer <redacted>) ----
+  router.use('/gists', createGistsRouter());
+
+  // ---- Phase 3: News tab headlines (standard in-game session auth).
+  // Mounted at /api/headlines — /api/news is the older M5 ticker feed.
+  // triggerRefresh comes from the app-level news scheduler (see app.js).
+  router.use('/headlines', createNewsRouter({ triggerRefresh: hub.triggerNewsRefresh }));
 
   // ---- admin (M4) ----
   router.use('/admin', createAdminRouter({ hub, getDay }));
