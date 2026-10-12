@@ -33,6 +33,7 @@ import {
 import { EatTab } from "./EatTab";
 import { ChatTab } from "./chat/ChatTab";
 import { FriendsPage } from "./Friends";
+import { GistApp } from "./gist/GistApp";
 import { StyleApp } from "./StyleApp";
 import { ElectionSheet } from "./election/ElectionSheet";
 import { HomeTab, type HomeFocus } from "./home/HomeTab";
@@ -1019,6 +1020,12 @@ export function Game({
           return <ChatTab sock={sock} you={you} />;
         case "friends":
           return <FriendsPage token={token} />;
+        case "gist":
+          return (
+            <div className="eko-tabpad">
+              <GistApp token={token} you={you} config={config} />
+            </div>
+          );
         case "style":
           return you.character_id != null ? (
             <StyleApp characterId={String(you.character_id)} />
