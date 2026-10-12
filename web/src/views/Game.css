@@ -529,12 +529,11 @@
   margin-top: var(--space-2);
 }
 
-/* ---- Bottom tab bar: floating dock, icon above label ---- */
+/* ---- Bottom tab bar: floating dock, icons only ---- */
 .eko-tabs {
   display: grid;
   /* 4 tabs in one row — the magnifying bubble (eko-tabs__pill) hugs the
-     active tab's content column (icon above label), so it adapts
-     automatically. */
+     active tab's icon, so it adapts automatically. */
   grid-template-columns: repeat(4, 1fr);
   /* Sit low: just the iOS safe-area inset plus a whisper of margin, so the
      dock never collides with the home indicator. */
@@ -584,15 +583,16 @@
   cursor: pointer;
 }
 
-/* Content column: icon ABOVE label (iOS reference). The active tab's column
-   zooms to TAB_ZOOM (1.28) with a spring — the magnification the bubble lens
-   implies. transform-only, so siblings never move. */
+/* Icon-only content: a single SVG per tab. The active tab's icon zooms to
+   TAB_ZOOM (1.28) with a spring — the magnification the bubble lens
+   implies. transform-only, so siblings never move. The content is the
+   positioning context for the unread dot (absolute, so it never affects
+   the bubble's measured box). */
 .eko-tabs__content {
+  position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
   transition: transform 0.38s cubic-bezier(0.32, 1.45, 0.45, 1);
 }
 
@@ -615,16 +615,27 @@
 }
 
 .eko-tabs__icon {
-  font-size: 1.35rem;
   line-height: 1;
+  display: inline-flex;
 }
 
-.eko-tabs__label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  line-height: 1.25;
-  white-space: nowrap;
+.eko-tabs__icon svg {
+  display: block;
+  width: 26px;
+  height: 26px;
+}
+
+/* Red unread-notification dot on the Phone tab (iOS reference). */
+.eko-tabs__dot {
+  position: absolute;
+  top: -3px;
+  right: -7px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 0 2px var(--surface);
+  pointer-events: none;
 }
 
 /* Short viewports (e.g. landscape phones): slim the bar but keep >=44px targets. */
@@ -634,11 +645,9 @@
     height: 48px;
     padding: 4px 1px;
   }
-  .eko-tabs__icon {
-    font-size: 1.2rem;
-  }
-  .eko-tabs__label {
-    font-size: 0.62rem;
+  .eko-tabs__icon svg {
+    width: 24px;
+    height: 24px;
   }
 }
 
@@ -995,33 +1004,42 @@
   font-size: 12px;
   opacity: 0.65;
 }
+/* Modern toggle switch: slimmer track, smaller knob, the game's green
+   accent (palm-500, shared with the selected dock tab), spring motion.
+   Markup contract: button[role="switch"][aria-checked] > .eko-switch__knob. */
 .eko-switch {
   flex: none;
-  width: 48px;
-  height: 28px;
+  width: 44px;
+  height: 26px;
   border-radius: 999px;
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+  border: none;
   background: rgba(120, 120, 128, 0.32);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.22);
   cursor: pointer;
   position: relative;
-  transition: background 0.2s;
+  padding: 0;
+  transition: background 0.25s cubic-bezier(0.32, 1.2, 0.4, 1);
 }
 .eko-switch--on {
-  background: #22d3ee;
+  background: var(--palm-500);
 }
 .eko-switch__knob {
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 22px;
-  height: 22px;
+  top: 4px;
+  left: 4px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
   background: #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  transition: left 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s cubic-bezier(0.32, 1.45, 0.4, 1);
 }
 .eko-switch--on .eko-switch__knob {
-  left: 22px;
+  transform: translateX(18px);
+}
+.eko-switch:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 /* Phone slide-over placeholder styles live in views/phone/Phone.css
