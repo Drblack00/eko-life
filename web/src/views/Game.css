@@ -286,6 +286,22 @@
   white-space: nowrap;
 }
 
+/* Phase 5: "Things to do" button in the map view bar. */
+.eko-city__things {
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: 1px solid var(--eko-border, rgba(255, 255, 255, 0.12));
+  background: var(--eko-card, rgba(255, 255, 255, 0.04));
+  color: inherit;
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.eko-city__things:hover {
+  border-color: var(--eko-accent, #22d3ee);
+}
+
 .eko-city__mapwrap {
   position: relative;
   height: min(58dvh, 520px);

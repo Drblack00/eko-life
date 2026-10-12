@@ -7,6 +7,7 @@ import {
   authGet,
   normalizeConfig,
   travelFare,
+  type ApiLocation,
   type GameConfig,
 } from "../lib/api";
 import { CityMap } from "../game/CityMap";
@@ -73,6 +74,10 @@ import {
 import "./home/HomeChrome.css";
 import { compactNum, moodFor } from "./home/homeChrome";
 import { blip, isSoundEnabled, setSoundEnabled, SOUND_EVENT } from "../lib/sound";
+// Phase 5: venue dialogs with activities ("things to do").
+import { ThingsToDoDialog, VenueExtras } from "./VenuePanel";
+import "./VenuePanel.css";
+import { parseVenueHash } from "../game/venues";
 // V2 milestones: shifts (M7), needs (M8), daily (M9), economy (M10),
 // governance (M11), skills/academy (M12).
 import { Clock, JobsTab } from "./v2/m7";
@@ -274,11 +279,13 @@ function CityTab({
   config,
   spawns,
   onPinSelect,
+  onOpenThings,
 }: {
   you: You;
   config: GameConfig | null;
   spawns: StreetSpawn[];
   onPinSelect: (p: PinLocation) => void;
+  onOpenThings: () => void;
 }) {
   const pins = useMemo<PinLocation[]>(() => {
     if (!config) return [];
@@ -338,6 +345,14 @@ function CityTab({
             💵 {spawns.length} find{spawns.length === 1 ? "" : "s"}
           </span>
         )}
+        <button
+          type="button"
+          className="eko-city__things"
+          onClick={onOpenThings}
+          aria-label="Things to do — open the venue list"
+        >
+          🎯 Things to do
+        </button>
       </div>
       <div className="eko-city__mapwrap">
         <CityMap pins={pins} onPinSelect={onPinSelect} />
@@ -775,6 +790,8 @@ export function Game({
     setWalkthroughOpen(true);
   }, []);
   const [pinSheet, setPinSheet] = useState<PinLocation | null>(null);
+  // Phase 5: "Things to do" (T) dialog.
+  const [thingsOpen, setThingsOpen] = useState(false);
   const [dayBanner, setDayBanner] = useState<number | null>(null);
   const [electionOpen, setElectionOpen] = useState(false);
   // M21: notification panel visibility.
@@ -857,6 +874,7 @@ export function Game({
         sock.openNotifications();
       } else if (k === "d") openPhoneApp("daily");
       else if (k === "j") openPhoneApp("jobs");
+      else if (k === "t") setThingsOpen(true);
       else return;
       blip("tap");
     };
@@ -925,6 +943,32 @@ export function Game({
   const handlePinSelect = useCallback((p: PinLocation) => {
     setPinSheet(p);
   }, []);
+
+  // Phase 5: tapping a venue in "Things to do" opens its pin sheet dialog.
+  const openVenueFromList = useCallback(
+    (loc: ApiLocation) => {
+      setThingsOpen(false);
+      const list = asList(config?.locations);
+      const i = list.findIndex((l) => l.id === loc.id);
+      if (i >= 0) handlePinSelect(toPin(list[i], i, list.length));
+    },
+    [config, handlePinSelect]
+  );
+
+  // Phase 5: #venue=<locationId> deep links (from venue share rows).
+  useEffect(() => {
+    if (!config) return;
+    const applyHash = () => {
+      const id = parseVenueHash(window.location.hash);
+      if (!id) return;
+      const list = asList(config.locations);
+      const i = list.findIndex((l) => l.id === id);
+      if (i >= 0) handlePinSelect(toPin(list[i], i, list.length));
+    };
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, [config, handlePinSelect]);
 
   const travelTo = useCallback(
     (locationId: string) => {
@@ -1243,6 +1287,7 @@ export function Game({
             config={config}
             spawns={sock.spawns}
             onPinSelect={handlePinSelect}
+            onOpenThings={() => setThingsOpen(true)}
           />
         )}
       </main>
@@ -1261,6 +1306,15 @@ export function Game({
               <h2 className="eko-pin__name">{pinSheet.name}</h2>
             </div>
             <p className="eko-pin__blurb">{pinSheet.blurb}</p>
+
+            {!isSpawnPin && config && pinLoc && (
+              <VenueExtras
+                locationId={pinLoc.id}
+                you={you}
+                config={config}
+                sendAct={(a, p) => sock.sendAct(a, p)}
+              />
+            )}
 
             {isSpawnPin && spawn && (
               <Button
@@ -1311,6 +1365,14 @@ export function Game({
           </div>
         )}
       </Sheet>
+
+      {/* Phase 5: "Things to do" (T) — every venue, one teaser each. */}
+      <ThingsToDoDialog
+        open={thingsOpen}
+        onClose={() => setThingsOpen(false)}
+        config={config}
+        onSelect={openVenueFromList}
+      />
 
       <Walkthrough
         open={walkthroughOpen}
