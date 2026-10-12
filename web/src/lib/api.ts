@@ -863,3 +863,90 @@ export const headlinesApi = {
       {}
     ),
 };
+
+/* ------------------------------------------------------------------ */
+/* Phase 4 — Èkó Reserve bank app (gameplay coins only)                 */
+/* ------------------------------------------------------------------ */
+
+/** One bond row as returned by /api/bank. */
+export interface BankBond {
+  id: number;
+  user_id: number;
+  principal: number;
+  rate: number;
+  start_day: number;
+  term_days: number;
+  matured: boolean;
+  matured_day: number | null;
+  /** First day the bond can pay out. */
+  matures_day: number;
+  /** Flat interest earned at maturity. */
+  interest: number;
+  /** Principal + interest credited at maturity. */
+  payout: number;
+}
+
+export interface BankTaxInfo {
+  weekEarnings: number;
+  bill: number;
+  rawBill: number;
+  taxMult: number;
+  holiday: boolean;
+  free: number;
+  band2: number;
+  rate2: number;
+  rate3: number;
+  bracket: { label: string; rate: number };
+}
+
+export interface BankBillsInfo {
+  weeklyBill: number;
+  weekEndsDay: number;
+  currentWeek: number;
+  arrears: number;
+  arrearsCap: number;
+  base: number;
+  propRate: number;
+  capWeeks: number;
+}
+
+/** Overview bundle from GET /api/bank. */
+export interface BankOverview {
+  balance: number;
+  savings: number;
+  /** coins + savings + active bond principal (see bank.js netWorth). */
+  netWorth: number;
+  lastReceipt: TransactionInfo | null;
+  bonds: {
+    active: BankBond[];
+    matured: BankBond[];
+    terms: Record<string, { rate: number; label: string }>;
+    min: number;
+  };
+  tax: BankTaxInfo;
+  bills: BankBillsInfo;
+  /** Savings interest credited since the current week started. */
+  interestWeek: number;
+  day: number;
+  isAdmin: boolean;
+}
+
+export const bankApi = {
+  /** Full bank overview bundle. */
+  overview: (token: string) =>
+    authGet<BankOverview>("/api/bank", token),
+  /** All bonds, newest first. */
+  bonds: (token: string) =>
+    authGet<{
+      bonds: BankBond[];
+      terms: Record<string, { rate: number; label: string }>;
+      min: number;
+    }>("/api/bank/bonds", token),
+  /** Buy a bond — server validates amount ≥ min, known term, affordability. */
+  buyBond: (token: string, amount: number, termDays: number) =>
+    authPost<{ bond: BankBond; balance: number }>(
+      "/api/bank/bonds",
+      token,
+      { amount, termDays }
+    ),
+};
