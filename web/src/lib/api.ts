@@ -859,6 +859,27 @@ export const gistsApi = {
     }),
 };
 
+/* ------------------------------------------------------------------ */
+/* Phase 7 — Èkó Rich List: top players by net worth.               */
+/* ------------------------------------------------------------------ */
+export interface RichListEntry {
+  id: number;
+  username: string;
+  avatar: string;
+  color: string;
+  netWorth: number;
+}
+
+export const richListApi = {
+  /** Ranked leaders + the caller's own rank and total ranked players. */
+  list: (token: string, limit = 25) =>
+    authGet<{
+      leaders: RichListEntry[];
+      yourRank: number | null;
+      totalPlayers: number;
+    }>(`/api/richlist?limit=${limit}`, token),
+};
+
 export const headlinesApi = {
   /** Newest-first headlines + cache metadata. */
   list: (token: string, cursor?: string | null, limit = 20) => {
