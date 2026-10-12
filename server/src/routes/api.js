@@ -14,6 +14,7 @@ import { createFriendsRouter } from './friends.js';
 import { createNotificationsRouter } from './notifications.js';
 import { createGistsRouter, createNewsRouter } from './gists.js';
 import { createBankRouter } from './bank.js';
+import { createBoutiqueRouter } from './boutique.js';
 import { createCashWalletRouter } from './cashWallet.js';
 import { createCashFlowsRouter } from './cashFlows.js';
 import { createCashAdminRouter } from './cashAdmin.js';
@@ -301,6 +302,9 @@ export function createApiRouter({ hub, getDay }) {
 
   // ---- Phase 4: Èkó Reserve bank app (gameplay coins only) ----
   router.use('/bank', createBankRouter({ getDay }));
+
+  // ---- Phase 6: Boutique clothing shop (gameplay coins only) ----
+  router.use('/boutique', createBoutiqueRouter());
 
   // ---- Phase 3: News tab headlines (standard in-game session auth).
   // Mounted at /api/headlines — /api/news is the older M5 ticker feed.
