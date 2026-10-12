@@ -150,5 +150,33 @@ export function applyCustomization(
     eyebrows: full.eyebrows,
     body: full.body,
   });
+  // Relax arms to sides (static idle pose) — matches approved stance.
+  // Done before animation so Idle_Loop (if it plays) starts from here.
+  relaxArms(root);
   if (full.fistsClenched) clenchFists(root, 1.0);
+}
+
+/**
+ * Rotates arms down to a relaxed at-the-sides stance.
+ * Static fallback so the avatar never shows T-pose.
+ */
+export function relaxArms(root: THREE.Object3D): void {
+  const D = Math.PI / 180;
+  root.traverse((o) => {
+    if (!(o instanceof THREE.Bone)) return;
+    const n = o.name;
+    if (n === "upperarm_l" || n === "upperarm_r") {
+      const dir = n === "upperarm_l" ? 1 : -1;
+      const q = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 0, dir),
+        76 * D
+      );
+      o.quaternion.premultiply(q);
+      const qy = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        dir * 8 * D
+      );
+      o.quaternion.premultiply(qy);
+    }
+  });
 }
