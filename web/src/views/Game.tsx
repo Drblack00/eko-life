@@ -37,6 +37,7 @@ import { FriendsPage } from "./Friends";
 import { GistApp } from "./gist/GistApp";
 import { BankApp } from "./bank/BankApp";
 import { BoutiqueApp } from "./boutique/BoutiqueApp";
+import { RichListApp } from "./richlist/RichListApp";
 import { StyleApp } from "./StyleApp";
 import { ElectionSheet } from "./election/ElectionSheet";
 import { HomeTab, type HomeFocus } from "./home/HomeTab";
@@ -1090,6 +1091,19 @@ export function Game({
           return (
             <div className="eko-tabpad">
               <BoutiqueApp token={token} you={you} />
+            </div>
+          );
+        case "richlist":
+          // Phase 7: Èkó Rich List — top players by net worth.
+          return (
+            <div className="eko-tabpad">
+              <RichListApp
+                token={token}
+                youId={you.id}
+                youUsername={you.username}
+                sock={sock}
+                onStartDm={() => setPhoneApp("chat")}
+              />
             </div>
           );
         case "style":
