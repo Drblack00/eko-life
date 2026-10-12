@@ -34,6 +34,7 @@ import { EatTab } from "./EatTab";
 import { ChatTab } from "./chat/ChatTab";
 import { FriendsPage } from "./Friends";
 import { GistApp } from "./gist/GistApp";
+import { BankApp } from "./bank/BankApp";
 import { StyleApp } from "./StyleApp";
 import { ElectionSheet } from "./election/ElectionSheet";
 import { HomeTab, type HomeFocus } from "./home/HomeTab";
@@ -1026,6 +1027,19 @@ export function Game({
               <GistApp token={token} you={you} config={config} />
             </div>
           );
+        case "bank":
+          // Phase 4: Èkó Reserve — the bank phone app (gameplay coins only).
+          // Top-up reuses the existing inert dialog (coming-soon, Jobs route).
+          return (
+            <div className="eko-tabpad">
+              <BankApp
+                token={token}
+                you={you}
+                sendAct={send}
+                onTopUp={() => setTopUpOpen(true)}
+              />
+            </div>
+          );
         case "style":
           return you.character_id != null ? (
             <StyleApp characterId={String(you.character_id)} />
@@ -1060,6 +1074,7 @@ export function Game({
                   travelTo={travelTo}
                   focus={homeFocus}
                   onClearFocus={() => setHomeFocus(null)}
+                  onOpenBank={() => setPhoneApp("bank")}
                 />
               )}
             </>
