@@ -409,9 +409,11 @@
     font-size: 0.7rem;
     gap: 3px;
   }
-  /* Narrow phones: drop the decorative emoji so the five labels get the
-     full tab width — "La… / Tr…" truncation is unreadable. */
-  .eko-gist__tab-icon {
-    display: none;
-  }
+}
+
+/* The Gist panel is a narrow (~345px) sheet even on wide viewports, so the
+   viewport media query can't be trusted: the emoji icons are dropped
+   unconditionally and the five text labels share the row. */
+.eko-gist__tabs .eko-gist__tab-icon {
+  display: none;
 }
