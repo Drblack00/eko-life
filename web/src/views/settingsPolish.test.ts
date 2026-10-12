@@ -5,11 +5,12 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Settings polish contract tests (2026-10-12 user request): the toggle
- * switches were chunky bright-cyan iOS clones; they are now slim
- * (44x26), smaller knob, the game's green accent, spring motion. The theme
- * picker cards broke labels mid-word ("Ligh t") — they now render on one
- * line. Source-level (node-only vitest): real-browser screenshots are the
- * visual proof.
+ * switches are iOS-native size (51x31, 27px knob — his pick from samples),
+ * the game's green accent, spring motion, and hard min-size floors so iOS
+ * Safari can never squeeze the track into a circle. The theme picker cards
+ * broke labels mid-word ("Ligh t") — they now render on one line.
+ * Source-level (node-only vitest): real-browser screenshots are the visual
+ * proof.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -26,13 +27,22 @@ function ruleBlock(css: string, selector: string): string {
 }
 
 describe("switch styling (Game.css)", () => {
-  it("uses a slimmer track (44x26) with a smaller knob", () => {
+  it("uses the iOS-native track (51x31) with a 27px knob", () => {
     const track = ruleBlock(gameCss, ".eko-switch");
-    expect(track).toMatch(/width:\s*44px/);
-    expect(track).toMatch(/height:\s*26px/);
+    expect(track).toMatch(/width:\s*51px/);
+    expect(track).toMatch(/height:\s*31px/);
     const knob = ruleBlock(gameCss, ".eko-switch__knob");
-    expect(knob).toMatch(/width:\s*18px/);
-    expect(knob).toMatch(/height:\s*18px/);
+    expect(knob).toMatch(/width:\s*27px/);
+    expect(knob).toMatch(/height:\s*27px/);
+  });
+
+  it("has hard min-size floors so the track can never squeeze into a circle on iOS", () => {
+    const track = ruleBlock(gameCss, ".eko-switch");
+    expect(track).toMatch(/min-width:\s*51px/);
+    expect(track).toMatch(/min-height:\s*31px/);
+    const knob = ruleBlock(gameCss, ".eko-switch__knob");
+    expect(knob).toMatch(/min-width:\s*27px/);
+    expect(knob).toMatch(/min-height:\s*27px/);
   });
 
   it("uses the game's green accent (not cyan) for the on state", () => {
@@ -45,13 +55,20 @@ describe("switch styling (Game.css)", () => {
     const knob = ruleBlock(gameCss, ".eko-switch__knob");
     expect(knob).toMatch(/transition:\s*transform/);
     const onKnob = ruleBlock(gameCss, ".eko-switch--on .eko-switch__knob");
-    expect(onKnob).toMatch(/transform:\s*translateX\(18px\)/);
+    expect(onKnob).toMatch(/transform:\s*translateX\(20px\)/);
   });
 
   it("keeps the switch accessible (role + aria-checked survive the redesign)", () => {
     expect(charPanelTsx).toMatch(/role="switch"/);
     expect(charPanelTsx).toMatch(/aria-checked=\{soundOn\}/);
     expect(charPanelTsx).toMatch(/aria-checked=\{on\}/);
+  });
+
+  it("the Me panel has its own Sound effects toggle (it was removed from the top header in v3.6)", () => {
+    const gameTsx = readFileSync(join(here, "Game.tsx"), "utf8");
+    expect(gameTsx).toMatch(/aria-label="Sound effects"/);
+    expect(gameTsx).toMatch(/Sound effects/);
+    expect(gameTsx).toMatch(/setSoundEnabled/);
   });
 });
 
