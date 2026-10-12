@@ -7,7 +7,7 @@ import { Router } from 'express';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getUserById, getUserByName, getCharacter, getCharacterById, ensureCharacter, saveCharacter, addTransaction, getMeta, dbMode, listTransactions, getPropertyOwnerIds, listFurniture, listTopByMoney, resolveReferralCode, setUsername, setCharacterName } from '../db.js';
+import { getUserById, getUserByName, getCharacter, getCharacterById, ensureCharacter, saveCharacter, addTransaction, getMeta, dbMode, listTransactions, getPropertyOwnerIds, listFurniture, listTopByMoney, listTopByNetWorth, getNetWorthRank, resolveReferralCode, setUsername, setCharacterName } from '../db.js';
 import { authMiddleware, createAuthRouter, USER_RE } from '../auth.js';
 import { createAdminRouter } from './admin.js';
 import { createFriendsRouter } from './friends.js';
@@ -203,6 +203,20 @@ export function createApiRouter({ hub, getDay }) {
   router.get('/leaderboard', async (req, res) => {
     const leaders = await listTopByMoney(10);
     res.json({ leaders });
+  });
+
+  // ---- Phase 7: Èkó Rich List — top players by NET WORTH ----
+  // Net worth = wallet coins + savings + active bond principal (see db.js).
+  // Requires auth so we can report the caller's own rank. Banned users
+  // get 403 like everywhere else.
+  router.get('/richlist', authMiddleware, async (req, res) => {
+    const user = await getUserById(req.userId);
+    if (!user) return res.status(401).json({ error: 'Account not found.' });
+    if (Number(user.banned)) return res.status(403).json({ error: 'This account is banned.' });
+    const limit = Math.max(1, Math.min(50, Math.floor(Number(req.query.limit) || 25)));
+    const leaders = await listTopByNetWorth(limit);
+    const { rank, totalPlayers } = await getNetWorthRank(req.userId);
+    res.json({ leaders, yourRank: rank, totalPlayers });
   });
 
   // ---- public game data (server is the source of truth) ----
