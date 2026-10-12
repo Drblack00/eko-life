@@ -35,6 +35,8 @@ import { activeShiftOf } from '../game/v2/m7.js';
 import { listActiveMoodlets } from '../game/v2/m8.js';
 import { activePerkEffects } from '../game/v2/m9.js';
 import * as m10 from '../game/v2/m10.js';
+// Phase 4: Èkó Reserve bank — bond maturities (daily) + weekly upkeep bills.
+import * as bank from '../game/v2/bank.js';
 import { isCommissioner } from '../game/v2/m11.js';
 import { m12YouSnapshot } from '../game/v2/m12.js';
 
@@ -486,10 +488,14 @@ export function createHub({ getDay }) {
       } catch (e) { console.error('[economy]', e.message); }
       // M10: LAPO auto-debits + weekly tax for online players.
       try { await m10.settleOnlinePlayer(ctx, conn); } catch (e) { console.error('[m10]', e.message); }
+      // Phase 4: Èkó Reserve — bond maturities + weekly upkeep bills (online).
+      try { await bank.settleOnlinePlayer(ctx, conn); } catch (e) { console.error('[bank]', e.message); }
     }
     try { await settleOfflineEconomy(); } catch (e) { console.error('[economy]', e.message); }
     // M10: LAPO auto-debits + weekly tax for offline players (DB-credited).
     try { await m10.settleOfflinePlayers(ctx, (id) => online.has(Number(id))); } catch (e) { console.error('[m10]', e.message); }
+    // Phase 4: Èkó Reserve — bond maturities + weekly bills (offline, DB-credited).
+    try { await bank.settleOfflinePlayers(ctx, (id) => online.has(Number(id))); } catch (e) { console.error('[bank]', e.message); }
     const { day } = getDay();
     try {
       let el = await currentElection();
