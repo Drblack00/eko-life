@@ -676,7 +676,10 @@ export function GistApp({
             onClick={() => switchTab(t.id)}
             aria-pressed={tab === t.id}
           >
-            <span aria-hidden="true">{t.icon}</span> {t.label}
+            <span className="eko-gist__tab-icon" aria-hidden="true">
+              {t.icon}
+            </span>
+            <span className="eko-gist__tab-label">{t.label}</span>
           </button>
         ))}
       </nav>
