@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS characters (
   class TEXT NOT NULL DEFAULT 'street_smart',
   avatar TEXT NOT NULL DEFAULT '🧑',
   color TEXT NOT NULL DEFAULT '#22d3ee',
-  money INTEGER NOT NULL DEFAULT 5000,
+  money BIGINT NOT NULL DEFAULT 5000,
   energy INTEGER NOT NULL DEFAULT 100,
   health INTEGER NOT NULL DEFAULT 100,
   happiness INTEGER NOT NULL DEFAULT 60,
@@ -49,8 +49,8 @@ CREATE TABLE IF NOT EXISTS characters (
   housing TEXT NOT NULL DEFAULT 'face-me',
   property TEXT NOT NULL DEFAULT 'none',
   vehicle TEXT NOT NULL DEFAULT 'none',
-  savings INTEGER NOT NULL DEFAULT 0,
-  loan INTEGER NOT NULL DEFAULT 0,
+  savings BIGINT NOT NULL DEFAULT 0,
+  loan BIGINT NOT NULL DEFAULT 0,
   cert INTEGER NOT NULL DEFAULT 0,
   location_id TEXT NOT NULL DEFAULT 'ojuelegba',
   x REAL,
@@ -486,7 +486,7 @@ CREATE TABLE IF NOT EXISTS characters (
   class TEXT NOT NULL DEFAULT 'street_smart',
   avatar TEXT NOT NULL DEFAULT '🧑',
   color TEXT NOT NULL DEFAULT '#22d3ee',
-  money INTEGER NOT NULL DEFAULT 5000,
+  money BIGINT NOT NULL DEFAULT 5000,
   energy INTEGER NOT NULL DEFAULT 100,
   health INTEGER NOT NULL DEFAULT 100,
   happiness INTEGER NOT NULL DEFAULT 60,
@@ -494,8 +494,8 @@ CREATE TABLE IF NOT EXISTS characters (
   housing TEXT NOT NULL DEFAULT 'face-me',
   property TEXT NOT NULL DEFAULT 'none',
   vehicle TEXT NOT NULL DEFAULT 'none',
-  savings INTEGER NOT NULL DEFAULT 0,
-  loan INTEGER NOT NULL DEFAULT 0,
+  savings BIGINT NOT NULL DEFAULT 0,
+  loan BIGINT NOT NULL DEFAULT 0,
   cert INTEGER NOT NULL DEFAULT 0,
   location_id TEXT NOT NULL DEFAULT 'ojuelegba',
   x DOUBLE PRECISION,
@@ -510,8 +510,8 @@ CREATE TABLE IF NOT EXISTS transactions (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL,
   kind TEXT NOT NULL,
-  amount INTEGER NOT NULL,
-  balance_after INTEGER NOT NULL,
+  amount BIGINT NOT NULL,
+  balance_after BIGINT NOT NULL,
   meta TEXT,
   created_at BIGINT NOT NULL
 );
@@ -712,7 +712,7 @@ CREATE INDEX IF NOT EXISTS idx_news_items_fetched ON news_items(fetched_at DESC)
 CREATE TABLE IF NOT EXISTS bank_bonds (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL,
-  principal INTEGER NOT NULL,
+  principal BIGINT NOT NULL,
   rate DOUBLE PRECISION NOT NULL,
   start_day INTEGER NOT NULL,
   term_days INTEGER NOT NULL,
@@ -961,6 +961,26 @@ export async function ensureColumn(table, col, sqliteDef, pgDef) {
     if (/duplicate|already exists/i.test(e.message)) return; // already there
     throw e;
   }
+};
+
+/**
+ * Money columns must be BIGINT on Postgres: gameplay balances compound
+ * (2%/day savings) and can exceed the int32 ceiling (2,147,483,647) —
+ * production hit `value "2219447721" is out of range for type integer`
+ * every 5 minutes in the offline economy settlement. SQLite INTEGER is
+ * already 64-bit, so this is a Postgres-only no-op-safe migration
+ * (ALTER to BIGINT when already BIGINT is a no-op).
+ */
+export async function ensurePgBigint(table, col) {
+  if (!pool && !process.env.DATABASE_URL) return; // SQLite needs nothing
+  try {
+    await runQ(
+      `SELECT 1`, // sqlite branch never reached (guard above)
+      `ALTER TABLE ${table} ALTER COLUMN ${col} TYPE BIGINT`,
+      []);
+  } catch (e) {
+    console.error(`[db] bigint migration ${table}.${col}:`, e.message);
+  }
 }
 
 export async function initDb() {
@@ -1017,6 +1037,14 @@ export async function initDb() {
     await ensureColumn('friendships', 'updated_ts', 'INTEGER NOT NULL DEFAULT 0', 'BIGINT NOT NULL DEFAULT 0');
     // Phase 4 (Èkó Reserve): unpaid weekly upkeep bills (no interest, no lockouts)
     await ensureColumn('characters', 'bill_arrears', 'INTEGER NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0');
+    // Money columns → BIGINT on Postgres (int32 overflow seen in production
+    // offline economy settlement; no-op on fresh DBs and SQLite).
+    await ensurePgBigint('characters', 'money');
+    await ensurePgBigint('characters', 'savings');
+    await ensurePgBigint('characters', 'loan');
+    await ensurePgBigint('transactions', 'amount');
+    await ensurePgBigint('transactions', 'balance_after');
+    await ensurePgBigint('bank_bonds', 'principal');
     console.log('[db] PostgreSQL connected');
   } else {
     const dbPath = process.env.EKO_DB_PATH || path.join(__dirname, 'eko-life.db');

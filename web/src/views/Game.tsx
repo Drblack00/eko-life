@@ -1454,6 +1454,7 @@ export function Game({
       <TabBar
         tab={tab}
         onTab={(t) => (t === "phone" ? setPhoneOpen(true) : setTab(t))}
+        hasUnread={sock.unreadNotifications > 0}
       />
         </>
       )}

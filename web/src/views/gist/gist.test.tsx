@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { formatTimeAgo, badgeClass, GistApp } from "./GistApp";
@@ -194,5 +197,66 @@ describe("Gist feed empty state", () => {
     await waitFor(() => {
       expect(screen.getByText("No gists yet — post the first one.")).toBeTruthy();
     });
+  });
+});
+
+describe("News tab visibility on phones", () => {
+  it("fits all 5 tabs without horizontal scrolling (flex shrink, no overflow-x)", () => {
+    const raw = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "GistApp.css"),
+      "utf8",
+    );
+    const tabRule = raw.match(/\.eko-gist__tab\s*\{([^}]*)\}/s);
+    expect(tabRule).not.toBeNull();
+    expect(tabRule![1]).toMatch(/flex:\s*1 1 0/);
+    expect(tabRule![1]).toMatch(/min-width:\s*0/);
+    const tabsRule = raw.match(/\.eko-gist__tabs\s*\{([^}]*)\}/s);
+    expect(tabsRule).not.toBeNull();
+    expect(tabsRule![1]).not.toMatch(/overflow-x:\s*auto/);
+    // Labels are ellipsis-safe so long tab names shrink instead of pushing.
+    expect(raw).toMatch(/\.eko-gist__tab-label\s*\{[^}]*text-overflow:\s*ellipsis/);
+    // On narrow phones the decorative emoji hides so labels get full width.
+    expect(raw).toMatch(/\.eko-gist__tab-icon\s*\{\s*display:\s*none/);
+  });
+
+  it("renders all 5 tab buttons including News", () => {
+    render(<GistApp token="t" you={you} config={null} />);
+    const nav = screen.getByRole("navigation", { name: /Gist feed tabs/ });
+    const buttons = nav.querySelectorAll("button");
+    expect(buttons).toHaveLength(5);
+    for (const name of ["Latest", "Trending", "Following", "Me", "News"]) {
+      expect(screen.getByRole("button", { name })).toBeTruthy();
+    }
+  });
+
+  it("Retry re-runs the headlines load and shows fresh headlines", async () => {
+    const { ApiError } = await import("../../lib/api");
+    mockHeadlinesList.mockRejectedValueOnce(new ApiError(500, "boom"));
+    mockHeadlinesList.mockResolvedValueOnce({
+      items: [
+        {
+          id: 9,
+          source: "Vanguard",
+          title: "Retry brought the news back",
+          link: "https://www.vanguardngr.com/retry/",
+          snippet: "",
+          published_at: Date.now() - 600_000,
+          fetched_at: Date.now(),
+        },
+      ],
+      next_cursor: null,
+      stale: false,
+      updated_minutes_ago: 0,
+    });
+    render(<GistApp token="t" you={you} config={null} />);
+    fireEvent.click(screen.getByRole("button", { name: /News/ }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => {
+      expect(screen.getByText("Retry brought the news back")).toBeTruthy();
+    });
+    expect(mockHeadlinesList).toHaveBeenCalledTimes(2);
   });
 });
