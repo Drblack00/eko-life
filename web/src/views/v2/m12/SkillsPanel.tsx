@@ -38,7 +38,8 @@ export interface SkillRow {
   trainAt: string;
 }
 
-const SKILL_FALLBACK: SkillRow[] = [
+/** Shared skill definitions (name/icon/train info) for panels that render skills from the `you` snapshot. */
+export const SKILL_FALLBACK: SkillRow[] = [
   { id: "cooking", name: "Cooking", icon: "🍲", xp: 0, level: 0, xpNext: 100, effective: 0, rust: 0, certified: false, trainFee: 500, trainAt: "markets" },
   { id: "charisma", name: "Charisma", icon: "✨", xp: 0, level: 0, xpNext: 100, effective: 0, rust: 0, certified: false, trainFee: 0, trainAt: "clubs & malls" },
   { id: "fitness", name: "Fitness", icon: "💪", xp: 0, level: 0, xpNext: 100, effective: 0, rust: 0, certified: false, trainFee: 0, trainAt: "stadiums" },
