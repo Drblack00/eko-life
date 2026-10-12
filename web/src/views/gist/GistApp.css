@@ -81,7 +81,6 @@
 .eko-gist__tabs {
   display: flex;
   gap: var(--space-1);
-  overflow-x: auto;
   padding-bottom: 2px;
   position: sticky;
   top: 0;
@@ -89,15 +88,29 @@
 }
 
 .eko-gist__tab {
-  flex: 1 0 auto;
+  /* All 5 tabs share the row equally and shrink — the News tab must be
+     visible without horizontal scrolling on a 390px phone. */
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-muted);
   font-size: 0.85rem;
   font-weight: 600;
-  padding: 8px 12px;
+  padding: 8px 6px;
   border-radius: var(--radius-pill);
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.eko-gist__tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -389,10 +402,16 @@
 
 @media (max-width: 480px) {
   .eko-gist__tabs {
-    gap: 2px;
+    gap: 0;
   }
   .eko-gist__tab {
-    padding: 8px 10px;
-    font-size: 0.8rem;
+    padding: 7px 2px;
+    font-size: 0.7rem;
+    gap: 3px;
+  }
+  /* Narrow phones: drop the decorative emoji so the five labels get the
+     full tab width — "La… / Tr…" truncation is unreadable. */
+  .eko-gist__tab-icon {
+    display: none;
   }
 }
