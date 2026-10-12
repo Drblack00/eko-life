@@ -41,7 +41,7 @@ export function gemCountdown(ms: number): string {
   return `New gem in ${s}s`;
 }
 
-function GemDialog({
+export function GemDialog({
   gem,
   token,
   onClose,
