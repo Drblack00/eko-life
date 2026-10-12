@@ -301,3 +301,29 @@
     bottom: calc(var(--sab, 0px) + 5.25rem);
   }
 }
+
+/* ---- Phase 9: Daily Gem Hunt dialog ---- */
+.eko-gem { display: flex; flex-direction: column; gap: 0.6rem; }
+.eko-gem__countdown { font-weight: 700; font-size: 1.05rem; margin: 0; }
+.eko-gem__clue-label { font-size: 0.72rem; letter-spacing: 0.12em; opacity: 0.7; margin: 0.4rem 0 0; }
+.eko-gem__clue {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  border-left: 3px solid var(--eko-accent, #22d3ee);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 0 0.5rem 0.5rem 0;
+  font-style: italic;
+  line-height: 1.45;
+}
+.eko-gem__section { font-weight: 700; margin: 0.4rem 0 0; }
+.eko-gem__ladder { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.eko-gem__ladder li {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.3rem 0.6rem; border-radius: 0.4rem;
+  background: rgba(255, 255, 255, 0.05);
+}
+.eko-gem__finders { margin: 0; font-size: 0.9rem; opacity: 0.9; }
+.eko-gem__mine { margin: 0.4rem 0 0; font-weight: 700; color: #4ade80; }
+.eko-gem__search { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.4rem; }
+.eko-gem__result { margin: 0; padding: 0.5rem 0.7rem; border-radius: 0.5rem; background: rgba(255,255,255,0.07); }
+.eko-gem__result--win { background: rgba(74, 222, 128, 0.15); font-weight: 700; }
