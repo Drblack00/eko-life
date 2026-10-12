@@ -122,6 +122,28 @@ CREATE TABLE IF NOT EXISTS friendships (
 CREATE INDEX IF NOT EXISTS idx_friendships_pair ON friendships(requester_id, addressee_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_friendships_unordered_pair
   ON friendships (min(requester_id, addressee_id), max(requester_id, addressee_id));
+-- M21: notifications (in-app; web-push hook comes later).
+-- type: friend_online | room_message | money_received (+ future types).
+-- data: JSON blob (e.g. {roomId, userId, amount}).
+CREATE TABLE IF NOT EXISTS notifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT,
+  data TEXT,
+  read INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read);
+-- M21: per-user notification preferences (row created lazily; absent = all on).
+CREATE TABLE IF NOT EXISTS notification_prefs (
+  user_id INTEGER PRIMARY KEY,
+  friend_online INTEGER NOT NULL DEFAULT 1,
+  room_message INTEGER NOT NULL DEFAULT 1,
+  money_received INTEGER NOT NULL DEFAULT 1
+);
 -- W3: referral attribution (data-only — no rewards, no payouts, ever).
 CREATE TABLE IF NOT EXISTS referrals (
   referrer_id INTEGER NOT NULL,
@@ -462,6 +484,28 @@ CREATE TABLE IF NOT EXISTS friendships (
 CREATE INDEX IF NOT EXISTS idx_friendships_pair ON friendships(requester_id, addressee_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_friendships_unordered_pair
   ON friendships (LEAST(requester_id, addressee_id), GREATEST(requester_id, addressee_id));
+-- M21: notifications (in-app; web-push hook comes later).
+-- type: friend_online | room_message | money_received (+ future types).
+-- data: JSON blob (e.g. {roomId, userId, amount}).
+CREATE TABLE IF NOT EXISTS notifications (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT,
+  data TEXT,
+  read INTEGER NOT NULL DEFAULT 0,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read);
+-- M21: per-user notification preferences (row created lazily; absent = all on).
+CREATE TABLE IF NOT EXISTS notification_prefs (
+  user_id INTEGER PRIMARY KEY,
+  friend_online INTEGER NOT NULL DEFAULT 1,
+  room_message INTEGER NOT NULL DEFAULT 1,
+  money_received INTEGER NOT NULL DEFAULT 1
+);
 -- W3: referral attribution (data-only — no rewards, no payouts, ever).
 CREATE TABLE IF NOT EXISTS referrals (
   referrer_id INTEGER NOT NULL,
@@ -1764,6 +1808,109 @@ export async function listTopByMoney(limit = 10) {
      ORDER BY c.money DESC NULLS LAST LIMIT $1`,
     [lim]);
   return rows.map(r => ({ username: r.username, money: Number(r.money) }));
+}
+
+// ============================================================
+// M21: notifications — backend-agnostic CRUD + preferences.
+// data is stored as a JSON string; callers pass a plain object.
+// Preferences: absent row = all toggles on (lazy default).
+// ============================================================
+export async function createNotification(userId, type, title, body, data) {
+  const now = Date.now();
+  const dataStr = data != null ? JSON.stringify(data) : null;
+  if (pool) {
+    const r = await pool.query(
+      `INSERT INTO notifications (user_id, type, title, body, data, read, created_at)
+       VALUES ($1,$2,$3,$4,$5,0,$6) RETURNING id`,
+      [Number(userId), String(type), String(title), body != null ? String(body) : null, dataStr, now]);
+    return Number(r.rows[0].id);
+  }
+  const r = sdb.prepare(
+    `INSERT INTO notifications (user_id, type, title, body, data, read, created_at)
+     VALUES (?,?,?,?,?,0,?)`)
+    .run(Number(userId), String(type), String(title), body != null ? String(body) : null, dataStr, now);
+  return Number(r.lastInsertRowid);
+}
+
+export async function listNotifications(userId, limit = 30, offset = 0) {
+  const lim = Math.max(1, Math.min(100, Math.floor(Number(limit) || 30)));
+  const off = Math.max(0, Math.floor(Number(offset) || 0));
+  const rows = await getAll(
+    `SELECT id, user_id, type, title, body, data, read, created_at FROM notifications
+     WHERE user_id=? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
+    `SELECT id, user_id, type, title, body, data, read, created_at FROM notifications
+     WHERE user_id=$1 ORDER BY created_at DESC, id DESC LIMIT $2 OFFSET $3`,
+    [Number(userId), lim, off]);
+  return rows.map(r => ({
+    id: Number(r.id),
+    type: r.type,
+    title: r.title,
+    body: r.body || null,
+    data: (() => { try { return r.data ? JSON.parse(r.data) : null; } catch { return null; } })(),
+    read: !!Number(r.read),
+    created_at: Number(r.created_at),
+  }));
+}
+
+export async function countUnreadNotifications(userId) {
+  const row = await getOne(
+    `SELECT COUNT(*) AS c FROM notifications WHERE user_id=? AND read=0`,
+    `SELECT COUNT(*) AS c FROM notifications WHERE user_id=$1 AND read=0`,
+    [Number(userId)]);
+  return Number(row ? row.c : 0);
+}
+
+export async function markNotificationRead(userId, id) {
+  const r = await runQ(
+    `UPDATE notifications SET read=1 WHERE id=? AND user_id=? AND read=0`,
+    `UPDATE notifications SET read=1 WHERE id=$1 AND user_id=$2 AND read=0`,
+    [Number(id), Number(userId)]);
+  return Number(r.changes) > 0;
+}
+
+export async function markAllNotificationsRead(userId) {
+  await runQ(
+    `UPDATE notifications SET read=1 WHERE user_id=? AND read=0`,
+    `UPDATE notifications SET read=1 WHERE user_id=$1 AND read=0`,
+    [Number(userId)]);
+}
+
+const NOTIF_PREF_KEYS = ['friend_online', 'room_message', 'money_received'];
+
+export async function getNotificationPrefs(userId) {
+  const row = await getOne(
+    `SELECT friend_online, room_message, money_received FROM notification_prefs WHERE user_id=?`,
+    `SELECT friend_online, room_message, money_received FROM notification_prefs WHERE user_id=$1`,
+    [Number(userId)]);
+  if (!row) return { friend_online: true, room_message: true, money_received: true };
+  const out = {};
+  for (const k of NOTIF_PREF_KEYS) out[k] = !!Number(row[k]);
+  return out;
+}
+
+export async function setNotificationPrefs(userId, prefs) {
+  const vals = {};
+  for (const k of NOTIF_PREF_KEYS) {
+    vals[k] = prefs && prefs[k] === false ? 0 : 1;
+  }
+  await runQ(
+    `INSERT INTO notification_prefs (user_id, friend_online, room_message, money_received)
+     VALUES (?,?,?,?)
+     ON CONFLICT(user_id) DO UPDATE SET friend_online=excluded.friend_online,
+       room_message=excluded.room_message, money_received=excluded.money_received`,
+    `INSERT INTO notification_prefs (user_id, friend_online, room_message, money_received)
+     VALUES ($1,$2,$3,$4)
+     ON CONFLICT(user_id) DO UPDATE SET friend_online=excluded.friend_online,
+       room_message=excluded.room_message, money_received=excluded.money_received`,
+    [Number(userId), vals.friend_online, vals.room_message, vals.money_received]);
+  return getNotificationPrefs(userId);
+}
+
+/** Single preference check without fetching the whole row. */
+export async function notificationPrefOn(userId, key) {
+  if (!NOTIF_PREF_KEYS.includes(key)) return true;
+  const prefs = await getNotificationPrefs(userId);
+  return !!prefs[key];
 }
 
 // ============================================================
