@@ -13,6 +13,7 @@ import { createAdminRouter } from './admin.js';
 import { createFriendsRouter } from './friends.js';
 import { createNotificationsRouter } from './notifications.js';
 import { createGistsRouter, createNewsRouter } from './gists.js';
+import { createBankRouter } from './bank.js';
 import { createCashWalletRouter } from './cashWallet.js';
 import { createCashFlowsRouter } from './cashFlows.js';
 import { createCashAdminRouter } from './cashAdmin.js';
@@ -281,6 +282,9 @@ export function createApiRouter({ hub, getDay }) {
   // ---- Phase 3: Gist social feed (all routes behind Bearer <redacted>) ----
   router.use('/gists', createGistsRouter());
 
+  // ---- Phase 4: Èkó Reserve bank app (gameplay coins only) ----
+  router.use('/bank', createBankRouter({ getDay }));
+
   // ---- Phase 3: News tab headlines (standard in-game session auth).
   // Mounted at /api/headlines — /api/news is the older M5 ticker feed.
   // triggerRefresh comes from the app-level news scheduler (see app.js).
@@ -348,9 +352,10 @@ export function createApiRouter({ hub, getDay }) {
     res.json({ ok: true, ...out });
   });
 
-  // ---- transactions (M3): newest-first ledger, last 50 (client spending history) ----
+  // ---- transactions (M3): newest-first ledger, last N (client spending history) ----
+  // limit honored (1–200, default 50) — the Bank app pulls a wider window.
   router.get('/transactions', authMiddleware, async (req, res) => {
-    const rows = await listTransactions(req.userId, 50);
+    const rows = await listTransactions(req.userId, req.query.limit);
     res.json({
       transactions: rows.map(r => {
         let meta = null;
