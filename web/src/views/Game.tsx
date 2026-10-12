@@ -38,6 +38,7 @@ import { GistApp } from "./gist/GistApp";
 import { BankApp } from "./bank/BankApp";
 import { BoutiqueApp } from "./boutique/BoutiqueApp";
 import { RichListApp } from "./richlist/RichListApp";
+import { GovApp } from "./gov/GovApp";
 import { StyleApp } from "./StyleApp";
 import { ElectionSheet } from "./election/ElectionSheet";
 import { HomeTab, type HomeFocus } from "./home/HomeTab";
@@ -1104,6 +1105,13 @@ export function Game({
                 sock={sock}
                 onStartDm={() => setPhoneApp("chat")}
               />
+            </div>
+          );
+        case "gov":
+          // Phase 8: Èkó Gov — governor election + governance.
+          return (
+            <div className="eko-tabpad">
+              <GovApp token={token} you={you} />
             </div>
           );
         case "style":
