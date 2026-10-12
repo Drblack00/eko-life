@@ -28,7 +28,7 @@ const STEPS: Array<{ icon: string; title: string; body: string }> = [
   {
     icon: "📱",
     title: "Phone — everything lives here",
-    body: "Jobs, Daily hustle, Market, Chat, Friends and your profile all moved into the phone. Tap the Phone tab to open it.",
+    body: "Jobs, Daily hustle, Market, Chat, Friends, your Style studio and your profile all moved into the phone. Tap the Phone tab to open it.",
   },
   {
     icon: "💚",

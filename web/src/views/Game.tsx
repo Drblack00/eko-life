@@ -13,7 +13,6 @@ import { CityMap } from "../game/CityMap";
 import { mapXYToWorld, toPin } from "../game/mapPins";
 import type { PinLocation } from "../game/stubLocations";
 import {
-  AVATAR_LOOK_FALLBACK_OPTIONS,
   naira,
   spawnEmoji,
   spawnLabel,
@@ -34,11 +33,11 @@ import {
 import { EatTab } from "./EatTab";
 import { ChatTab } from "./chat/ChatTab";
 import { FriendsPage } from "./Friends";
+import { StyleApp } from "./StyleApp";
 import { ElectionSheet } from "./election/ElectionSheet";
 import { HomeTab, type HomeFocus } from "./home/HomeTab";
 import { HomeView } from "./home/HomeView";
 import { LedgerSheet } from "./home/LedgerSheet";
-import { AvatarEditButton } from "./avatar/AvatarEditButton";
 import { AdminView } from "./Admin";
 import { TabBar, TABS, type Tab } from "./TabBar";
 export { TABS };
@@ -423,7 +422,6 @@ function MeTab({
   onUpgrade,
   onOpenAdmin,
   onReplayWalkthrough,
-  sendAct,
 }: {
   you: You;
   config: GameConfig | null;
@@ -460,12 +458,6 @@ function MeTab({
             </div>
           </div>
         </div>
-        <AvatarEditButton
-          look={you.avatar_look}
-          options={config?.avatarLook ?? AVATAR_LOOK_FALLBACK_OPTIONS}
-          sendAct={sendAct}
-          characterId={you.character_id}
-        />
         <dl className="eko-me__rows">
           <div>
             <dt>Wallet</dt>
@@ -793,6 +785,14 @@ export function Game({
           return <ChatTab sock={sock} you={you} />;
         case "friends":
           return <FriendsPage token={token} />;
+        case "style":
+          return you.character_id != null ? (
+            <StyleApp characterId={String(you.character_id)} />
+          ) : (
+            <p className="eko-me__tip">
+              Your character is still loading — reopen Style in a moment.
+            </p>
+          );
         case "me":
         default:
           return (
