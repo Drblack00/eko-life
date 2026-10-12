@@ -46,6 +46,14 @@ import { Phone } from "./phone/Phone";
 import { BuyView } from "./buy/BuyView";
 import { Walkthrough, WALKTHROUGH_KEY } from "./Walkthrough";
 import { ThemePicker } from "../theme/theme";
+// M21: notifications (bell, panel, live toasts).
+import {
+  NotificationBell,
+  NotificationPanel,
+  NotificationToasts,
+} from "./Notifications";
+import "./Notifications.css";
+import { NOTIFICATION_PREF_LABELS, type NotificationEntry, type NotificationPrefs } from "../game/types";
 import "./Walkthrough.css";
 import "./Admin.css";
 import "./Game.css";
@@ -71,6 +79,8 @@ function Hud({
   queued,
   lastError,
   governorName,
+  unreadNotifications,
+  onOpenNotifications,
   onGovOpen,
   onRetry,
 }: {
@@ -80,6 +90,8 @@ function Hud({
   queued: number;
   lastError: string | null;
   governorName: string | null;
+  unreadNotifications: number;
+  onOpenNotifications: () => void;
   onGovOpen: () => void;
   onRetry: () => void;
 }) {
@@ -95,8 +107,10 @@ function Hud({
         </span>
         <div className="eko-hud__identity">
           <strong className="eko-hud__name">{you.name}</strong>
-          <span className="eko-hud__money" aria-label={`Balance ${naira(you.money)}`}>
-            {naira(you.money)}
+          <span className="eko-hud__money" aria-label={you.is_admin ? "Unlimited admin balance" : `Balance ${naira(you.money)}`}>
+            {/* M21: admins see unlimited here (private view); everyone else
+                sees the real coins column — including the leaderboard. */}
+            {you.is_admin ? "∞ Unlimited" : naira(you.money)}
           </span>
         </div>
         <button
@@ -111,6 +125,7 @@ function Hud({
         <span className="eko-hud__day" aria-label={`Day ${day}`}>
           Day {day}
         </span>
+        <NotificationBell unread={unreadNotifications} onOpen={onOpenNotifications} />
         <Clock />
       </div>
       <div className="eko-hud__stats">
@@ -422,6 +437,8 @@ function MeTab({
   onUpgrade,
   onOpenAdmin,
   onReplayWalkthrough,
+  notifPrefs,
+  onNotifPrefs,
 }: {
   you: You;
   config: GameConfig | null;
@@ -432,6 +449,8 @@ function MeTab({
   onUpgrade: () => void;
   onOpenAdmin: () => void;
   onReplayWalkthrough: () => void;
+  notifPrefs: NotificationPrefs | null;
+  onNotifPrefs: (p: Partial<NotificationPrefs>) => void;
   sendAct: (a: ActName, params?: Record<string, unknown>) => void;
 }) {
   const [ledgerOpen, setLedgerOpen] = useState(false);
@@ -461,7 +480,9 @@ function MeTab({
         <dl className="eko-me__rows">
           <div>
             <dt>Wallet</dt>
-            <dd>{naira(you.money)}</dd>
+            {/* M21: admins see unlimited (private view); the coins column
+                itself stays small so the leaderboard shows the decoy. */}
+            <dd>{you.is_admin ? "∞ Unlimited" : naira(you.money)}</dd>
           </div>
           <div>
             <dt>Savings</dt>
@@ -589,6 +610,34 @@ function MeTab({
           🎬 Replay walkthrough
         </Button>
         <ThemePicker />
+        {/* M21: notification preferences */}
+        <div className="eko-me__notifprefs">
+          <h3 className="eko-me__notifprefs-title">🔔 Notifications</h3>
+          {(Object.keys(NOTIFICATION_PREF_LABELS) as Array<keyof NotificationPrefs>).map(
+            (key) => {
+              const label = NOTIFICATION_PREF_LABELS[key];
+              const on = notifPrefs ? notifPrefs[key] !== false : true;
+              return (
+                <label key={key} className="eko-me__notifpref">
+                  <span className="eko-me__notifpref-text">
+                    <strong>{label.title}</strong>
+                    <small>{label.hint}</small>
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={on}
+                    aria-label={label.title}
+                    className={`eko-switch${on ? " eko-switch--on" : ""}`}
+                    onClick={() => onNotifPrefs({ [key]: !on })}
+                  >
+                    <span className="eko-switch__knob" aria-hidden="true" />
+                  </button>
+                </label>
+              );
+            }
+          )}
+        </div>
       </Card>
 
       <LedgerSheet token={token} open={ledgerOpen} onClose={() => setLedgerOpen(false)} />
@@ -628,6 +677,29 @@ export function Game({
   const [pinSheet, setPinSheet] = useState<PinLocation | null>(null);
   const [dayBanner, setDayBanner] = useState<number | null>(null);
   const [electionOpen, setElectionOpen] = useState(false);
+  // M21: notification panel visibility.
+  const [notifOpen, setNotifOpen] = useState(false);
+  /** Tap a notification (panel row or live toast) → jump to the right screen. */
+  const onNotificationTap = useCallback(
+    (n: NotificationEntry) => {
+      setNotifOpen(false);
+      sock.markNotificationRead(n.id);
+      const data = n.data ?? {};
+      if (n.type === "friend_online") {
+        openPhoneApp("friends");
+      } else if (n.type === "money_received") {
+        openPhoneApp("me");
+      } else if (n.type === "room_message") {
+        const rid = Number(
+          (data as Record<string, unknown>).roomId ??
+            (data as Record<string, unknown>).room_id
+        );
+        if (Number.isFinite(rid) && rid > 0) sock.requestRoomNav(rid);
+        openPhoneApp("chat");
+      }
+    },
+    [sock, openPhoneApp]
+  );
   const [restConfig, setRestConfig] = useState<GameConfig | null>(null);
   const [slow, setSlow] = useState(false);
   const [homeFocus, setHomeFocus] = useState<HomeFocus>(null);
@@ -807,6 +879,8 @@ export function Game({
                 onUpgrade={onUpgrade}
                 onOpenAdmin={() => setAdminOpen(true)}
                 onReplayWalkthrough={replayWalkthrough}
+                notifPrefs={sock.notifPrefs}
+                onNotifPrefs={sock.updateNotifPrefs}
                 sendAct={sock.sendAct}
               />
               {config && (
@@ -877,6 +951,11 @@ export function Game({
         queued={sock.queued}
         lastError={sock.lastError}
         governorName={sock.governor?.name ?? null}
+        unreadNotifications={sock.unreadNotifications}
+        onOpenNotifications={() => {
+          setNotifOpen(true);
+          sock.openNotifications(); // loads the list + clears the badge
+        }}
         onGovOpen={() => setElectionOpen(true)}
         onRetry={sock.retryNow}
       />
@@ -1006,6 +1085,20 @@ export function Game({
       <Walkthrough
         open={walkthroughOpen}
         onDone={() => setWalkthroughOpen(false)}
+      />
+
+      {/* M21: notifications — panel (badge clears on open) + live toasts. */}
+      <NotificationPanel
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        notifications={sock.notifications}
+        onTap={onNotificationTap}
+        onMarkAllRead={() => sock.openNotifications()}
+      />
+      <NotificationToasts
+        toasts={sock.notifToasts}
+        onTap={onNotificationTap}
+        onDismiss={sock.dismissNotifToast}
       />
 
       <Phone

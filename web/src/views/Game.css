@@ -949,5 +949,64 @@
   color: var(--text-muted);
 }
 
+/* M21: notification preference toggles (Me → Settings). */
+.eko-me__notifprefs {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
+}
+.eko-me__notifprefs-title {
+  font-size: 14px;
+  margin: 0 0 6px;
+}
+.eko-me__notifpref {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  cursor: pointer;
+}
+.eko-me__notifpref-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.eko-me__notifpref-text strong {
+  font-size: 14px;
+}
+.eko-me__notifpref-text small {
+  font-size: 12px;
+  opacity: 0.65;
+}
+.eko-switch {
+  flex: none;
+  width: 48px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+  background: rgba(120, 120, 128, 0.32);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+}
+.eko-switch--on {
+  background: #22d3ee;
+}
+.eko-switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: left 0.2s;
+}
+.eko-switch--on .eko-switch__knob {
+  left: 22px;
+}
+
 /* Phone slide-over placeholder styles live in views/phone/Phone.css
    (Worker B owns the real Phone shell). */
