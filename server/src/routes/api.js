@@ -11,6 +11,7 @@ import { getUserById, getCharacter, getCharacterById, ensureCharacter, saveChara
 import { authMiddleware, createAuthRouter, USER_RE } from '../auth.js';
 import { createAdminRouter } from './admin.js';
 import { createFriendsRouter } from './friends.js';
+import { createNotificationsRouter } from './notifications.js';
 import { createCashWalletRouter } from './cashWallet.js';
 import { createCashFlowsRouter } from './cashFlows.js';
 import { createCashAdminRouter } from './cashAdmin.js';
@@ -258,6 +259,9 @@ export function createApiRouter({ hub, getDay }) {
 
   // ---- W3: friends page (all routes behind Bearer <redacted>) ----
   router.use('/friends', createFriendsRouter({ hub }));
+
+  // ---- M21: notifications (all routes behind Bearer <redacted>) ----
+  router.use('/notifications', createNotificationsRouter());
 
   // ---- admin (M4) ----
   router.use('/admin', createAdminRouter({ hub, getDay }));
