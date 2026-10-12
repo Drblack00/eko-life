@@ -174,6 +174,44 @@ test('M6 validateAppearanceV1: rejects bad ids, morphs, colours, mismatches', ()
   assert.equal(r.ok, false);
 });
 
+test('M8 new fields: accessories, eye colour, brow style, expanded catalog', () => {
+  // valid M8 payload passes
+  let r = appearance.validateAppearanceV1({
+    base: { skinToneId: 'onyx', eyeColorId: 'eye_green_01', browStyleId: 'brow_bold_01' },
+    hair: { styleId: 'hair_bun_01', colorId: 'hair_auburn_01' },
+    clothing: { topId: 'top_agbada_01', bottomId: 'bottom_trouser_01', shoeId: 'shoe_sandal_01' },
+    accessories: [
+      { slot: 'head', assetId: 'acc_cap_01' },
+      { slot: 'face', assetId: 'acc_glasses_01' },
+      { slot: 'ears', assetId: 'acc_earrings_01' },
+    ],
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.appearance.base.skinToneId, 'onyx');
+  assert.equal(r.appearance.base.eyeColorId, 'eye_green_01');
+  assert.equal(r.appearance.base.browStyleId, 'brow_bold_01');
+  assert.equal(r.appearance.accessories.length, 3);
+  // unknown ids reject
+  r = appearance.validateAppearanceV1({ base: { eyeColorId: 'eye_purple_01' } });
+  assert.equal(r.ok, false);
+  r = appearance.validateAppearanceV1({ base: { browStyleId: 'brow_wild_01' } });
+  assert.equal(r.ok, false);
+  r = appearance.validateAppearanceV1({ base: { skinToneId: 'ultraviolet' } });
+  assert.equal(r.ok, false);
+  r = appearance.validateAppearanceV1({ hair: { styleId: 'hair_mullet_99' } });
+  assert.equal(r.ok, false);
+  r = appearance.validateAppearanceV1({
+    accessories: [{ slot: 'face', assetId: 'acc_monocle_99' }],
+  });
+  assert.equal(r.ok, false);
+  // missing M8 fields default
+  r = appearance.validateAppearanceV1({});
+  assert.equal(r.ok, true);
+  assert.equal(r.appearance.base.eyeColorId, 'eye_brown_01');
+  assert.equal(r.appearance.base.browStyleId, 'brow_natural_01');
+  assert.deepEqual(r.appearance.accessories, []);
+});
+
 test('M6 legacyLookToV1: total, mirrors migrate policy', () => {
   // null/garbage → defaults, never throws
   for (const bad of [null, undefined, 'nope', 42, [], { body: 'alien', hair: 'mohawk', outfit: 'spacesuit' }]) {
@@ -335,20 +373,23 @@ test('M6 GET /api/avatar/catalog: shape + ids match the M2 manifest', async () =
   assert.deepEqual(cat.bodyPresets, ['woman', 'man']);
   assert.deepEqual(cat.facePresets, ['face_default_01']);
   assert.deepEqual(cat.skins, [
-    'deep_espresso', 'dark_cocoa', 'burnt_caramel', 'mahogany',
-    'walnut', 'cocoa', 'coffee', 'latte',
-    'honey', 'sand', 'amber', 'cream',
+    'onyx', 'deep_espresso', 'dark_cocoa', 'truffle', 'burnt_caramel',
+    'mahogany', 'walnut', 'sienna', 'cocoa', 'coffee',
+    'caramel', 'latte', 'honey', 'sand', 'butterscotch',
+    'amber', 'cream', 'ivory',
   ]);
-  assert.deepEqual(cat.hairs, ['lowcut', 'bald', 'curls', 'afro', 'locs', 'braids', 'classic', 'hair_taper_fade_01', 'hair_waves_01']);
-  assert.deepEqual(cat.hairColors, ['hair_black_01', 'hair_dark_brown_01', 'hair_brown_01']);
+  assert.deepEqual(cat.eyeColors, ['eye_brown_01', 'eye_hazel_01', 'eye_amber_01', 'eye_green_01']);
+  assert.deepEqual(cat.browStyles, ['brow_natural_01', 'brow_bold_01', 'brow_arched_01', 'brow_trimmed_01']);
+  assert.deepEqual(cat.hairs, ['lowcut', 'bald', 'curls', 'afro', 'locs', 'braids', 'classic', 'hair_taper_fade_01', 'hair_waves_01', 'hair_bun_01', 'hair_ponytail_01', 'hair_mohawk_01', 'hair_bantu_knots_01']);
+  assert.deepEqual(cat.hairColors, ['hair_black_01', 'hair_dark_brown_01', 'hair_brown_01', 'hair_auburn_01', 'hair_blonde_01', 'hair_grey_01']);
   assert.deepEqual(cat.facialHair, ['facialhair_none_01', 'facialhair_mustache_01', 'facialhair_goatee_01', 'facialhair_beard_short_01']);
   assert.deepEqual(cat.fabrics, ['plain', 'ankara', 'adire', 'asoke']);
-  assert.deepEqual(cat.tops, ['top_tee_01', 'top_shirt_office_01']);
-  assert.deepEqual(cat.bottoms, ['bottom_trouser_01', 'bottom_short_01', 'bottom_cargo_01']);
+  assert.deepEqual(cat.tops, ['top_tee_01', 'top_shirt_office_01', 'top_tank_01', 'top_agbada_01', 'top_dress_01']);
+  assert.deepEqual(cat.bottoms, ['bottom_trouser_01', 'bottom_short_01', 'bottom_cargo_01', 'bottom_skirt_01']);
   assert.deepEqual(cat.outerwear, ['outer_hoodie_01', 'outer_hivis_vest_01']);
-  assert.deepEqual(cat.shoes, ['shoe_sneaker_01', 'shoe_oxford_01', 'shoe_boot_01']);
+  assert.deepEqual(cat.shoes, ['shoe_sneaker_01', 'shoe_oxford_01', 'shoe_boot_01', 'shoe_sandal_01', 'shoe_heel_01']);
   assert.deepEqual(cat.outfits, ['casual', 'hoodie', 'office', 'chill', 'sitework']);
-  assert.deepEqual(cat.accessories, []);
+  assert.deepEqual(cat.accessories, ['acc_glasses_01', 'acc_cap_01', 'acc_earrings_01']);
   assert.equal(cat.morphs.length, 9);
   assert.deepEqual(cat.morphs.map(m => m.key), [
     'jawWidth', 'cheekboneHeight', 'noseWidth', 'noseLength', 'lipFullness',
