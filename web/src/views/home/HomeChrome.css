@@ -1,0 +1,303 @@
+/* Home screen chrome — Phase 1 of the reference audit rebuild.
+   Original styling; liquid-glass treatment matches the app theme. */
+
+/* ---- Top status pill (replaces the old HUD row) ---- */
+.eko-top-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 999px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.eko-top-pill::-webkit-scrollbar {
+  display: none;
+}
+.eko-top-pill > * {
+  flex: none;
+}
+.eko-top-pill__avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 2px solid var(--surface-2);
+  font-size: 1.1rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.eko-top-pill__name {
+  font-weight: 700;
+  font-size: 0.85rem;
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.eko-top-pill__sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--surface-2);
+  opacity: 0.6;
+}
+.eko-top-pill__mood,
+.eko-top-pill__online {
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.eko-top-pill__online {
+  color: var(--text-2, inherit);
+}
+.eko-top-pill__iconbtn {
+  border: none;
+  background: transparent;
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 0.25rem;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.eko-top-pill__iconbtn:active {
+  transform: scale(0.92);
+}
+.eko-top-pill__wallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.eko-top-pill__topup {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  border: none;
+  background: #22c55e;
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.eko-top-pill__topup:active {
+  transform: scale(0.9);
+}
+
+/* ---- Announcement pill (top-center, dismissible) ---- */
+.eko-announce {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.4rem auto 0;
+  max-width: min(92vw, 34rem);
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.eko-announce__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.eko-announce button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 0.2rem;
+  line-height: 1;
+}
+
+/* ---- Left floating cards ---- */
+.eko-sidecards {
+  position: fixed;
+  left: 0.6rem;
+  top: 42%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 20;
+  max-width: 11rem;
+}
+.eko-sidecard {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: 1rem;
+  padding: 0.55rem 0.65rem;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+.eko-sidecard:active {
+  transform: scale(0.96);
+}
+.eko-sidecard__icon {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+.eko-sidecard__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 0.75rem;
+}
+.eko-sidecard__body strong {
+  font-size: 0.78rem;
+}
+.eko-sidecard__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 7.5rem;
+}
+.eko-sidecard__sub {
+  opacity: 0.75;
+  font-size: 0.7rem;
+}
+
+/* ---- Bottom-right pills ---- */
+.eko-workpills {
+  position: fixed;
+  right: 0.6rem;
+  bottom: calc(var(--sab, 0px) + 5.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 20;
+  align-items: flex-end;
+}
+.eko-workpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: 999px;
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.eko-workpill:active {
+  transform: scale(0.95);
+}
+.eko-workpill > span {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+}
+.eko-workpill__sub {
+  font-size: 0.7rem;
+  font-weight: 500;
+  opacity: 0.75;
+}
+.eko-workpill--round {
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+/* ---- Clean-screen mode: everything except the top pill goes away ---- */
+.eko-game--clean .eko-hud__stats,
+.eko-game--clean .eko-sidecards,
+.eko-game--clean .eko-workpills,
+.eko-game--clean .eko-hint,
+.eko-game--clean .eko-daybanner,
+.eko-game--clean .eko-govbanner,
+.eko-game--clean .eko-announce,
+.eko-game--clean .eko-tabs {
+  display: none !important;
+}
+.eko-cleanrestore {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--sab, 0px) + 1rem);
+  z-index: 60;
+  border: none;
+  border-radius: 999px;
+  padding: 0.6rem 1.1rem;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* ---- Top-up dialog ---- */
+.eko-topup__balance {
+  font-size: 1rem;
+}
+.eko-topup__actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+  flex-wrap: wrap;
+}
+
+/* ---- Shortcuts dialog ---- */
+.eko-shortcuts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.eko-shortcuts__row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 0.88rem;
+}
+.eko-shortcuts__row kbd {
+  min-width: 2rem;
+  text-align: center;
+  padding: 0.25rem 0.45rem;
+  border-radius: 0.4rem;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-3, var(--surface-2));
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+/* ---- Small screens: keep the pill one scrollable row, slim the cards ---- */
+@media (max-width: 560px) {
+  .eko-top-pill__name {
+    display: none;
+  }
+  .eko-top-pill__mood-text {
+    display: none;
+  }
+  .eko-sidecards {
+    max-width: 8.5rem;
+    top: 36%;
+  }
+  .eko-sidecard__text {
+    max-width: 5.5rem;
+  }
+  .eko-workpills {
+    bottom: calc(var(--sab, 0px) + 5.25rem);
+  }
+}
