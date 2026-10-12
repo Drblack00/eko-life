@@ -36,6 +36,7 @@ import { ChatTab } from "./chat/ChatTab";
 import { FriendsPage } from "./Friends";
 import { GistApp } from "./gist/GistApp";
 import { BankApp } from "./bank/BankApp";
+import { BoutiqueApp } from "./boutique/BoutiqueApp";
 import { StyleApp } from "./StyleApp";
 import { ElectionSheet } from "./election/ElectionSheet";
 import { HomeTab, type HomeFocus } from "./home/HomeTab";
@@ -1082,6 +1083,13 @@ export function Game({
                 sendAct={send}
                 onTopUp={() => setTopUpOpen(true)}
               />
+            </div>
+          );
+        case "boutique":
+          // Phase 6: Boutique — premium clothing shop (gameplay coins only).
+          return (
+            <div className="eko-tabpad">
+              <BoutiqueApp token={token} you={you} />
             </div>
           );
         case "style":
