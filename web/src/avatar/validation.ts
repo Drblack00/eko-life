@@ -36,11 +36,18 @@ import { AVATAR_MANIFEST_BY_ID } from "./manifest";
 export const AVATAR_TOP_COLORS: readonly string[] = [
   "#22d3ee", "#f472b6", "#a3e635", "#fbbf24", "#c084fc",
   "#fb7185", "#34d399", "#60a5fa", "#ef4444", "#fb923c",
+  // Phase 6 (boutique): signature garment colors for premium outfits.
+  "#f8fafc", "#c2703d", "#0f766e", "#1e3a8a", "#e11d48",
+  "#f5d76e", "#111418", "#374151", "#7c3aed", "#3b82c4",
+  "#18181b",
 ];
 
 export const AVATAR_BOTTOM_COLORS: readonly string[] = [
   "#334155", "#111827", "#f8fafc", "#1e3a8a", "#64748b",
   "#78350f", "#14532d", "#7c2d12", "#831843", "#3b0764",
+  // Phase 6 (boutique): signature garment colors for premium outfits.
+  "#1f2430", "#3b2f2f", "#134e4a", "#172554", "#b45309",
+  "#92400e", "#111418", "#1f2937", "#18181b", "#1e40af",
 ];
 
 const ACCESSORY_SLOTS: readonly AccessorySlot[] = [

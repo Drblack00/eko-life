@@ -196,7 +196,7 @@ export interface ResolvedAssets {
   isMan: boolean;
 }
 
-/** Inverse of migrate.ts OUTFIT_DECOMPOSITION (exact keys). M8 adds gym/agbada/owambe. */
+/** Inverse of migrate.ts OUTFIT_DECOMPOSITION (exact keys). M8 adds gym/agbada/owambe; Phase 6 adds the 12 boutique outfits. */
 const V1_TO_OUTFIT: Record<string, OutfitId> = {
   "top_tee_01|bottom_trouser_01||shoe_sneaker_01": "casual",
   "top_tee_01|bottom_trouser_01|outer_hoodie_01|shoe_sneaker_01": "hoodie",
@@ -206,6 +206,18 @@ const V1_TO_OUTFIT: Record<string, OutfitId> = {
   "top_tank_01|bottom_short_01||shoe_sneaker_01": "gym",
   "top_agbada_01|bottom_trouser_01||shoe_sandal_01": "agbada",
   "top_dress_01|bottom_skirt_01||shoe_heel_01": "owambe",
+  "top_agbada_01|bottom_trouser_01||shoe_oxford_01": "senator",
+  "top_tee_01|bottom_trouser_01||shoe_sandal_01": "dashiki",
+  "top_agbada_01|bottom_skirt_01||shoe_sandal_01": "kaftan",
+  "top_dress_01|bottom_skirt_01||shoe_sneaker_01": "adire_gown",
+  "top_dress_01|bottom_skirt_01||shoe_sandal_01": "ankara_set",
+  "top_dress_01|bottom_short_01||shoe_heel_01": "asoebi",
+  "top_shirt_office_01|bottom_cargo_01||shoe_oxford_01": "tuxedo",
+  "top_tee_01|bottom_trouser_01||shoe_oxford_01": "suit",
+  "top_tee_01|bottom_cargo_01||shoe_sneaker_01": "streetwear",
+  "top_tank_01|bottom_trouser_01||shoe_sneaker_01": "denim",
+  "top_tank_01|bottom_trouser_01|outer_hoodie_01|shoe_sneaker_01": "sport_luxe",
+  "top_agbada_01|bottom_cargo_01||shoe_sandal_01": "royalty",
 };
 
 export function outfitIdForClothing(

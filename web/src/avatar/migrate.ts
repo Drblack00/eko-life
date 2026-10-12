@@ -101,6 +101,79 @@ const OUTFIT_DECOMPOSITION: Record<string, OutfitDecomposition> = {
     outerwearId: "outer_hivis_vest_01",
     shoeId: "shoe_boot_01",
   },
+  // Phase 6: boutique premium outfits (novel combos, invertible).
+  senator: {
+    topId: "top_agbada_01",
+    bottomId: "bottom_trouser_01",
+    outerwearId: null,
+    shoeId: "shoe_oxford_01",
+  },
+  dashiki: {
+    topId: "top_tee_01",
+    bottomId: "bottom_trouser_01",
+    outerwearId: null,
+    shoeId: "shoe_sandal_01",
+  },
+  kaftan: {
+    topId: "top_agbada_01",
+    bottomId: "bottom_skirt_01",
+    outerwearId: null,
+    shoeId: "shoe_sandal_01",
+  },
+  adire_gown: {
+    topId: "top_dress_01",
+    bottomId: "bottom_skirt_01",
+    outerwearId: null,
+    shoeId: "shoe_sneaker_01",
+  },
+  ankara_set: {
+    topId: "top_dress_01",
+    bottomId: "bottom_skirt_01",
+    outerwearId: null,
+    shoeId: "shoe_sandal_01",
+  },
+  asoebi: {
+    topId: "top_dress_01",
+    bottomId: "bottom_short_01",
+    outerwearId: null,
+    shoeId: "shoe_heel_01",
+  },
+  tuxedo: {
+    topId: "top_shirt_office_01",
+    bottomId: "bottom_cargo_01",
+    outerwearId: null,
+    shoeId: "shoe_oxford_01",
+  },
+  suit: {
+    topId: "top_tee_01",
+    bottomId: "bottom_trouser_01",
+    outerwearId: null,
+    shoeId: "shoe_oxford_01",
+  },
+  streetwear: {
+    topId: "top_tee_01",
+    bottomId: "bottom_cargo_01",
+    outerwearId: null,
+    shoeId: "shoe_sneaker_01",
+  },
+  denim: {
+    topId: "top_tank_01",
+    bottomId: "bottom_trouser_01",
+    outerwearId: null,
+    shoeId: "shoe_sneaker_01",
+  },
+  sport_luxe: {
+    topId: "top_tank_01",
+    bottomId: "bottom_trouser_01",
+    outerwearId: "outer_hoodie_01",
+    shoeId: "shoe_sneaker_01",
+  },
+  royalty: {
+    topId: "top_agbada_01",
+    bottomId: "bottom_cargo_01",
+    outerwearId: null,
+    shoeId: "shoe_sandal_01",
+  },
 };
 
 const DEFAULT_OUTFIT = OUTFIT_DECOMPOSITION.casual;
