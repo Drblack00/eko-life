@@ -618,6 +618,38 @@ describe("dressBody contracts (stub three)", () => {
       expect(body.armL.children.length, outfit).toBeGreaterThan(0);
     }
   });
+  // Phase 6: boutique premium outfits dress without throwing and add
+  // visible geometry (torso + legs + sleeves).
+  const premiumOutfits = [
+    "senator",
+    "dashiki",
+    "kaftan",
+    "adire_gown",
+    "ankara_set",
+    "asoebi",
+    "tuxedo",
+    "suit",
+    "streetwear",
+    "denim",
+    "sport_luxe",
+    "royalty",
+  ] as const;
+  it("dresses all 12 boutique outfits without throwing", () => {
+    for (const outfit of premiumOutfits) {
+      const body = fakeBody();
+      const before = body.upper.children.length;
+      const { torsoMesh } = dressBody(
+        T,
+        fakeMats() as never,
+        body as never,
+        { outfit, isMan: false, limbScale: 1, topColor: "#3a6ea5" }
+      );
+      expect(torsoMesh, outfit).toBeInstanceOf(FakeMesh);
+      expect(body.upper.children.length, outfit).toBeGreaterThan(before);
+      expect(body.legL.children.length, outfit).toBeGreaterThan(0);
+      expect(body.armL.children.length, outfit).toBeGreaterThan(0);
+    }
+  });
   it("respects the women's fit without throwing", () => {
     const body = fakeBody();
     expect(() =>

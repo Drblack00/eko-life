@@ -27,7 +27,20 @@ export type OutfitId =
   | "sitework"
   | "gym"
   | "agbada"
-  | "owambe";
+  | "owambe"
+  // Boutique premium outfits (Phase 6). Each has distinct geometry below.
+  | "senator"
+  | "dashiki"
+  | "kaftan"
+  | "adire_gown"
+  | "ankara_set"
+  | "asoebi"
+  | "tuxedo"
+  | "suit"
+  | "streetwear"
+  | "denim"
+  | "sport_luxe"
+  | "royalty";
 
 export interface GarmentCtx {
   outfit: OutfitId;
@@ -564,17 +577,31 @@ function dressLegs(
 ): void {
   const { outfit, limbScale, topColor } = ctx;
   const shorts = outfit === "chill" || outfit === "gym";
-  const cargo = outfit === "sitework" || outfit === "hoodie";
-  const office = outfit === "office";
-  const skirt = outfit === "owambe";
+  const cargo = outfit === "sitework" || outfit === "hoodie" || outfit === "streetwear";
+  const office =
+    outfit === "office" ||
+    outfit === "tuxedo" ||
+    outfit === "suit" ||
+    outfit === "senator";
+  // Bare legs under a skirt/gown (wrapper skirt or flowing gown).
+  const skirt =
+    outfit === "owambe" ||
+    outfit === "kaftan" ||
+    outfit === "adire_gown" ||
+    outfit === "ankara_set" ||
+    outfit === "asoebi";
   const footwearKind =
     outfit === "sitework"
       ? "boot"
       : office
         ? "oxford"
-        : outfit === "agbada"
+        : outfit === "agbada" ||
+            outfit === "dashiki" ||
+            outfit === "kaftan" ||
+            outfit === "ankara_set" ||
+            outfit === "royalty"
           ? "sandal"
-          : outfit === "owambe"
+          : skirt
             ? "heel"
             : "sneaker";
   const bottomStd = std(mats.bottomMat);
@@ -700,8 +727,14 @@ function dressHips(
   const shorts = outfit === "chill" || outfit === "gym";
 
   // M8: wrapper skirt (owambe) replaces the whole hip assembly.
-  if (outfit === "owambe") {
+  // Phase 6: kaftan/adire_gown get floor-length gowns, ankara_set/asoebi
+  // get the knee-length wrapper.
+  if (outfit === "owambe" || outfit === "ankara_set" || outfit === "asoebi") {
     dressSkirt(T, mats, gm, body, ctx);
+    return;
+  }
+  if (outfit === "kaftan" || outfit === "adire_gown") {
+    dressSkirt(T, mats, gm, body, ctx, 0.12);
     return;
   }
 
@@ -822,13 +855,16 @@ function dressSkirt(
   _mats: AvatarMaterials,
   gm: GarmentMats,
   body: BuiltBody,
-  ctx: GarmentCtx
+  ctx: GarmentCtx,
+  /** Absolute hem height — 0.42 = knee (owambe), lower = floor-length gown. */
+  hemAbsY = 0.42
 ): void {
   const { limbScale } = ctx;
   const LY = (absY: number) => absY - HIP_Y;
-  // Flared skirt: waist radius → knee flare, in ascending y for lathe normals.
+  // Flared skirt: waist radius → hem flare, in ascending y for lathe normals.
   const prof: Array<[number, number]> = [
-    [0.205 * limbScale, LY(0.42)],
+    [0.215 * limbScale, LY(hemAbsY)],
+    [0.205 * limbScale, LY(hemAbsY + 0.13)],
     [0.185 * limbScale, LY(0.55)],
     [0.168 * limbScale, LY(0.7)],
     [0.158 * limbScale, LY(0.82)],
@@ -887,7 +923,21 @@ function buildShirt(
   const LY = (absY: number) => absY - HIP_Y;
   // M8: gym/agbada/owambe get their own silhouettes.
   let looseness =
-    outfit === "chill" ? 1.12 : outfit === "hoodie" ? 1.06 : 1;
+    outfit === "chill"
+      ? 1.12
+      : outfit === "hoodie"
+        ? 1.06
+        : outfit === "streetwear"
+          ? 1.2
+          : outfit === "dashiki"
+            ? 1.18
+            : outfit === "sport_luxe"
+              ? 1.1
+              : outfit === "denim"
+                ? 1.06
+                : outfit === "suit"
+                  ? 1.02
+                  : 1;
   let profile = shirtProfile(isMan, looseness);
   if (outfit === "gym") {
     // Tank: narrow shoulders, cropped at the waist.
@@ -901,7 +951,34 @@ function buildShirt(
     looseness = 1.42;
     profile = shirtProfile(isMan, looseness);
     profile.unshift([0.21, 0.64], [0.2, 0.7]);
-  } else if (outfit === "owambe") {
+  } else if (outfit === "senator") {
+    // Knee-length embroidered tunic: agbada drape, tailored shorter.
+    looseness = 1.3;
+    profile = shirtProfile(isMan, looseness);
+    profile = profile.filter(([, y]) => y >= 0.76);
+    profile.unshift([0.2, 0.76], [0.195, 0.8]);
+  } else if (outfit === "royalty") {
+    // Grand royal boubou: the fullest drape, falls to mid-shin.
+    looseness = 1.5;
+    profile = shirtProfile(isMan, looseness);
+    profile = profile.filter(([, y]) => y >= 0.58);
+    profile.unshift([0.225, 0.58], [0.215, 0.64]);
+  } else if (outfit === "kaftan") {
+    // Ankle-length kaftan: flowing column.
+    looseness = 1.38;
+    profile = shirtProfile(isMan, looseness);
+    profile = profile.filter(([, y]) => y >= 0.5);
+    profile.unshift([0.2, 0.5], [0.195, 0.56]);
+  } else if (outfit === "dashiki") {
+    // Relaxed dashiki: easy fit, hip length.
+    profile = profile.filter(([, y]) => y >= 0.84);
+    profile.unshift([0.185, 0.84]);
+  } else if (
+    outfit === "owambe" ||
+    outfit === "adire_gown" ||
+    outfit === "ankara_set" ||
+    outfit === "asoebi"
+  ) {
     // Fitted dress bodice: close cut, flares slightly into the skirt.
     profile = shirtProfile(isMan, 0.96).map(([r, y]) =>
       y < 0.95 ? [r * 1.12, y] : [r, y]
@@ -1081,6 +1158,370 @@ function dressDressTrim(
   seam.rotation.x = Math.PI / 2;
   seam.scale.set(1, 0.86, 1);
   upper.add(seam);
+}
+
+/* ------------------------------------------------------------------ */
+/* Phase 6: Boutique premium-outfit trim builders                      */
+/*                                                                     */
+/* All original procedural geometry following the file's conventions:  */
+/* LY() maps absolute Y to upper-group space, gm.* are the garment     */
+/* materials, embMat is a gold thread material. Each builder adds      */
+/* only the accents that distinguish its outfit.                       */
+/* ------------------------------------------------------------------ */
+
+/** Shared gold-thread material for premium embroidery. */
+function goldThread(T: typeof import("three")): THREE.Material {
+  return new T.MeshStandardMaterial({
+    color: "#d4af37",
+    roughness: 0.35,
+    metalness: 0.65,
+  });
+}
+
+/** Senator: dense gold chest embroidery — triple V rows + collar + placket. */
+function dressSenatorTrim(
+  T: typeof import("three"),
+  gm: GarmentMats,
+  upper: THREE.Group
+): void {
+  const LY = (absY: number) => absY - HIP_Y;
+  const embMat = goldThread(T);
+  for (const sx of [-1, 1]) {
+    for (let row = 0; row < 3; row++) {
+      const v = mesh(
+        T,
+        new T.BoxGeometry(0.016 - row * 0.003, 0.1, 0.008),
+        embMat,
+        sx * (0.03 + row * 0.02),
+        LY(1.26),
+        0.118
+      );
+      v.rotation.z = sx * -0.42;
+      v.rotation.x = -0.12;
+      upper.add(v);
+    }
+  }
+  // Wide embroidered collar band.
+  const collar = mesh(
+    T,
+    new T.TorusGeometry(0.088, 0.017, 10, 24),
+    embMat,
+    0,
+    LY(1.335),
+    0.004
+  );
+  collar.rotation.x = Math.PI / 2;
+  collar.scale.set(1, 0.82, 1);
+  upper.add(collar);
+  // Front placket stitching.
+  upper.add(stitchStrip(T, gm, 0.02, 0.36, 0, LY(1.06), 0.155));
+}
+
+/** Royalty: the heaviest gold embroidery — broad chest panel + hem band. */
+function dressRoyaltyTrim(
+  T: typeof import("three"),
+  gm: GarmentMats,
+  upper: THREE.Group
+): void {
+  const LY = (absY: number) => absY - HIP_Y;
+  const embMat = goldThread(T);
+  // Broad embroidered chest panel.
+  for (const sx of [-1, 1]) {
+    for (let row = 0; row < 4; row++) {
+      const v = mesh(
+        T,
+        new T.BoxGeometry(0.02, 0.13, 0.009),
+        embMat,
+        sx * (0.028 + row * 0.024),
+        LY(1.24),
+        0.125
+      );
+      v.rotation.z = sx * -0.4;
+      v.rotation.x = -0.12;
+      upper.add(v);
+    }
+  }
+  // Medallion at the sternum.
+  const medallion = mesh(
+    T,
+    new T.CylinderGeometry(0.028, 0.028, 0.012, 18),
+    embMat,
+    0,
+    LY(1.18),
+    0.148
+  );
+  medallion.rotation.x = Math.PI / 2 - 0.15;
+  upper.add(medallion);
+  // Heavy hem band.
+  const hem = mesh(
+    T,
+    new T.TorusGeometry(0.21, 0.02, 10, 28),
+    embMat,
+    0,
+    LY(0.66),
+    0
+  );
+  hem.rotation.x = Math.PI / 2;
+  hem.scale.set(1, 0.9, 1);
+  upper.add(hem);
+  upper.add(stitchStrip(T, gm, 0.022, 0.5, 0, LY(1.0), 0.16));
+}
+
+/** Kaftan: rounded neckline trim + vertical front embroidery. */
+function dressKaftanTrim(
+  T: typeof import("three"),
+  gm: GarmentMats,
+  upper: THREE.Group
+): void {
+  const LY = (absY: number) => absY - HIP_Y;
+  const embMat = goldThread(T);
+  const neck = mesh(
+    T,
+    new T.TorusGeometry(0.075, 0.012, 10, 24),
+    embMat,
+    0,
+    LY(1.33),
+    0.01
+  );
+  neck.rotation.x = Math.PI / 2;
+  neck.scale.set(1, 0.85, 1);
+  upper.add(neck);
+  // Single embroidered column down the front.
+  for (let i = 0; i < 5; i++) {
+    const dot = mesh(
+      T,
+      new T.SphereGeometry(0.011, 8, 8),
+      embMat,
+      0,
+      LY(1.26 - i * 0.07),
+      0.128 + i * 0.004
+    );
+    dot.scale.z = 0.5;
+    upper.add(dot);
+  }
+  upper.add(stitchStrip(T, gm, 0.014, 0.4, 0, LY(1.05), 0.14));
+}
+
+/** Dashiki: bold V panel with contrasting border. */
+function dressDashikiTrim(
+  T: typeof import("three"),
+  gm: GarmentMats,
+  upper: THREE.Group,
+  topColor: string
+): void {
+  const LY = (absY: number) => absY - HIP_Y;
+  const embMat = goldThread(T);
+  // Contrast V panel (darker shade of the top colour).
+  const panelMat = new T.MeshStandardMaterial({
+    color: new T.Color(topColor).offsetHSL(0, 0.05, -0.18),
+    roughness: 0.8,
+  });
+  for (const sx of [-1, 1]) {
+    const panel = mesh(
+      T,
+      new T.BoxGeometry(0.055, 0.16, 0.006),
+      panelMat,
+      sx * 0.045,
+      LY(1.24),
+      0.112
+    );
+    panel.rotation.z = sx * -0.45;
+    panel.rotation.x = -0.12;
+    upper.add(panel);
+    // Gold border along the V.
+    const border = mesh(
+      T,
+      new T.BoxGeometry(0.012, 0.16, 0.007),
+      embMat,
+      sx * 0.078,
+      LY(1.24),
+      0.114
+    );
+    border.rotation.z = sx * -0.45;
+    border.rotation.x = -0.12;
+    upper.add(border);
+  }
+  // Hem band.
+  upper.add(stitchStrip(T, gm, 0.16, 0.018, 0, LY(0.9), 0.13));
+}
+
+/** Aso-ebi peplum: flared ruffle at the waist over the skirt. */
+function dressPeplum(
+  T: typeof import("three"),
+  gm: GarmentMats,
+  upper: THREE.Group,
+  limbScale: number
+): void {
+  const LY = (absY: number) => absY - HIP_Y;
+  const prof: Array<[number, number]> = [
+    [0.24 * limbScale, LY(0.82)],
+    [0.2 * limbScale, LY(0.88)],
+    [0.17 * limbScale, LY(0.94)],
+    [0.165 * limbScale, LY(0.97)],
+  ];
+  const peplum = lathe(T, prof, gm.weave, 22);
+  peplum.scale.z = 0.86;
+  upper.add(peplum);
+  // Scalloped edge trim.
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2;
+    const scallop = mesh(
+      T,
+      new T.SphereGeometry(0.016 * limbScale, 8, 8),
+      gm.rib,
+      Math.sin(a) * 0.235 * limbScale,
+      LY(0.82),
+      Math.cos(a) * 0.2 * limbScale
+    );
+    upper.add(scallop);
+  }
+}
+
+/** Tuxedo bow tie. */
+function dressBowTie(
+  T: typeof import("three"),
+  upper: THREE.Group
+): void {
+  const LY = (absY: number) => absY - HIP_Y;
+  const tieMat = new T.MeshStandardMaterial({
+    color: "#14161c",
+    roughness: 0.35,
+  });
+  // Knot.
+  upper.add(
+    mesh(T, new T.BoxGeometry(0.03, 0.025, 0.02), tieMat, 0, LY(1.31), 0.125)
+  );
+  // Wings.
+  for (const sx of [-1, 1]) {
+    const wing = mesh(
+      T,
+      new T.BoxGeometry(0.055, 0.035, 0.012),
+      tieMat,
+      sx * 0.05,
+      LY(1.31),
+      0.122
+    );
+    wing.rotation.z = sx * 0.25;
+    upper.add(wing);
+  }
+}
+
+/**
+ * Jacket lapels + open front panels.
+ * style "peaked" (tuxedo) vs "notch" (suit); denim/track reuse the panels.
+ */
+function dressJacket(
+  T: typeof import("three"),
+  gm: GarmentMats,
+  upper: THREE.Group,
+  opts: {
+    lapel: "peaked" | "notch" | "collar";
+    panelMat?: THREE.Material;
+    zipper?: boolean;
+  }
+): void {
+  const LY = (absY: number) => absY - HIP_Y;
+  const panelMat = opts.panelMat ?? gm.weave;
+  // Open front panels from shoulder to hip.
+  for (const sx of [-1, 1]) {
+    const panel = mesh(
+      T,
+      new T.BoxGeometry(0.075, 0.42, 0.014),
+      panelMat,
+      sx * 0.1,
+      LY(1.12),
+      0.1
+    );
+    panel.rotation.z = sx * -0.06;
+    panel.rotation.y = sx * -0.18;
+    upper.add(panel);
+    // Lapel / collar.
+    if (opts.lapel === "peaked") {
+      const lapel = mesh(
+        T,
+        new T.BoxGeometry(0.05, 0.16, 0.01),
+        panelMat,
+        sx * 0.062,
+        LY(1.28),
+        0.118
+      );
+      lapel.rotation.z = sx * 0.5;
+      lapel.rotation.x = -0.1;
+      upper.add(lapel);
+    } else if (opts.lapel === "notch") {
+      const lapel = mesh(
+        T,
+        new T.BoxGeometry(0.045, 0.12, 0.01),
+        panelMat,
+        sx * 0.06,
+        LY(1.27),
+        0.116
+      );
+      lapel.rotation.z = sx * 0.28;
+      lapel.rotation.x = -0.1;
+      upper.add(lapel);
+    } else {
+      // Collar band for denim/track jackets.
+      const collar = mesh(
+        T,
+        new T.BoxGeometry(0.05, 0.05, 0.012),
+        panelMat,
+        sx * 0.055,
+        LY(1.32),
+        0.1
+      );
+      collar.rotation.z = sx * 0.35;
+      upper.add(collar);
+    }
+  }
+  if (opts.zipper) {
+    // Centre zipper teeth + pull.
+    upper.add(stitchStrip(T, gm, 0.014, 0.4, 0, LY(1.12), 0.128));
+    upper.add(
+      mesh(
+        T,
+        new T.BoxGeometry(0.02, 0.035, 0.014),
+        gm.rib,
+        0,
+        LY(1.3),
+        0.13
+      )
+    );
+  }
+}
+
+/** Streetwear chain: torus necklace + pendant. */
+function dressChain(
+  T: typeof import("three"),
+  upper: THREE.Group
+): void {
+  const LY = (absY: number) => absY - HIP_Y;
+  const chainMat = new T.MeshStandardMaterial({
+    color: "#c0c5ce",
+    roughness: 0.25,
+    metalness: 0.9,
+  });
+  const chain = mesh(
+    T,
+    new T.TorusGeometry(0.075, 0.007, 8, 24),
+    chainMat,
+    0,
+    LY(1.26),
+    0.06
+  );
+  chain.rotation.x = Math.PI / 2 - 0.5;
+  chain.scale.set(1, 1, 1.4);
+  upper.add(chain);
+  const pendant = mesh(
+    T,
+    new T.BoxGeometry(0.035, 0.045, 0.012),
+    chainMat,
+    0,
+    LY(1.16),
+    0.125
+  );
+  pendant.rotation.x = -0.15;
+  upper.add(pendant);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1365,8 +1806,18 @@ function dressSleeves(
   const { outfit, limbScale } = ctx;
   // M8: the gym tank is sleeveless — bare shoulders, no caps.
   if (outfit === "gym") return;
-  const longSleeves = outfit === "hoodie" || outfit === "office";
-  const wideSleeves = outfit === "agbada";
+  const longSleeves =
+    outfit === "hoodie" ||
+    outfit === "office" ||
+    outfit === "tuxedo" ||
+    outfit === "suit" ||
+    outfit === "denim" ||
+    outfit === "sport_luxe";
+  const wideSleeves =
+    outfit === "agbada" ||
+    outfit === "senator" ||
+    outfit === "kaftan" ||
+    outfit === "royalty";
   for (const [arm, sx] of [[body.armL, -1], [body.armR, 1]] as const) {
     // Shoulder cap — an ellipsoid stretched toward the torso that bridges
     // into the sleeve, swallowing the sleeve's top edge so no seam shows.
@@ -1509,21 +1960,56 @@ export function dressBody(
   const shirt = buildShirt(T, gm, ctx);
   body.upper.add(shirt);
 
-  if (outfit === "office") {
+  if (outfit === "office" || outfit === "suit" || outfit === "tuxedo") {
     dressOfficeExtras(T, mats, gm, body.upper, topColor);
     // Office shirt: no ribbed hem band (tucked look) — waist folds only.
     body.upper.add(foldArc(T, gm.fold, 0.035, 0.005, -0.09, 0.04, 0.1, 0.4, 1.1));
     body.upper.add(foldArc(T, gm.fold, 0.032, 0.005, 0.09, 0.03, 0.1, 0.4, -1.1 + Math.PI));
+    if (outfit === "tuxedo") {
+      dressBowTie(T, body.upper);
+      dressJacket(T, gm, body.upper, { lapel: "peaked" });
+    } else if (outfit === "suit") {
+      dressJacket(T, gm, body.upper, { lapel: "notch" });
+    }
   } else if (outfit === "gym") {
     dressTankTrim(T, gm, body.upper, topColor);
   } else if (outfit === "agbada") {
     dressAgbadaTrim(T, gm, body.upper, topColor);
-  } else if (outfit === "owambe") {
+  } else if (outfit === "senator") {
+    dressSenatorTrim(T, gm, body.upper);
+  } else if (outfit === "royalty") {
+    dressRoyaltyTrim(T, gm, body.upper);
+  } else if (outfit === "kaftan") {
+    dressKaftanTrim(T, gm, body.upper);
+  } else if (outfit === "dashiki") {
+    dressDashikiTrim(T, gm, body.upper, topColor);
+  } else if (
+    outfit === "owambe" ||
+    outfit === "adire_gown" ||
+    outfit === "ankara_set"
+  ) {
     dressDressTrim(T, gm, body.upper, topColor);
+  } else if (outfit === "asoebi") {
+    dressDressTrim(T, gm, body.upper, topColor);
+    dressPeplum(T, gm, body.upper, ctx.limbScale);
+  } else if (outfit === "denim") {
+    dressTeeTrim(T, gm, body.upper, looseness);
+    dressJacket(T, gm, body.upper, {
+      lapel: "collar",
+      panelMat: new T.MeshStandardMaterial({
+        color: "#3b5bdb",
+        roughness: 0.85,
+      }),
+    });
+  } else if (outfit === "sport_luxe") {
+    dressTeeTrim(T, gm, body.upper, looseness);
+    dressJacket(T, gm, body.upper, { lapel: "collar", zipper: true });
   } else {
     dressTeeTrim(T, gm, body.upper, looseness);
   }
-  if (outfit === "hoodie") dressHoodieExtras(T, mats, gm, body.upper);
+  if (outfit === "hoodie" || outfit === "streetwear")
+    dressHoodieExtras(T, mats, gm, body.upper);
+  if (outfit === "streetwear") dressChain(T, body.upper);
   if (outfit === "sitework") dressSiteworkExtras(T, mats, body.upper);
 
   dressSleeves(T, mats, gm, body, ctx);
