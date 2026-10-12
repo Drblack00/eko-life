@@ -293,35 +293,6 @@
   }
 }
 
-/* "Edit look" entry button (Me tab profile header) */
-.eko-avatar-edit {
-  min-height: 40px;
-  padding: var(--space-2) var(--space-3);
-  border-radius: 999px;
-  border: 2px solid var(--surface-2);
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 700;
-  font-size: 0.9rem;
-}
-
-.eko-avatar-edit__wrap {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--space-2);
-}
-
-.eko-avatar-edit__sheet h2 {
-  margin: 0 0 var(--space-1);
-  font-size: 1.25rem;
-}
-
-.eko-avatar-edit__sheet p {
-  margin: 0 0 var(--space-4);
-  color: var(--text-muted);
-  font-size: 0.9rem;
-}
-
 /* ---- Workstream B: landscape studio ----
    Side-by-side on short viewports: the 3D preview sticks to the left while
    the option rows scroll beside it; the footer spans full width. Portrait
@@ -376,7 +347,7 @@
   color: var(--text);
 }
 
-/* Outfit cards (5 exact pipeline outfits — honest, no fake combos) */
+/* Outfit cards (8 exact pipeline outfits — honest, no fake combos) */
 .eko-studio__outfits {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -592,6 +563,122 @@
 .eko-studio__framebtn--ghost {
   font-weight: 600;
   opacity: 0.75;
+}
+
+/* ---- M8: Style app — dedicated studio ---- */
+/* The Phone shell owns the "Style" title + back button; this makes the
+   studio fill the app area with a hero-size live preview. Narrow phones
+   keep this single-column sheet; wide screens get the two-column studio
+   mode below. */
+.eko-styleapp {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.eko-styleapp .eko-studio {
+  flex: 1;
+  gap: var(--space-3);
+}
+
+.eko-styleapp .eko-studio__preview {
+  height: min(54vh, 500px);
+  min-height: 340px;
+  border-radius: var(--radius-xl, 20px);
+}
+
+/* ---- M8: wide studio mode (desktop, Style app active) ----
+   The phone panel widens to 860px; the studio becomes a two-column
+   layout: hero-size 3D preview on the left, tabs + options + footer
+   stacked on the right. Narrow phones keep the single-column sheet. */
+@media (min-width: 700px) {
+  .eko-phone__panel--wide .eko-styleapp {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .eko-phone__panel--wide .eko-styleapp .eko-studio {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "preview tabs"
+      "preview panel"
+      "preview footer";
+    gap: var(--space-3);
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Status regions + dialogs span both columns. */
+  .eko-phone__panel--wide .eko-styleapp .eko-studio > *:not(.eko-studio__preview):not(.eko-studio__tabs):not(.eko-studio__tabpanel):not(.eko-studio__footer) {
+    grid-column: 1 / -1;
+  }
+
+  .eko-phone__panel--wide .eko-studio__preview {
+    grid-area: preview;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .eko-phone__panel--wide .eko-studio__tabs {
+    grid-area: tabs;
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .eko-phone__panel--wide .eko-studio__tabpanel {
+    grid-area: panel;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .eko-phone__panel--wide .eko-studio__footer {
+    grid-area: footer;
+  }
+}
+
+/* Tab panel transition: soft fade + rise on every category switch.
+   (The panel gets key={tab} so React remounts it per tab.) */
+.eko-studio__tabpanel {
+  animation: eko-studio-tabin 0.22s ease-out;
+}
+
+@keyframes eko-studio-tabin {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eko-studio__tabpanel {
+    animation: none;
+  }
+}
+
+/* 6 category tabs: allow horizontal scroll on narrow phones instead of
+   crushing the labels. */
+.eko-studio__tabs {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.eko-studio__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.eko-studio__tab {
+  flex: 1 0 auto;
+  padding-left: var(--space-3);
+  padding-right: var(--space-3);
+  white-space: nowrap;
 }
 
 /* Landscape: new blocks join the scrolling options column */
