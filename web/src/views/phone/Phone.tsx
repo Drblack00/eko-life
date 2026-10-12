@@ -21,6 +21,8 @@ export const PHONE_APPS: PhoneApp[] = [
   { id: "boutique", label: "Boutique", icon: "🛍️" },
   // Phase 7: Èkó Rich List — top players by net worth.
   { id: "richlist", label: "Rich List", icon: "🏆" },
+  // Phase 8: Èkó Gov — governor election + governance.
+  { id: "gov", label: "Èkó Gov", icon: "🏛️" },
   { id: "style", label: "Style", icon: "✨" },
   { id: "me", label: "Me", icon: "🧑" },
 ];
