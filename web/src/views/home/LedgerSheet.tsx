@@ -5,7 +5,7 @@ import { Button, EmptyState, Loading, Sheet } from "../../components";
 import "./Home.css";
 
 /** Human labels for ledger kinds (fallback: prettified kind). */
-const KIND_LABELS: Record<string, string> = {
+export const KIND_LABELS: Record<string, string> = {
   work: "Work pay",
   work_pay: "Work pay",
   eat: "Food",
@@ -34,13 +34,20 @@ const KIND_LABELS: Record<string, string> = {
   savings_interest: "Savings interest",
   loan_interest: "Loan interest",
   starter_loan: "Starter loan",
+  lapo_auto: "LAPO auto-debit",
+  lapo_repay: "LAPO repayment",
+  income_tax: "Income tax",
+  // Phase 4 — Èkó Reserve bank app.
+  bond_buy: "Bond purchase",
+  bond_payout: "Bond payout",
+  weekly_bill: "Weekly upkeep bill",
   evict: "Eviction",
   class_bonus: "Starter package",
   signup: "Welcome bonus",
   migrate: "Account migration",
 };
 
-function kindLabel(kind: string | null | undefined): string {
+export function kindLabel(kind: string | null | undefined): string {
   const k = String(kind ?? "other");
   return KIND_LABELS[k] ?? k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }

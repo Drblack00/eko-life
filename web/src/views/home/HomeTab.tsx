@@ -302,10 +302,13 @@ function BankSection({
   you,
   config,
   sendAct,
+  onOpenBank,
 }: {
   you: You;
   config: GameConfig;
   sendAct: (a: ActName, params?: Record<string, unknown>) => void;
+  /** Opens the full Èkó Reserve bank phone app. */
+  onOpenBank?: () => void;
 }) {
   const [amount, setAmount] = useState("");
   const [loanAmt, setLoanAmt] = useState("");
@@ -493,6 +496,17 @@ function BankSection({
           </>
         )}
       </Card>
+      {/* Phase 4: full bank app lives on the Phone — deep-link into it. */}
+      {onOpenBank && (
+        <Button
+          size="md"
+          variant="ghost"
+          className="eko-home__full"
+          onClick={onOpenBank}
+        >
+          🏦 Open Èkó Reserve — full bank app
+        </Button>
+      )}
     </Section>
   );
 }
@@ -663,6 +677,7 @@ export function HomeTab({
   travelTo,
   focus,
   onClearFocus,
+  onOpenBank,
 }: {
   you: You;
   config: GameConfig;
@@ -670,6 +685,8 @@ export function HomeTab({
   travelTo: (locationId: string) => void;
   focus: HomeFocus;
   onClearFocus: () => void;
+  /** Opens the full Èkó Reserve bank phone app (Phase 4). */
+  onOpenBank?: () => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -685,7 +702,7 @@ export function HomeTab({
   return (
     <div className="eko-tabpad eko-home" ref={rootRef}>
       <HousingSection you={you} config={config} sendAct={sendAct} travelTo={travelTo} />
-      <BankSection you={you} config={config} sendAct={sendAct} />
+      <BankSection you={you} config={config} sendAct={sendAct} onOpenBank={onOpenBank} />
       <VehicleSection you={you} config={config} sendAct={sendAct} />
       <BusinessSection you={you} config={config} sendAct={sendAct} />
     </div>
