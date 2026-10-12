@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { authGet, type TravelFares } from "../../lib/api";
 import { naira } from "../../game/types";
 import { Button, Dialog } from "../../components";
@@ -151,7 +152,11 @@ export function ShortcutsDialog({
 }
 
 /* ------------------------------------------------------------------ */
-/* Left floating cards: goals, daily, clean-screen toggle.             */
+/* Quick actions: ONE floating button (bottom-left, above the dock) that */
+/* opens a clean overlay panel with the goals / daily / gem / clean      */
+/* cards. Default: closed, so the home screen stays uncluttered. The     */
+/* panel portals to document.body — transformed ancestors (e.g. the home */
+/* chrome) re-anchor position:fixed, the GemHunt-dialog lesson.          */
 /* ------------------------------------------------------------------ */
 
 interface Mission {
@@ -201,12 +206,36 @@ function SideCards({
   onToggleClean: () => void;
 }) {
   const { missions, stars } = useHustle(token);
+  const [open, setOpen] = useState(false);
   const top = missions?.find((m) => !m.done) ?? null;
   const tap = (app: string) => () => {
     blip("tap");
     onOpenApp(app);
   };
-  return (
+
+  // Clean-screen mode hides the chrome: never trap the panel open behind it.
+  useEffect(() => {
+    if (cleanMode) setOpen(false);
+  }, [cleanMode]);
+
+  // Escape closes the panel.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open ]);
+
+  if (cleanMode) return null;
+
+  const togglePanel = () => {
+    blip("tap");
+    setOpen((o) => !o);
+  };
+
+  const cards = (
     <div className="eko-sidecards" aria-label="Quick cards">
       {top && (
         <button
@@ -257,6 +286,46 @@ function SideCards({
         </span>
       </button>
     </div>
+  );
+
+  return (
+    <>
+      <button
+        type="button"
+        className="eko-quickfab glass"
+        aria-label="Quick actions"
+        aria-expanded={open}
+        title="Quick actions"
+        onClick={togglePanel}
+      >
+        <span aria-hidden="true">{open ? "✕" : "✨"}</span>
+      </button>
+      {open &&
+        createPortal(
+          <div className="eko-quickpanel__scrim" onClick={togglePanel}>
+            <div
+              className="eko-quickpanel glass"
+              role="dialog"
+              aria-label="Quick actions"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="eko-quickpanel__head">
+                <strong>Quick actions</strong>
+                <button
+                  type="button"
+                  className="eko-quickpanel__close"
+                  aria-label="Close quick actions"
+                  onClick={togglePanel}
+                >
+                  <span aria-hidden="true">✕</span>
+                </button>
+              </div>
+              {cards}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 
