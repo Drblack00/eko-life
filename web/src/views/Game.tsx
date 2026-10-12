@@ -10,7 +10,7 @@ import {
   type ApiLocation,
   type GameConfig,
 } from "../lib/api";
-import { CityMap } from "../game/CityMap";
+import { LagosMap } from "../game/LagosMap";
 import { mapXYToWorld, toPin } from "../game/mapPins";
 import type { PinLocation } from "../game/stubLocations";
 import {
@@ -341,7 +341,7 @@ function CityTab({
         </button>
       </div>
       <div className="eko-city__mapwrap">
-        <CityMap pins={pins} onPinSelect={onPinSelect} />
+        <LagosMap pins={pins} onPinSelect={onPinSelect} />
       </div>
       <p className="eko-city__tip">
         Tap a pin to see what's there — travelling costs 5 energy, so choose
