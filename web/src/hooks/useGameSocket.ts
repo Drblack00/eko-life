@@ -11,6 +11,8 @@ import type {
   FriendEntry,
   FriendRequest,
   GovernorInfo,
+  NotificationEntry,
+  NotificationPrefs,
   PlayerLite,
   RoomEntry,
   RoomMember,
@@ -19,7 +21,8 @@ import type {
   StreetSpawn,
   You,
 } from "../game/types";
-import { spawnMapXY } from "../game/types";
+import { spawnMapXY, normalizeNotification } from "../game/types";
+import { notificationsApi } from "../lib/api";
 
 export type SocketStatus = "connecting" | "open" | "retrying" | "failed";
 
@@ -478,6 +481,25 @@ export interface GameSocket {
 
   /** Top-level social sender for message types not covered above. */
   sendSocial: (t: string, params?: Record<string, unknown>) => void;
+
+  /* ---------------- M21: notifications ---------------- */
+  /** Recent notifications (newest first, capped). */
+  notifications: NotificationEntry[];
+  /** Unread badge count. */
+  unreadNotifications: number;
+  /** Pending toast popups for live notifications. */
+  notifToasts: NotificationEntry[];
+  dismissNotifToast: (id: number) => void;
+  /** Preference toggles (null until loaded). */
+  notifPrefs: NotificationPrefs | null;
+  updateNotifPrefs: (prefs: Partial<NotificationPrefs>) => void;
+  /** Load the panel list, then clear the badge (mark all read). */
+  openNotifications: () => void;
+  markNotificationRead: (id: number) => void;
+  /** Deep-link: open a room from a notification tap. */
+  navRoomId: number | null;
+  requestRoomNav: (roomId: number) => void;
+  clearRoomNav: () => void;
 }
 
 /**
@@ -522,6 +544,15 @@ export function useGameSocket(token: string | null): GameSocket {
   /** Server-authoritative total (`{t:'dm_unread', n}`) — null until first push. */
   const [dmTotal, setDmTotal] = useState<number | null>(null);
   const [blocked, setBlocked] = useState<Record<number, string>>(loadBlocked);
+
+  // --- M21: notifications ---
+  const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [notifToasts, setNotifToasts] = useState<NotificationEntry[]>([]);
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs | null>(null);
+  const [navRoomId, setNavRoomId] = useState<number | null>(null);
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
 
   const wsRef = useRef<WebSocket | null>(null);
   const attemptRef = useRef(0);
@@ -649,6 +680,20 @@ export function useGameSocket(token: string | null): GameSocket {
             setRooms(rs);
           }
           if (typeof msg.unreadDm === "number") setDmTotal(msg.unreadDm);
+          // M21: prime the notification badge + preferences on connect.
+          const nt = tokenRef.current;
+          if (nt) {
+            notificationsApi
+              .list(nt, 1, 0)
+              .then((r) => setUnreadNotifications(Number(r.unread) || 0))
+              .catch(() => {});
+            notificationsApi
+              .getPrefs(nt)
+              .then((r) => {
+                if (r && r.preferences) setNotifPrefs(r.preferences);
+              })
+              .catch(() => {});
+          }
           break;
         case "you":
           if (msg.you) {
@@ -854,6 +899,31 @@ export function useGameSocket(token: string | null): GameSocket {
               )
             );
           }
+          break;
+        }
+        case "notification:new": {
+          // M21: live notification. Suppress toast + auto-mark-read while
+          // the relevant room is open (the message is already visible).
+          const n = normalizeNotification(msg.notification);
+          if (!n) break;
+          const nRoomId = n.data ? (n.data.roomId ?? n.data.room_id) : null;
+          if (
+            n.type === "room_message" &&
+            nRoomId != null &&
+            activeRoomRef.current != null &&
+            String(activeRoomRef.current) === String(nRoomId)
+          ) {
+            const t = tokenRef.current;
+            if (t) notificationsApi.markRead(t, n.id).catch(() => {});
+            break;
+          }
+          setNotifications((prev) =>
+            [n, ...prev.filter((x) => x.id !== n.id)].slice(0, 30)
+          );
+          setUnreadNotifications((u) => u + 1);
+          setNotifToasts((prev) =>
+            [...prev.filter((x) => x.id !== n.id), n].slice(-3)
+          );
           break;
         }
         case "room_unread": {
@@ -1286,6 +1356,61 @@ export function useGameSocket(token: string | null): GameSocket {
     []
   );
 
+  /* ---------------- M21: notifications ---------------- */
+  const markNotificationRead = useCallback((id: number) => {
+    const t = tokenRef.current;
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    setUnreadNotifications((u) => Math.max(0, u - 1));
+    if (t) notificationsApi.markRead(t, id).catch(() => {});
+  }, []);
+
+  /** Load the panel list, then clear the badge (mark all read). */
+  const openNotifications = useCallback(() => {
+    const t = tokenRef.current;
+    if (!t) return;
+    notificationsApi
+      .list(t, 30, 0)
+      .then((r) => {
+        const list = (r.notifications || [])
+          .map(normalizeNotification)
+          .filter((n): n is NotificationEntry => n !== null);
+        setNotifications(list);
+      })
+      .catch(() => {});
+    notificationsApi
+      .markAllRead(t)
+      .then(() => {
+        setUnreadNotifications(0);
+        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      })
+      .catch(() => {});
+  }, []);
+
+  const updateNotifPrefs = useCallback((prefs: Partial<NotificationPrefs>) => {
+    const t = tokenRef.current;
+    setNotifPrefs((prev) => ({ ...(prev ?? { friend_online: true, room_message: true, money_received: true }), ...prefs }));
+    if (t) {
+      notificationsApi
+        .setPrefs(t, prefs)
+        .then((r) => {
+          if (r && r.preferences) setNotifPrefs(r.preferences);
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  const dismissNotifToast = useCallback((id: number) => {
+    setNotifToasts((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+
+  const requestRoomNav = useCallback((roomId: number) => {
+    setNavRoomId(roomId);
+  }, []);
+
+  const clearRoomNav = useCallback(() => {
+    setNavRoomId(null);
+  }, []);
+
   const sendDm = useCallback(
     (to: number, text: string) => {
       const clean = text.trim().slice(0, 200);
@@ -1465,5 +1590,18 @@ export function useGameSocket(token: string | null): GameSocket {
     reportUser,
 
     sendSocial,
+
+    // M21: notifications
+    notifications,
+    unreadNotifications,
+    notifToasts,
+    dismissNotifToast,
+    notifPrefs,
+    updateNotifPrefs,
+    openNotifications,
+    markNotificationRead,
+    navRoomId,
+    requestRoomNav,
+    clearRoomNav,
   };
 }
