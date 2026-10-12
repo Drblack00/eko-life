@@ -261,6 +261,14 @@ CREATE TABLE IF NOT EXISTS bank_bonds (
 );
 CREATE INDEX IF NOT EXISTS idx_bank_bonds_user ON bank_bonds(user_id);
 CREATE INDEX IF NOT EXISTS idx_bank_bonds_due ON bank_bonds(matured, start_day, term_days);
+-- Phase 6: Boutique wardrobe — premium outfits owned per user.
+CREATE TABLE IF NOT EXISTS wardrobe (
+  user_id INTEGER NOT NULL,
+  item_id TEXT NOT NULL,
+  bought_at BIGINT NOT NULL,
+  PRIMARY KEY (user_id, item_id)
+);
+CREATE INDEX IF NOT EXISTS idx_wardrobe_user ON wardrobe(user_id);
 -- ============================================================
 -- FINTECH FOUNDATION (Worker A) — real-money cash ledger.
 -- ADDITIVE ONLY: no existing game table, game code, or the
@@ -683,6 +691,14 @@ CREATE TABLE IF NOT EXISTS bank_bonds (
 );
 CREATE INDEX IF NOT EXISTS idx_bank_bonds_user ON bank_bonds(user_id);
 CREATE INDEX IF NOT EXISTS idx_bank_bonds_due ON bank_bonds(matured, start_day, term_days);
+-- Phase 6: Boutique wardrobe — premium outfits owned per user.
+CREATE TABLE IF NOT EXISTS wardrobe (
+  user_id INTEGER NOT NULL,
+  item_id TEXT NOT NULL,
+  bought_at BIGINT NOT NULL,
+  PRIMARY KEY (user_id, item_id)
+);
+CREATE INDEX IF NOT EXISTS idx_wardrobe_user ON wardrobe(user_id);
 -- ============================================================
 -- FINTECH FOUNDATION (Worker A) — real-money cash ledger.
 -- ADDITIVE ONLY: no existing game table, game code, or the
@@ -1360,9 +1376,36 @@ export async function addTransaction(userId, kind, amount, balanceAfter, meta) {
     [userId, kind, amount, balanceAfter, meta ? JSON.stringify(meta) : null, Date.now()]);
 }
 
+// ---------- wardrobe (Phase 6: boutique premium outfits) ----------
+
+/** All boutique item ids owned by a user. */
+export async function getWardrobe(userId) {
+  const rows = await dbAll(
+    'SELECT item_id FROM wardrobe WHERE user_id=? ORDER BY bought_at ASC',
+    'SELECT item_id FROM wardrobe WHERE user_id=$1 ORDER BY bought_at ASC',
+    [userId]);
+  return rows.map(r => r.item_id);
+}
+
+/** True when the user owns the boutique item. */
+export async function ownsBoutiqueItem(userId, itemId) {
+  const row = await dbGet(
+    'SELECT 1 AS one FROM wardrobe WHERE user_id=? AND item_id=?',
+    'SELECT 1 AS one FROM wardrobe WHERE user_id=$1 AND item_id=$2',
+    [userId, itemId]);
+  return !!row;
+}
+
+/** Record a boutique purchase (idempotent — PK prevents duplicates). */
+export async function addWardrobeItem(userId, itemId) {
+  await dbRun(
+    'INSERT OR IGNORE INTO wardrobe (user_id, item_id, bought_at) VALUES (?,?,?)',
+    'INSERT INTO wardrobe (user_id, item_id, bought_at) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',
+    [userId, itemId, Date.now()]);
+}
+
 // Newest-first ledger rows for a player (used by tests; M3 economy UI).
-export async function listTransactions(userId, limit = 50) {
-  const lim = Math.max(1, Math.min(200, Math.floor(Number(limit) || 50)));
+export async function listTransactions(userId, limit = 50) {  const lim = Math.max(1, Math.min(200, Math.floor(Number(limit) || 50)));
   if (pool) {
     const r = await pool.query(
       'SELECT * FROM transactions WHERE user_id=$1 ORDER BY id DESC LIMIT $2', [userId, lim]);
