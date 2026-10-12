@@ -313,6 +313,8 @@ export interface Me {
   character_id?: number;
   username: string;
   name: string;
+  /** Character panel: masked account email (null when the account has none). */
+  email_masked?: string | null;
   class: string | null;
   avatar: string;
   color: string;
@@ -416,6 +418,18 @@ export async function authGet<T>(path: string, token: string): Promise<T> {
 export async function authPost<T>(path: string, token: string, body: unknown): Promise<T> {
   return request<T>(path, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+/** Bearer-auth PUT-with-JSON helper. */
+export async function authPut<T>(path: string, token: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: "PUT",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
@@ -685,6 +699,19 @@ export const friendsApi = {
   resolveReferral: (code: string) =>
     request<{ username: string }>(
       `/api/referral/${encodeURIComponent(code)}`
+    ),
+};
+
+/* ------------------------------------------------------------------ */
+/* Character panel: username + display name changes.                   */
+/* ------------------------------------------------------------------ */
+export const profileApi = {
+  /** Change username and/or display name (server validates like registration). */
+  update: (token: string, body: { username?: string; name?: string }) =>
+    authPut<{ ok: boolean; username?: string; name?: string }>(
+      "/api/me/profile",
+      token,
+      body
     ),
 };
 
