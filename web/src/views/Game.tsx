@@ -147,7 +147,8 @@ function Hud({
   };
   return (
     <header className="eko-hud">
-      <div className="eko-top-pill glass" role="status" aria-label="Status">
+      <div className="eko-hud__pills">
+      <div className="eko-top-pill eko-top-pill--status glass" role="status" aria-label="Status">
         <button
           type="button"
           className="eko-top-pill__avatar"
@@ -175,7 +176,8 @@ function Hud({
           {visits !== null ? `${compactNum(visits)} · ` : ""}
           {online} online
         </span>
-        <span className="eko-top-pill__sep" aria-hidden="true" />
+      </div>
+      <div className="eko-top-pill eko-top-pill--actions glass" aria-label="Quick actions">
         <button
           type="button"
           className="eko-top-pill__iconbtn"
@@ -192,7 +194,7 @@ function Hud({
             you.is_admin ? "Unlimited admin balance" : `Balance ${naira(you.money)}`
           }
         >
-          {balance}
+          <span className="eko-top-pill__wallet-text">{balance}</span>
           <button
             type="button"
             className="eko-top-pill__topup"
@@ -212,10 +214,21 @@ function Hud({
           className="eko-hud__gov"
           onClick={onGovOpen}
           aria-haspopup="dialog"
-          title="State House — elections"
+          title={governorName ? `State House — governor @${governorName}` : "State House — elections"}
         >
-          {governorName ? `👑 @${governorName}` : "🏛️ No governor"}
+          {governorName ? (
+            <>
+              <span aria-hidden="true">👑</span>
+              <span className="eko-hud__gov-text"> @{governorName}</span>
+            </>
+          ) : (
+            <>
+              <span aria-hidden="true">🏛️</span>
+              <span className="eko-hud__gov-text"> No governor</span>
+            </>
+          )}
         </button>
+      </div>
       </div>
       <div
         className="eko-hud__stats eko-hud__stats--clickable"
