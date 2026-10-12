@@ -181,6 +181,7 @@
 .eko-gist__badge--veteran { background: #1e3a8a; color: #bfdbfe; }
 .eko-gist__badge--legend { background: #7c2d12; color: #fed7aa; }
 .eko-gist__badge--odogwu { background: #713f12; color: #fde68a; }
+.eko-gist__badge--governor { background: #854d0e; color: #fef08a; }
 
 .eko-gist__text {
   margin: var(--space-2) 0 0;
