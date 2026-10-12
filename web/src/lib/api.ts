@@ -966,3 +966,30 @@ export const bankApi = {
       { amount, termDays }
     ),
 };
+
+/* ------------------------------------------------------------------ */
+/* Phase 6 — Boutique clothing shop.                                   */
+/* ------------------------------------------------------------------ */
+
+export interface BoutiqueItem {
+  id: string;
+  outfitId: string;
+  name: string;
+  price: number;
+  occasion: "owambe" | "street" | "office" | "traditional";
+  blurb: string;
+  owned: boolean;
+}
+
+export const boutiqueApi = {
+  /** Catalog + owned flags + coin balance. */
+  catalog: (token: string) =>
+    authGet<{ items: BoutiqueItem[]; balance: number }>("/api/boutique", token),
+  /** Buy an outfit — server validates existence, ownership, affordability. */
+  buy: (token: string, itemId: string) =>
+    authPost<{ item: BoutiqueItem; balance: number }>(
+      "/api/boutique/buy",
+      token,
+      { itemId }
+    ),
+};
