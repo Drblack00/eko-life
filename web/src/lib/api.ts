@@ -3,6 +3,8 @@ import type {
   AvatarLookOptions,
   LeaderEntry,
   NewsItem,
+  NotificationEntry,
+  NotificationPrefs,
   PresenceEntry,
 } from "../game/types";
 
@@ -684,4 +686,38 @@ export const friendsApi = {
     request<{ username: string }>(
       `/api/referral/${encodeURIComponent(code)}`
     ),
+};
+
+/* ------------------------------------------------------------------ */
+/* M21 — notifications API.                                            */
+/* ------------------------------------------------------------------ */
+export const notificationsApi = {
+  /** Newest-first page + unread count. */
+  list: (token: string, limit = 30, offset = 0) =>
+    authGet<{ notifications: NotificationEntry[]; unread: number; limit: number; offset: number }>(
+      `/api/notifications?limit=${limit}&offset=${offset}`,
+      token
+    ),
+  /** Mark one notification read. */
+  markRead: (token: string, id: number) =>
+    authPost<{ ok: boolean }>(`/api/notifications/${id}/read`, token, {}),
+  /** Mark everything read (clears the badge). */
+  markAllRead: (token: string) =>
+    authPost<{ ok: boolean }>(`/api/notifications/read-all`, token, {}),
+  /** Current preference toggles. */
+  getPrefs: (token: string) =>
+    authGet<{ preferences: NotificationPrefs }>(
+      `/api/notifications/preferences`,
+      token
+    ),
+  /** Save preference toggles. */
+  setPrefs: (token: string, prefs: Partial<NotificationPrefs>) =>
+    request<{ preferences: NotificationPrefs }>(`/api/notifications/preferences`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(prefs),
+    }),
 };
