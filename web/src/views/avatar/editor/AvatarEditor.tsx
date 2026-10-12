@@ -15,9 +15,9 @@
  * draft = DEFAULT_APPEARANCE_V1 (still needs an explicit Save).
  *
  * Categories (honesty rule — every control drives a real parameter):
- * Body / Skin / Hair / Clothing. Face is omitted (all 9 morphs are stubbed
- * in the assembler; only face_default_01 exists) and Accessories is omitted
- * (zero available accessory assets in the manifest) — see catalog.ts.
+ * Face (eye colour, brow style — both honored) / Body / Skin / Hair /
+ * Extras (procedural accessories) / Outfit. Face morph sliders stay
+ * omitted (all 9 morphs are stubbed in the assembler).
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -35,9 +35,12 @@ import { AvatarEditorMachine, type DraftMutator } from "./editorMachine";
 import { StudioPreview, type StudioPreviewApi } from "./StudioPreview";
 import { PillRow, SwatchRow } from "./controls";
 import {
+  ACCESSORY_SLOT_OPTIONS,
   BODY_OPTIONS,
   BOTTOM_COLOR_OPTIONS,
+  BROW_STYLE_OPTIONS,
   EDITOR_CATEGORIES,
+  EYE_COLOR_OPTIONS,
   FABRIC_OPTIONS,
   facialHairOptionsForBody,
   HAIR_COLOR_OPTIONS,
@@ -45,8 +48,10 @@ import {
   OUTFIT_ROWS,
   SKIN_TONE_OPTIONS,
   TOP_COLOR_OPTIONS,
+  accessoryIdForSlot,
   applyOutfitRow,
   outfitRowForClothing,
+  setAccessorySlot,
   type EditorCategory,
   type OutfitRow,
 } from "./catalog";
@@ -61,7 +66,7 @@ export function AvatarEditor({
   onSaved?: (appearance: AppearanceV1) => void;
 }) {
   const [, setTick] = useState(0);
-  const [tab, setTab] = useState<EditorCategory>("body");
+  const [tab, setTab] = useState<EditorCategory>("face");
   const [confirmResetDefault, setConfirmResetDefault] = useState(false);
   // Defect 5: body/face switches trigger a full in-place rebuild
   // (rebuildInto — the head hangs off the body subtree, so a group swap
@@ -90,8 +95,10 @@ export function AvatarEditor({
     const loader = new AvatarLoader(THREE, {});
     loaderRef.current = loader;
 
-    /** Structural switch (body/face preset or type) — mirrors the
-     * assembler's diffUpdateAssembled rebuild condition. */
+    /** Structural switch (body/face preset, body type, or brow style —
+     * the brow rebuilds the head subtree, which blocks like a body
+     * rebuild) — mirrors the assembler's diffUpdateAssembled rebuild
+     * conditions. */
     const isStructuralChange = (
       oldApp: AppearanceV1 | null,
       next: AppearanceV1
@@ -99,7 +106,8 @@ export function AvatarEditor({
       !oldApp ||
       oldApp.base.bodyPresetId !== next.base.bodyPresetId ||
       oldApp.base.facePresetId !== next.base.facePresetId ||
-      oldApp.base.bodyType !== next.base.bodyType;
+      oldApp.base.bodyType !== next.base.bodyType ||
+      oldApp.base.browStyleId !== next.base.browStyleId;
 
     const pumpRenderQueue = () => {
       if (renderBusyRef.current) return;
@@ -344,7 +352,63 @@ export function AvatarEditor({
             ))}
           </div>
 
-          <div role="tabpanel" aria-label={`${tab} options`}>
+          <div
+            key={tab}
+            role="tabpanel"
+            aria-label={`${tab} options`}
+            className="eko-studio__tabpanel"
+          >
+            {tab === "face" && (
+              <>
+                <SwatchRow
+                  disabled={rebuilding}
+                  label="Eye colour"
+                  colors={EYE_COLOR_OPTIONS}
+                  value={draft.base.eyeColorId}
+                  onPick={(id) =>
+                    edit((d) => {
+                      d.base.eyeColorId = id as AppearanceV1["base"]["eyeColorId"];
+                    })
+                  }
+                />
+                <PillRow
+                  disabled={rebuilding}
+                  label="Eyebrows"
+                  items={BROW_STYLE_OPTIONS}
+                  value={draft.base.browStyleId}
+                  onPick={(id) =>
+                    edit((d) => {
+                      d.base.browStyleId = id as AppearanceV1["base"]["browStyleId"];
+                    })
+                  }
+                />
+              </>
+            )}
+
+            {tab === "accessories" && (
+              <>
+                {ACCESSORY_SLOT_OPTIONS.map((slot) => (
+                  <PillRow
+                    key={slot.slot}
+                    disabled={rebuilding}
+                    label={slot.name}
+                    items={slot.options}
+                    value={accessoryIdForSlot(draft.accessories, slot.slot)}
+                    onPick={(id) =>
+                      edit((d) => {
+                        const next = setAccessorySlot(d, slot.slot, id);
+                        d.accessories = next.accessories;
+                      })
+                    }
+                  />
+                ))}
+                <p className="eko-studio__caption">
+                  Extras sit on your 3D figure — shades, a snapback, or hoops.
+                  Mix and match; each slot holds one.
+                </p>
+              </>
+            )}
+
             {tab === "body" && (
               <PillRow
                 disabled={rebuilding}
@@ -457,9 +521,9 @@ export function AvatarEditor({
                     ))}
                   </div>
                   <p className="eko-studio__caption">
-                    Shoes are matched to the outfit — Casual, Hoodie and Chill
-                    come with sneakers, Office with oxfords, Site work with
-                    boots.
+                    Shoes are matched to the outfit — Casual, Hoodie, Chill
+                    and Gym come with sneakers, Office with oxfords, Site work
+                    with boots, Agbada with sandals, Owambe with heels.
                     {!activeRow &&
                       " This combination has no exact outfit match, so it renders as Casual."}
                   </p>

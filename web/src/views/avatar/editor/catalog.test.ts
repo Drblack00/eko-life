@@ -1,5 +1,5 @@
 /**
- * Èkó Life avatar studio — catalog honesty tests (Milestone 5).
+ * Èkó Life avatar studio — catalog honesty tests (Milestone 5, expanded M8).
  *
  * The M5 brief's top rule: every control must drive a real supported
  * parameter. These tests pin that:
@@ -7,14 +7,17 @@
  * - every outfit card maps to the EXACT decomposed row the assembler
  *   renders (assembler.outfitIdForClothing, zero fallback notes);
  * - palettes match the server palettes mirrored in validation.ts;
- * - the Face/Accessories omissions are backed by manifest facts
- *   (1 head asset, 0 available accessories, all morphs stubbed).
+ * - the face-morph omission is backed by manifest facts
+ *   (1 head asset, all morphs stubbed); accessories now ship (3 assets).
  */
 import { describe, expect, it } from "vitest";
 import {
+  ACCESSORY_SLOT_OPTIONS,
   BODY_OPTIONS,
   BOTTOM_COLOR_OPTIONS,
+  BROW_STYLE_OPTIONS,
   EDITOR_CATEGORIES,
+  EYE_COLOR_OPTIONS,
   FABRIC_OPTIONS,
   FACIAL_HAIR_OPTIONS,
   facialHairOptionsForBody,
@@ -23,10 +26,12 @@ import {
   OUTFIT_ROWS,
   SKIN_TONE_OPTIONS,
   TOP_COLOR_OPTIONS,
+  accessoryIdForSlot,
   applyOutfitRow,
   assertCatalogIds,
   catalogAssetKinds,
   outfitRowForClothing,
+  setAccessorySlot,
 } from "./catalog";
 import {
   AVATAR_MANIFEST_BY_ID,
@@ -49,6 +54,8 @@ describe("catalog honesty", () => {
     const ids = [
       ...BODY_OPTIONS.map((o) => o.id),
       ...SKIN_TONE_OPTIONS.map((o) => o.id),
+      ...EYE_COLOR_OPTIONS.map((o) => o.id),
+      ...BROW_STYLE_OPTIONS.map((o) => o.id),
       ...HAIR_STYLE_OPTIONS.map((o) => o.id),
       ...HAIR_COLOR_OPTIONS.map((o) => o.id),
       ...FACIAL_HAIR_OPTIONS.map((o) => o.id),
@@ -58,30 +65,39 @@ describe("catalog honesty", () => {
       ids.push(r.topId, r.bottomId, r.shoeId);
       if (r.outerwearId) ids.push(r.outerwearId);
     }
+    for (const s of ACCESSORY_SLOT_OPTIONS) {
+      for (const o of s.options) if (o.id !== "none") ids.push(o.id);
+    }
     expect(() => assertCatalogIds(ids)).not.toThrow();
     // …and of the expected kinds.
     const kinds = catalogAssetKinds();
     for (const o of BODY_OPTIONS) expect(kinds[o.id]).toBe("body");
     for (const o of SKIN_TONE_OPTIONS) expect(kinds[o.id]).toBe("texture");
     for (const o of HAIR_STYLE_OPTIONS) expect(kinds[o.id]).toBe("hair");
+    for (const o of EYE_COLOR_OPTIONS) expect(kinds[o.id]).toBe("texture");
+    for (const o of BROW_STYLE_OPTIONS) expect(kinds[o.id]).toBe("hair");
   });
 
   it("body options cover both binary presets and nothing else", () => {
     expect(BODY_OPTIONS.map((o) => o.id).sort()).toEqual(["man", "woman"]);
   });
 
-  it("skin tones: 12, hexes match the manifest exactly", () => {
-    expect(SKIN_TONE_OPTIONS).toHaveLength(12);
+  it("skin tones: 18, hexes match the manifest exactly", () => {
+    expect(SKIN_TONE_OPTIONS).toHaveLength(18);
     for (const o of SKIN_TONE_OPTIONS) {
       expect(o.hex).toBe(AVATAR_MANIFEST_BY_ID[o.id].hex);
     }
   });
 
-  it("hair: 9 styles, 3 colours, 4 facial-hair options", () => {
-    expect(HAIR_STYLE_OPTIONS).toHaveLength(9);
+  it("hair: 13 styles, 6 colours, 4 facial-hair options", () => {
+    expect(HAIR_STYLE_OPTIONS).toHaveLength(13);
     expect(HAIR_STYLE_OPTIONS.map((o) => o.id)).toContain("hair_taper_fade_01");
     expect(HAIR_STYLE_OPTIONS.map((o) => o.id)).toContain("hair_waves_01");
-    expect(HAIR_COLOR_OPTIONS).toHaveLength(3);
+    expect(HAIR_STYLE_OPTIONS.map((o) => o.id)).toContain("hair_bun_01");
+    expect(HAIR_STYLE_OPTIONS.map((o) => o.id)).toContain("hair_ponytail_01");
+    expect(HAIR_STYLE_OPTIONS.map((o) => o.id)).toContain("hair_mohawk_01");
+    expect(HAIR_STYLE_OPTIONS.map((o) => o.id)).toContain("hair_bantu_knots_01");
+    expect(HAIR_COLOR_OPTIONS).toHaveLength(6);
     expect(FACIAL_HAIR_OPTIONS).toHaveLength(4);
     // Hair styles and facial hair share kind "hair" but occupy different slots.
     for (const o of HAIR_STYLE_OPTIONS) {
@@ -92,8 +108,48 @@ describe("catalog honesty", () => {
     }
   });
 
+  it("face: 4 eye colours + 4 brow styles, all honored by the builder", () => {
+    expect(EYE_COLOR_OPTIONS).toHaveLength(4);
+    for (const o of EYE_COLOR_OPTIONS) {
+      expect(AVATAR_MANIFEST_BY_ID[o.id].kind).toBe("texture");
+    }
+    expect(BROW_STYLE_OPTIONS).toHaveLength(4);
+    for (const o of BROW_STYLE_OPTIONS) {
+      expect(AVATAR_MANIFEST_BY_ID[o.id].slots).toContain("brows");
+    }
+  });
+
+  it("accessories: 3 slots, one pick each, all available in the manifest", () => {
+    expect(ACCESSORY_SLOT_OPTIONS.map((s) => s.slot)).toEqual([
+      "head",
+      "face",
+      "ears",
+    ]);
+    const ids = ACCESSORY_SLOT_OPTIONS.flatMap((s) =>
+      s.options.map((o) => o.id).filter((id) => id !== "none")
+    );
+    expect(ids).toHaveLength(3);
+    for (const id of ids) {
+      expect(AVATAR_MANIFEST_BY_ID[id].kind).toBe("accessory");
+      expect(AVATAR_MANIFEST_BY_ID[id].status).toBe("available");
+    }
+    // Slot helpers: set + clear round-trip.
+    const app = cloneApp();
+    expect(accessoryIdForSlot(app.accessories, "face")).toBe("none");
+    const withGlasses = setAccessorySlot(app, "face", "acc_glasses_01");
+    expect(accessoryIdForSlot(withGlasses.accessories, "face")).toBe(
+      "acc_glasses_01"
+    );
+    const cleared = setAccessorySlot(withGlasses, "face", "none");
+    expect(accessoryIdForSlot(cleared.accessories, "face")).toBe("none");
+    expect(cleared.accessories).toHaveLength(0);
+    // Setting one slot never touches another.
+    const two = setAccessorySlot(withGlasses, "head", "acc_cap_01");
+    expect(two.accessories).toHaveLength(2);
+  });
+
   it("outfit cards: each row resolves to its exact outfit with no fallback", () => {
-    expect(OUTFIT_ROWS).toHaveLength(5);
+    expect(OUTFIT_ROWS).toHaveLength(8);
     for (const row of OUTFIT_ROWS) {
       const app = applyOutfitRow(cloneApp(), row);
       const notes: string[] = [];
@@ -141,23 +197,29 @@ describe("catalog honesty", () => {
     expect(BOTTOM_COLOR_OPTIONS).toHaveLength(10);
   });
 
-  it("categories shipped: body/skin/hair/clothing — face + accessories omitted for cause", () => {
+  it("categories shipped: face/body/skin/hair/accessories/clothing — morph sliders omitted for cause", () => {
     expect(EDITOR_CATEGORIES.map((c) => c.id)).toEqual([
+      "face",
       "body",
       "skin",
       "hair",
+      "accessories",
       "clothing",
     ]);
-    // Face: only one head asset exists and every morph is stubbed — there
-    // is nothing real a Face category could control.
+    // Face morphs: only one head asset exists and every morph is stubbed —
+    // there is nothing real a morph slider could control. (Eye colour and
+    // brow style ARE honored, so the Face category ships with those.)
     const heads = manifestByKind("head", "available");
     expect(heads.map((a) => a.id)).toEqual(["face_default_01"]);
     expect(Object.values(MORPH_SUPPORT).every((s) => s === "stubbed")).toBe(
       true
     );
-    // Accessories: the manifest carries zero available accessory assets
-    // (only a pending licensed-GLB pack).
-    expect(manifestByKind("accessory", "available")).toEqual([]);
+    // Accessories: 3 procedural assets now ship (M8).
+    expect(manifestByKind("accessory", "available").map((a) => a.id).sort()).toEqual([
+      "acc_cap_01",
+      "acc_earrings_01",
+      "acc_glasses_01",
+    ]);
   });
 });
 
