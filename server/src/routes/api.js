@@ -7,7 +7,7 @@ import { Router } from 'express';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getUserById, getCharacter, getCharacterById, ensureCharacter, saveCharacter, addTransaction, getMeta, dbMode, listTransactions, getPropertyOwnerIds, listFurniture, listTopByMoney, resolveReferralCode } from '../db.js';
+import { getUserById, getUserByName, getCharacter, getCharacterById, ensureCharacter, saveCharacter, addTransaction, getMeta, dbMode, listTransactions, getPropertyOwnerIds, listFurniture, listTopByMoney, resolveReferralCode, setUsername, setCharacterName } from '../db.js';
 import { authMiddleware, createAuthRouter, USER_RE } from '../auth.js';
 import { createAdminRouter } from './admin.js';
 import { createFriendsRouter } from './friends.js';
@@ -70,6 +70,18 @@ try {
 } catch { /* keep default */ }
 
 // Full character state shared by GET /api/me and POST /api/characters.
+/** Mask an account email for display: j***@g***.com (null when none). */
+function maskEmail(email) {
+  if (!email || typeof email !== 'string') return null;
+  const at = email.indexOf('@');
+  if (at <= 0) return null;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  const dot = domain.lastIndexOf('.');
+  const dom = dot > 0 ? domain.slice(0, dot) : domain;
+  const tld = dot > 0 ? domain.slice(dot) : '';
+  return `${local[0]}***@${dom[0]}***${tld}`;
+}
 function characterBody(user, c, day) {
   const body = {
     id: user.id,
@@ -115,6 +127,8 @@ function characterBody(user, c, day) {
     day,
     is_admin: !!Number(user.is_admin),
     guest: !!Number(user.is_guest),
+    // Character panel: masked account email (null when the account has none).
+    email_masked: maskEmail(user.email),
   };
   body.stats = {
     energy: body.energy,
@@ -286,6 +300,43 @@ export function createApiRouter({ hub, getDay }) {
     } catch (e) { console.error('[me] furniture:', e.message); }
     body.furniture = furniture;
     res.json(body);
+  });
+
+  // ---- character panel: change username and/or display name ----
+  // Username validated exactly like registration (USER_RE); must be unique.
+  // Display name: 1–24 chars. Guests may change display name only.
+  router.put('/me/profile', authMiddleware, async (req, res) => {
+    const user = await getUserById(req.userId);
+    if (!user) return res.status(401).json({ error: 'Account not found.' });
+    if (Number(user.banned)) return res.status(403).json({ error: 'This account is banned.' });
+    const isGuest = !!Number(user.is_guest);
+    const out = {};
+    if (req.body.username !== undefined) {
+      if (isGuest) return res.status(400).json({ error: 'Guests keep their generated username — create a full account to pick your own.' });
+      const username = String(req.body.username || '').trim();
+      if (!USER_RE.test(username)) {
+        return res.status(400).json({ error: 'Username: 3–16 characters, letters, numbers or _.' });
+      }
+      if (username !== user.username) {
+        const taken = await getUserByName(username);
+        if (taken && Number(taken.id) !== Number(user.id)) {
+          return res.status(409).json({ error: 'That username is taken.' });
+        }
+        await setUsername(user.id, username);
+        out.username = username;
+      } else {
+        out.username = user.username;
+      }
+    }
+    if (req.body.name !== undefined) {
+      const name = String(req.body.name || '').trim().slice(0, 24);
+      if (name.length < 1) {
+        return res.status(400).json({ error: 'Display name can\'t be empty.' });
+      }
+      await setCharacterName(user.id, name);
+      out.name = name;
+    }
+    res.json({ ok: true, ...out });
   });
 
   // ---- transactions (M3): newest-first ledger, last 50 (client spending history) ----
