@@ -54,11 +54,22 @@ const ACCESSORY_SLOTS: readonly AccessorySlot[] = [
 /** Fabric texture ids — the verbatim legacy fabric ids. */
 const FABRIC_IDS: readonly string[] = ["plain", "ankara", "adire", "asoke"];
 
-/** Skin-tone texture ids — the verbatim legacy skin ids. */
+/** Skin-tone texture ids — the verbatim legacy skin ids + the M8 pack. */
 const SKIN_TONE_IDS: readonly string[] = [
-  "deep_espresso", "dark_cocoa", "burnt_caramel", "mahogany",
-  "walnut", "cocoa", "coffee", "latte",
-  "honey", "sand", "amber", "cream",
+  "onyx", "deep_espresso", "dark_cocoa", "truffle", "burnt_caramel",
+  "mahogany", "walnut", "sienna", "cocoa", "coffee",
+  "caramel", "latte", "honey", "sand", "butterscotch",
+  "amber", "cream", "ivory",
+];
+
+/** Eye-colour texture ids (M8) — index into faceTextures IRIS_PALETTES. */
+const EYE_COLOR_IDS: readonly string[] = [
+  "eye_brown_01", "eye_hazel_01", "eye_amber_01", "eye_green_01",
+];
+
+/** Eyebrow style ids (M8) — kind "hair", slot "brows" in the manifest. */
+const BROW_STYLE_IDS: readonly string[] = [
+  "brow_natural_01", "brow_bold_01", "brow_arched_01", "brow_trimmed_01",
 ];
 
 /* ------------------------------------------------------------------ */
@@ -80,6 +91,8 @@ export const DEFAULT_APPEARANCE_V1: AppearanceV1 = {
     bodyPresetId: "woman",
     facePresetId: "face_default_01",
     skinToneId: "cocoa",
+    eyeColorId: "eye_brown_01",
+    browStyleId: "brow_natural_01",
   },
   morphs: defaultMorphs(),
   hair: {
@@ -182,6 +195,24 @@ export function validateAppearance(raw: unknown): ValidationResult {
         err("base.skinToneId", `unknown skin tone '${String(id)}'`);
       } else {
         base.skinToneId = id as AppearanceV1["base"]["skinToneId"];
+      }
+    }
+    if (rawBase.eyeColorId !== undefined) {
+      const id = rawBase.eyeColorId;
+      const asset = typeof id === "string" ? AVATAR_MANIFEST_BY_ID[id] : undefined;
+      if (!asset || asset.status !== "available" || asset.kind !== "texture" || !EYE_COLOR_IDS.includes(asset.id)) {
+        err("base.eyeColorId", `unknown eye colour '${String(id)}'`);
+      } else {
+        base.eyeColorId = id as AppearanceV1["base"]["eyeColorId"];
+      }
+    }
+    if (rawBase.browStyleId !== undefined) {
+      const id = rawBase.browStyleId;
+      const asset = typeof id === "string" ? AVATAR_MANIFEST_BY_ID[id] : undefined;
+      if (!asset || asset.status !== "available" || asset.kind !== "hair" || !asset.slots.includes("brows") || !BROW_STYLE_IDS.includes(asset.id)) {
+        err("base.browStyleId", `unknown brow style '${String(id)}'`);
+      } else {
+        base.browStyleId = id as AppearanceV1["base"]["browStyleId"];
       }
     }
   }

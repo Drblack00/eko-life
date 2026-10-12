@@ -278,6 +278,94 @@ describe("assembler", () => {
     a.dispose();
   });
 
+  it("M8: accessories attach on build and swap in place on diff", () => {
+    const app = cloneApp();
+    app.accessories = [
+      { slot: "face", assetId: "acc_glasses_01" },
+      { slot: "head", assetId: "acc_cap_01" },
+    ];
+    const a = assembleAppearance(THREE, app) as AssembledAvatarInternal;
+    expect(a.stages.accessoryObjects).toHaveLength(2);
+    expect(a.resolved.accessories.map((x) => x.id).sort()).toEqual([
+      "acc_cap_01",
+      "acc_glasses_01",
+    ]);
+    // Both groups are actually in the head subtree.
+    for (const o of a.stages.accessoryObjects) {
+      expect(o.parent).toBe(a.stages.head.group);
+    }
+    // Diff: swap glasses for earrings.
+    const next = JSON.parse(JSON.stringify(app)) as AppearanceV1;
+    next.accessories = [
+      { slot: "ears", assetId: "acc_earrings_01" },
+      { slot: "head", assetId: "acc_cap_01" },
+    ];
+    const summary = diffUpdateAssembled(a, app, next);
+    expect(summary.rebuilt).toBe(false);
+    expect(summary.touched).toContain("accessories");
+    expect(a.stages.accessoryObjects).toHaveLength(2);
+    expect(a.resolved.accessories.map((x) => x.id).sort()).toEqual([
+      "acc_cap_01",
+      "acc_earrings_01",
+    ]);
+    // Head geometry identity kept (no head rebuild for accessories).
+    a.dispose();
+  });
+
+  it("M8: eye colour diff swaps the iris texture without rebuilding", () => {
+    const app = cloneApp();
+    const a = assembleAppearance(THREE, app) as AssembledAvatarInternal;
+    const headGroup = a.stages.head.group;
+    // The iris material is found via its tag even without a DOM.
+    expect(a.stages.irisMat).not.toBeNull();
+    const next = JSON.parse(JSON.stringify(app)) as AppearanceV1;
+    next.base.eyeColorId = "eye_green_01";
+    const summary = diffUpdateAssembled(a, app, next);
+    expect(summary.rebuilt).toBe(false);
+    expect(summary.touched).toContain("eyeColor");
+    expect(a.stages.head.group).toBe(headGroup);
+    expect(a.resolved.eyeColor.id).toBe("eye_green_01");
+    // Node has no canvas: the swap is honestly reported as deferred.
+    expect(
+      summary.notes.some((n) => n.includes("eye_green_01"))
+    ).toBe(true);
+    a.dispose();
+  });
+
+  it("M8: brow style diff rebuilds the head subtree and re-points the rig", () => {
+    const app = cloneApp();
+    const a = assembleAppearance(THREE, app) as AssembledAvatarInternal;
+    const next = JSON.parse(JSON.stringify(app)) as AppearanceV1;
+    next.base.browStyleId = "brow_bold_01";
+    const summary = diffUpdateAssembled(a, app, next);
+    expect(summary.rebuilt).toBe(false);
+    expect(summary.touched).toContain("brows");
+    expect(a.resolved.browStyle.id).toBe("brow_bold_01");
+    // Rig eye/lid refs follow the rebuilt head (blink keeps working).
+    expect(a.rig.eyeL).toBe(a.stages.head.eyeL);
+    expect(a.rig.lidL).toBe(a.stages.head.upperLidL);
+    a.dispose();
+  });
+
+  it("M8: new outfits (gym/agbada/owambe) assemble with the right outfit + footwear", () => {
+    const cases = [
+      { topId: "top_tank_01", bottomId: "bottom_short_01", outerwearId: null, shoeId: "shoe_sneaker_01", outfit: "gym" },
+      { topId: "top_agbada_01", bottomId: "bottom_trouser_01", outerwearId: null, shoeId: "shoe_sandal_01", outfit: "agbada" },
+      { topId: "top_dress_01", bottomId: "bottom_skirt_01", outerwearId: null, shoeId: "shoe_heel_01", outfit: "owambe" },
+    ] as const;
+    for (const c of cases) {
+      const app = cloneApp();
+      app.clothing.topId = c.topId;
+      app.clothing.bottomId = c.bottomId;
+      app.clothing.outerwearId = c.outerwearId;
+      app.clothing.shoeId = c.shoeId;
+      const a = assembleAppearance(THREE, app) as AssembledAvatarInternal;
+      expect(a.resolved.outfit).toBe(c.outfit);
+      expect(a.notes.filter((n) => n.includes("no exact outfit match"))).toEqual([]);
+      a.dispose();
+    }
+  });
+
   it("dispose() fires dispose events on its own objects only", () => {
     const a1 = assembleAppearance(THREE, cloneApp());
     const a2 = assembleAppearance(THREE, cloneApp());

@@ -146,19 +146,26 @@ const GLB_INTEGRATION = [
 ].join(" ");
 
 const SKIN_TONES: Array<[string, string, string]> = [
-  // [id, name, hex] — verbatim from server AVATAR_SKINS.
+  // [id, name, hex] — verbatim from server AVATAR_SKINS, plus the M8
+  // expansion pack (onyx → ivory).
+  ["onyx", "Onyx", "#291709"],
   ["deep_espresso", "Deep Espresso", "#3b2314"],
   ["dark_cocoa", "Dark Cocoa", "#4a2c17"],
+  ["truffle", "Truffle", "#553521"],
   ["burnt_caramel", "Burnt Caramel", "#5d3a1f"],
   ["mahogany", "Mahogany", "#6f4426"],
   ["walnut", "Walnut", "#7d5330"],
+  ["sienna", "Sienna", "#835c36"],
   ["cocoa", "Cocoa", "#8a5f38"],
   ["coffee", "Coffee", "#9a6f45"],
+  ["caramel", "Caramel", "#a37a4e"],
   ["latte", "Latte", "#ab8054"],
   ["honey", "Honey", "#bc9066"],
   ["sand", "Sand", "#cda077"],
+  ["butterscotch", "Butterscotch", "#d4a878"],
   ["amber", "Amber", "#dcb07e"],
   ["cream", "Cream", "#e8cfa3"],
+  ["ivory", "Ivory", "#f2e0bd"],
 ];
 
 export const AVATAR_MANIFEST: AvatarAsset[] = [
@@ -214,6 +221,10 @@ export const AVATAR_MANIFEST: AvatarAsset[] = [
       ["classic", "Classic", "parts/hair.ts:buildClassic"],
       ["hair_taper_fade_01", "Taper fade", "parts/hair.ts:buildTaperFade"],
       ["hair_waves_01", "Waves", "parts/hair.ts:buildWaves"],
+      ["hair_bun_01", "Top bun", "parts/hair.ts:buildBun"],
+      ["hair_ponytail_01", "Ponytail", "parts/hair.ts:buildPonytail"],
+      ["hair_mohawk_01", "Mohawk", "parts/hair.ts:buildMohawk"],
+      ["hair_bantu_knots_01", "Bantu knots", "parts/hair.ts:buildBantuKnots"],
     ] as Array<[string, string, string]>
   ).map(([id, name, ref]) =>
     proc(id, name, "hair", "hair_mat_01", {
@@ -238,6 +249,21 @@ export const AVATAR_MANIFEST: AvatarAsset[] = [
   proc("hair_brown_01", "Brown hair", "texture", "hair_mat_01", {
     hex: "#5b3a21",
     proceduralRef: "parts/hair.ts:buildHair(colorId) tint (M3b)",
+    fallbackAssetId: "hair_black_01",
+  }),
+  proc("hair_auburn_01", "Auburn hair", "texture", "hair_mat_01", {
+    hex: "#6e2f16",
+    proceduralRef: "parts/hair.ts:buildHair(colorId) tint (M8)",
+    fallbackAssetId: "hair_black_01",
+  }),
+  proc("hair_blonde_01", "Blonde hair", "texture", "hair_mat_01", {
+    hex: "#b98a3e",
+    proceduralRef: "parts/hair.ts:buildHair(colorId) tint (M8)",
+    fallbackAssetId: "hair_black_01",
+  }),
+  proc("hair_grey_01", "Grey hair", "texture", "hair_mat_01", {
+    hex: "#8d8d94",
+    proceduralRef: "parts/hair.ts:buildHair(colorId) tint (M8)",
     fallbackAssetId: "hair_black_01",
   }),
 
@@ -277,6 +303,37 @@ export const AVATAR_MANIFEST: AvatarAsset[] = [
     compatibleBodyTypes: ["masculine"],
   }),
 
+  /* ---------------- eye colours (M8 — index into IRIS_PALETTES) ---------------- */
+  ...(
+    [
+      ["eye_brown_01", "Brown eyes", 0],
+      ["eye_hazel_01", "Hazel eyes", 1],
+      ["eye_amber_01", "Amber eyes", 2],
+      ["eye_green_01", "Green eyes", 3],
+    ] as Array<[string, string, number]>
+  ).map(([id, name, palette]) =>
+    proc(id, name, "texture", MAT.eye, {
+      proceduralRef: `parts/faceTextures.ts:IRIS_PALETTES[${palette}] via buildIrisImageWithPalette (M8)`,
+      fallbackAssetId: id === "eye_brown_01" ? null : "eye_brown_01",
+    })
+  ),
+
+  /* ---------------- eyebrow styles (M8 — parts/head.ts brow builder) ---------------- */
+  ...(
+    [
+      ["brow_natural_01", "Natural brows", "16 strands, soft arc"],
+      ["brow_bold_01", "Bold brows", "20 strands, thicker + darker"],
+      ["brow_arched_01", "Arched brows", "higher peak, tapered"],
+      ["brow_trimmed_01", "Trimmed brows", "12 strands, shorter + neat"],
+    ] as Array<[string, string, string]>
+  ).map(([id, name, ref]) =>
+    proc(id, name, "hair", "hair_mat_01", {
+      slots: ["brows"],
+      proceduralRef: `parts/head.ts:buildBrows (${ref})`,
+      fallbackAssetId: id === "brow_natural_01" ? null : "brow_natural_01",
+    })
+  ),
+
   /* ---------------- skin tones (texture entries) ---------------- */
   ...SKIN_TONES.map(([id, name, hex]) =>
     proc(id, name, "texture", MAT.skin, {
@@ -313,6 +370,21 @@ export const AVATAR_MANIFEST: AvatarAsset[] = [
     proceduralRef: "parts/clothing.ts:buildShirt + dressOfficeExtras",
     fallbackAssetId: "top_tee_01",
   }),
+  proc("top_tank_01", "Tank top (gym)", "clothing", MAT.garmentSolid, {
+    slots: ["top"],
+    proceduralRef: "parts/clothing.ts:buildShirt (tank variant, no sleeves)",
+    fallbackAssetId: "top_tee_01",
+  }),
+  proc("top_agbada_01", "Agbada (flowing, wide sleeves)", "clothing", MAT.garmentSolid, {
+    slots: ["top"],
+    proceduralRef: "parts/clothing.ts:buildShirt (agbada variant + wide sleeves)",
+    fallbackAssetId: "top_tee_01",
+  }),
+  proc("top_dress_01", "Party dress bodice", "clothing", MAT.garmentSolid, {
+    slots: ["top"],
+    proceduralRef: "parts/clothing.ts:buildShirt (dress variant, fitted)",
+    fallbackAssetId: "top_tee_01",
+  }),
   proc("bottom_trouser_01", "Trousers", "clothing", MAT.garmentSolid, {
     slots: ["bottom"],
     proceduralRef: "parts/clothing.ts:dressLegs + dressHips (long)",
@@ -325,6 +397,11 @@ export const AVATAR_MANIFEST: AvatarAsset[] = [
   proc("bottom_cargo_01", "Cargo trousers", "clothing", MAT.garmentSolid, {
     slots: ["bottom"],
     proceduralRef: "parts/clothing.ts:dressLegs + dressHips (cargo pockets)",
+    fallbackAssetId: "bottom_trouser_01",
+  }),
+  proc("bottom_skirt_01", "Wrapper skirt", "clothing", MAT.garmentSolid, {
+    slots: ["bottom"],
+    proceduralRef: "parts/clothing.ts:dressSkirt (flared lathe, knee length)",
     fallbackAssetId: "bottom_trouser_01",
   }),
   proc("outer_hoodie_01", "Hoodie (hood cowl + kangaroo pocket)", "clothing", MAT.garmentSolid, {
@@ -352,6 +429,30 @@ export const AVATAR_MANIFEST: AvatarAsset[] = [
     slots: ["shoe"],
     proceduralRef: "parts/clothing.ts:buildFootwear(boot)",
     fallbackAssetId: "shoe_sneaker_01",
+  }),
+  proc("shoe_sandal_01", "Leather sandals (agbada)", "clothing", MAT.shoe, {
+    slots: ["shoe"],
+    proceduralRef: "parts/clothing.ts:buildFootwear(sandal)",
+    fallbackAssetId: "shoe_sneaker_01",
+  }),
+  proc("shoe_heel_01", "Block heels (owambe)", "clothing", MAT.shoe, {
+    slots: ["shoe"],
+    proceduralRef: "parts/clothing.ts:buildFootwear(heel)",
+    fallbackAssetId: "shoe_sneaker_01",
+  }),
+
+  /* ---------------- accessories (M8 — procedural, parts/accessories.ts) ---------------- */
+  proc("acc_glasses_01", "Shades", "accessory", MAT.eye, {
+    slots: ["face"],
+    proceduralRef: "parts/accessories.ts:buildGlasses (tinted lenses + frame)",
+  }),
+  proc("acc_cap_01", "Snapback cap", "accessory", MAT.garmentSolid, {
+    slots: ["head"],
+    proceduralRef: "parts/accessories.ts:buildCap (crown + brim + strap)",
+  }),
+  proc("acc_earrings_01", "Hoop earrings", "accessory", MAT.garmentSolid, {
+    slots: ["ears"],
+    proceduralRef: "parts/accessories.ts:buildEarrings (gold hoops at the lobes)",
   }),
 
   /* ---------------- future licensed-GLB path (PENDING — not available) ---------------- */

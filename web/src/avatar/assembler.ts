@@ -82,7 +82,12 @@ import {
   buildFacialHair,
 } from "../views/avatar/parts/facialHair";
 import {
-  buildIrisImage,
+  attachAccessories,
+  buildAccessory,
+} from "../views/avatar/parts/accessories";
+import {
+  EYE_COLOR_PALETTE,
+  buildIrisImageWithPalette,
   hashSeed,
   toCanvasTexture,
 } from "../views/avatar/parts/faceTextures";
@@ -169,6 +174,9 @@ export interface ResolvedAssets {
   body: AvatarAsset;
   face: AvatarAsset;
   skin: AvatarAsset;
+  /** M8: eye colour + brow style (validated texture/hair assets). */
+  eyeColor: AvatarAsset;
+  browStyle: AvatarAsset;
   hairStyle: AvatarAsset;
   hairColor: AvatarAsset;
   facialHair: AvatarAsset;
@@ -177,6 +185,8 @@ export interface ResolvedAssets {
   outerwear: AvatarAsset | null;
   shoe: AvatarAsset;
   fabric: AvatarAsset;
+  /** M8: resolved accessory assets (kind "accessory", available only). */
+  accessories: AvatarAsset[];
   /** Outfit recovered by inverting the M2 decomposition table. */
   outfit: OutfitId;
   skinHex: string;
@@ -186,13 +196,16 @@ export interface ResolvedAssets {
   isMan: boolean;
 }
 
-/** Inverse of migrate.ts OUTFIT_DECOMPOSITION (exact keys). */
+/** Inverse of migrate.ts OUTFIT_DECOMPOSITION (exact keys). M8 adds gym/agbada/owambe. */
 const V1_TO_OUTFIT: Record<string, OutfitId> = {
   "top_tee_01|bottom_trouser_01||shoe_sneaker_01": "casual",
   "top_tee_01|bottom_trouser_01|outer_hoodie_01|shoe_sneaker_01": "hoodie",
   "top_shirt_office_01|bottom_trouser_01||shoe_oxford_01": "office",
   "top_tee_01|bottom_short_01||shoe_sneaker_01": "chill",
   "top_tee_01|bottom_cargo_01|outer_hivis_vest_01|shoe_boot_01": "sitework",
+  "top_tank_01|bottom_short_01||shoe_sneaker_01": "gym",
+  "top_agbada_01|bottom_trouser_01||shoe_sandal_01": "agbada",
+  "top_dress_01|bottom_skirt_01||shoe_heel_01": "owambe",
 };
 
 export function outfitIdForClothing(
@@ -262,6 +275,37 @@ export function resolveAvatarAssets(
   assertCompatible(face, appearance);
   const skin = resolveAsset(appearance.base.skinToneId);
 
+  // M8: eye colour + brow style — optional slots with safe defaults.
+  const eyeColor = (() => {
+    try {
+      return resolveAssetOrFallback(appearance.base.eyeColorId);
+    } catch {
+      notes.push(`eyeColor "${appearance.base.eyeColorId}" unresolvable → eye_brown_01`);
+      return resolveAsset("eye_brown_01");
+    }
+  })();
+  const browStyle = (() => {
+    try {
+      return resolveAssetOrFallback(appearance.base.browStyleId);
+    } catch {
+      notes.push(`browStyle "${appearance.base.browStyleId}" unresolvable → brow_natural_01`);
+      return resolveAsset("brow_natural_01");
+    }
+  })();
+
+  // M8: accessories — validated appearances only carry available
+  // kind-"accessory" ids; anything else is skipped with a note (never
+  // rendered, never thrown).
+  const accessories: AvatarAsset[] = [];
+  for (const entry of appearance.accessories) {
+    const asset = AVATAR_MANIFEST_BY_ID[entry.assetId];
+    if (asset && asset.status === "available" && asset.kind === "accessory") {
+      accessories.push(asset);
+    } else {
+      notes.push(`accessory "${entry.assetId}" unavailable → skipped`);
+    }
+  }
+
   // Optional — fallback chains, then per-slot safe defaults.
   const hairStyle = lenient(appearance.hair.styleId, "hairStyle", notes);
   const hairColor = lenient(appearance.hair.colorId, "hairColor", notes);
@@ -302,6 +346,8 @@ export function resolveAvatarAssets(
     body,
     face,
     skin,
+    eyeColor,
+    browStyle,
     hairStyle,
     hairColor,
     facialHair,
@@ -310,6 +356,7 @@ export function resolveAvatarAssets(
     outerwear,
     shoe,
     fabric,
+    accessories,
     outfit,
     skinHex: skin.hex ?? "#8a5f38",
     hairHex: hairColor.hex ?? "#171110",
@@ -435,6 +482,8 @@ export interface AssemblyStages {
   head: BuiltHead;
   hairObjects: THREE.Object3D[];
   facialHair: THREE.Group | null;
+  /** M8: accessory groups attached to the head (for stage-disposal on swap). */
+  accessoryObjects: THREE.Object3D[];
   /** The iris material (for skin-tone recolor without rebuild). */
   irisMat: THREE.Material | null;
 }
@@ -462,6 +511,7 @@ export interface StagedAssembly {
   head: BuiltHead | null;
   hairObjects: THREE.Object3D[];
   facialHair: THREE.Group | null;
+  accessoryObjects: THREE.Object3D[];
   irisMat: THREE.Material | null;
 }
 
@@ -489,6 +539,7 @@ export function beginStagedAssembly(
     head: null,
     hairObjects: [],
     facialHair: null,
+    accessoryObjects: [],
     irisMat: null,
   };
 }
@@ -514,7 +565,12 @@ export function buildStagedBody(s: StagedAssembly): void {
 export function buildStagedHead(s: StagedAssembly): void {
   const { T, resolved, mats } = s;
   if (!s.body) throw new Error("buildStagedHead: body stage not built");
-  const head = buildHead(T, { skin: resolved.skinHex, mats });
+  const head = buildHead(T, {
+    skin: resolved.skinHex,
+    mats,
+    eyeColorId: resolved.eyeColor.id,
+    browStyleId: resolved.browStyle.id,
+  });
   s.body.headMount.add(head.group);
   const hairObjects = buildHair(
     T,
@@ -525,12 +581,20 @@ export function buildStagedHead(s: StagedAssembly): void {
   attachHair(head, hairObjects);
   const facialHair = buildFacialHair(T, resolved.facialHair.id, mats);
   attachFacialHair(head, facialHair);
+  // M8: accessories attach into the head group (same subtree as hair).
+  const accessoryObjects: THREE.Object3D[] = [];
+  for (const asset of resolved.accessories) {
+    const g = buildAccessory(T, asset.id);
+    if (g) accessoryObjects.push(g);
+  }
+  attachAccessories(head, accessoryObjects);
   // Same as the legacy build: the whole head group (skull, face AND hair)
   // scales about the neck-top origin, so the chin anchor (y=1.4) is fixed.
   head.group.scale.setScalar(HEAD_GROUP_SCALE);
   s.head = head;
   s.hairObjects = hairObjects;
   s.facialHair = facialHair;
+  s.accessoryObjects = accessoryObjects;
   s.irisMat = findIrisMaterial(head);
 }
 
@@ -551,6 +615,7 @@ export function finishStagedAssembly(
     head: s.head,
     hairObjects: s.hairObjects,
     facialHair: s.facialHair,
+    accessoryObjects: s.accessoryObjects,
     irisMat: s.irisMat,
   };
   const assembled: AssembledAvatarInternal = {
@@ -598,7 +663,9 @@ function clothingTargets(body: BuiltBody): THREE.Object3D[] {
   return [body.upper, body.legL, body.legR, body.armL, body.armR];
 }
 
-/** Find the iris material: the only non-physical MeshStandardMaterial with a canvas map in the head. */
+/** Find the iris material: tagged userData.irisMaterial (head.ts), falling
+ * back to the legacy texture sniff (the only non-physical
+ * MeshStandardMaterial with a canvas map in the head). */
 function findIrisMaterial(head: BuiltHead): THREE.Material | null {
   let found: THREE.Material | null = null;
   head.group.traverse((node) => {
@@ -611,6 +678,10 @@ function findIrisMaterial(head: BuiltHead): THREE.Material | null {
         isMeshStandardMaterial?: boolean;
         isMeshPhysicalMaterial?: boolean;
       };
+      if ((sm as { userData?: { irisMaterial?: boolean } }).userData?.irisMaterial) {
+        found = m as THREE.Material;
+        return;
+      }
       if (
         sm &&
         sm.isMeshStandardMaterial &&
@@ -1105,10 +1176,16 @@ export function recolorSkin(
   setHex(a.mats.lipMat, shade(newHex, -42));
 
   // Iris texture is seeded by the skin tone — regenerate and swap.
+  // M8: keep the character's chosen eye colour (palette), not a random one.
   const iris = a.stages.irisMat as THREE.MeshStandardMaterial | null;
   if (iris) {
     const oldTex = iris.map as THREE.Texture | null;
-    const img = buildIrisImage(128, hashSeed(newHex + ":iris"));
+    const eyeId = a.resolved.eyeColor.id;
+    const img = buildIrisImageWithPalette(
+      128,
+      hashSeed(newHex + ":iris:" + eyeId),
+      EYE_COLOR_PALETTE[eyeId] ?? 0
+    );
     const tex = toCanvasTexture(T, img);
     if (tex) {
       iris.map = tex;
@@ -1163,6 +1240,121 @@ function swapFacialHairStage(
   attachFacialHair(stages.head, fh);
   stages.facialHair = fh;
   notes.push(`facialHair: swapped group only → ${resolved.facialHair.id}`);
+}
+
+/**
+ * M8: swap the iris texture in place for an eye-colour change. No
+ * geometry touched — the iris material keeps its identity.
+ */
+function swapEyeColor(
+  a: AssembledAvatarInternal,
+  resolved: ResolvedAssets,
+  notes: string[]
+): void {
+  const { T, stages } = a;
+  const iris = stages.irisMat as THREE.MeshStandardMaterial | null;
+  if (!iris) {
+    notes.push("eyeColor: iris material not found — left as-is");
+    return;
+  }
+  const eyeId = resolved.eyeColor.id;
+  const oldTex = iris.map as THREE.Texture | null;
+  const img = buildIrisImageWithPalette(
+    128,
+    hashSeed(stages.resolved.skinHex + ":iris:" + eyeId),
+    EYE_COLOR_PALETTE[eyeId] ?? 0
+  );
+  const tex = toCanvasTexture(T, img);
+  if (tex) {
+    iris.map = tex;
+    iris.needsUpdate = true;
+    if (oldTex) (oldTex as Disposable).dispose();
+    notes.push(`eyeColor: iris texture swapped → ${eyeId}`);
+  } else {
+    // No DOM (e.g. unit tests): canvas textures can't be built — the
+    // resolved id is still recorded so the next real build renders it.
+    notes.push(`eyeColor: no canvas in this environment — recorded ${eyeId}, texture unchanged`);
+  }
+}
+
+/**
+ * M8: rebuild the head subtree for a brow-style change. The head group
+ * is detached from the headMount, disposed, and rebuilt (skull, eyes,
+ * brows); hair, facial hair and accessories are re-attached fresh. The
+ * rig's eye/lid references are re-pointed (the animation controller
+ * reads them per-frame, so blinking keeps working).
+ */
+function swapHeadStage(
+  a: AssembledAvatarInternal,
+  resolved: ResolvedAssets,
+  notes: string[]
+): void {
+  const { T, mats, stages } = a;
+  const mount = stages.head.group.parent;
+  if (mount) mount.remove(stages.head.group);
+  const keep = new Set<THREE.Material>(
+    Object.values(mats).map((v) => v as THREE.Material)
+  );
+  disposeObjects([stages.head.group], keep);
+
+  const head = buildHead(T, {
+    skin: resolved.skinHex,
+    mats,
+    eyeColorId: resolved.eyeColor.id,
+    browStyleId: resolved.browStyle.id,
+  });
+  mount?.add(head.group);
+  const hairObjects = buildHair(
+    T,
+    resolved.hairStyle.id,
+    mats,
+    resolved.hairColor.id
+  );
+  attachHair(head, hairObjects);
+  const facialHair = buildFacialHair(T, resolved.facialHair.id, mats);
+  attachFacialHair(head, facialHair);
+  const accessoryObjects: THREE.Object3D[] = [];
+  for (const asset of resolved.accessories) {
+    const g = buildAccessory(T, asset.id);
+    if (g) accessoryObjects.push(g);
+  }
+  attachAccessories(head, accessoryObjects);
+  head.group.scale.setScalar(HEAD_GROUP_SCALE);
+
+  stages.head = head;
+  stages.hairObjects = hairObjects;
+  stages.facialHair = facialHair;
+  stages.accessoryObjects = accessoryObjects;
+  stages.irisMat = findIrisMaterial(head);
+  a.rig.eyeL = head.eyeL;
+  a.rig.eyeR = head.eyeR;
+  a.rig.lidL = head.upperLidL;
+  a.rig.lidR = head.upperLidR;
+  notes.push(`head: rebuilt subtree → brow ${resolved.browStyle.id}`);
+}
+
+/** M8: swap the accessory groups only (head/hair untouched). */
+function swapAccessoryStage(
+  a: AssembledAvatarInternal,
+  resolved: ResolvedAssets,
+  notes: string[]
+): void {
+  const { T, mats, stages } = a;
+  for (const o of stages.accessoryObjects) stages.head.group.remove(o);
+  const keep = new Set<THREE.Material>(
+    Object.values(mats).map((v) => v as THREE.Material)
+  );
+  disposeObjects(stages.accessoryObjects, keep);
+  const accessoryObjects: THREE.Object3D[] = [];
+  for (const asset of resolved.accessories) {
+    const g = buildAccessory(T, asset.id);
+    if (g) accessoryObjects.push(g);
+  }
+  attachAccessories(stages.head, accessoryObjects);
+  stages.accessoryObjects = accessoryObjects;
+  notes.push(
+    `accessories: swapped group only → [${resolved.accessories.map((x) => x.id).join(", ") || "none"}]`
+  );
 }
 
 /** Garment-driven material fields — the only mats entries re-dress replaces. */
@@ -1253,6 +1445,7 @@ function rebuildInto(
     head: s.head,
     hairObjects: s.hairObjects,
     facialHair: s.facialHair,
+    accessoryObjects: s.accessoryObjects,
     irisMat: s.irisMat,
   };
   a.appearance = s.appearance;
@@ -1279,17 +1472,34 @@ function clothingChanged(
   );
 }
 
+/** M8: accessory list changed (slot or asset differs, order-insensitive). */
+function accessoriesChanged(
+  oldA: AppearanceV1["accessories"],
+  newA: AppearanceV1["accessories"]
+): boolean {
+  if (oldA.length !== newA.length) return true;
+  const key = (e: AppearanceV1["accessories"][number]) =>
+    `${e.slot}:${e.assetId}`;
+  const oldKeys = oldA.map(key).sort().join("|");
+  const newKeys = newA.map(key).sort().join("|");
+  return oldKeys !== newKeys;
+}
+
 /**
  * Minimal in-place update from oldApp → newApp. Change classes:
  * - skin tone → recolor materials only (no rebuild, geometry identity kept)
+ * - eye colour → swap the iris texture only
+ * - brow style → rebuild the head subtree (skull/eyes/brows), re-attaching
+ *   hair, facial hair and accessories; rig eye/lid refs re-pointed
  * - hair style/colour → swap the hair group only
  * - facial hair (or hair colour, which tints it) → swap that group only.
  *   (Group-swap, not colour-remap: the stubble/strand tint textures are
  *   baked at build time and cannot be recolored in place. Same minimal
  *   granularity as a style swap — head/body are never rebuilt.)
+ * - accessories → swap the accessory groups only
  * - clothing/outfit/fabric/colours → re-dress (body/head/hair untouched)
  * - body/face preset → full rebuild (the head hangs off the body subtree)
- * - morphs/accessories → validated-and-ignored with notes (stubbed in M4)
+ * - morphs → validated-and-ignored with notes (stubbed in M4)
  */
 export function diffUpdateAssembled(
   a: AssembledAvatarInternal,
@@ -1315,6 +1525,16 @@ export function diffUpdateAssembled(
     touched.push("skin");
   }
 
+  if (newApp.base.eyeColorId !== oldApp.base.eyeColorId) {
+    swapEyeColor(a, resolved, notes);
+    touched.push("eyeColor");
+  }
+
+  if (newApp.base.browStyleId !== oldApp.base.browStyleId) {
+    swapHeadStage(a, resolved, notes);
+    touched.push("brows");
+  }
+
   const hairStyleChanged = newApp.hair.styleId !== oldApp.hair.styleId;
   const hairColorChanged = newApp.hair.colorId !== oldApp.hair.colorId;
   const fhChanged = newApp.hair.facialHairId !== oldApp.hair.facialHairId;
@@ -1332,12 +1552,12 @@ export function diffUpdateAssembled(
     touched.push("clothing");
   }
 
-  applyMorphPolicy(newApp.morphs, notes);
-  if (newApp.accessories.length > 0) {
-    notes.push(
-      `accessories ignored: no accessory builders in M4 (${newApp.accessories.length} entries)`
-    );
+  if (accessoriesChanged(oldApp.accessories, newApp.accessories)) {
+    swapAccessoryStage(a, resolved, notes);
+    touched.push("accessories");
   }
+
+  applyMorphPolicy(newApp.morphs, notes);
 
   a.resolved = resolved;
   a.appearance = newApp;
