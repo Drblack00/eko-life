@@ -121,17 +121,85 @@
   line-height: 1;
 }
 
-/* ---- Left floating cards ---- */
-.eko-sidecards {
+/* ---- Quick actions: one floating button + expandable panel ---- */
+/* The FAB lives bottom-left, above the dock; the panel portals to
+   document.body (see HomeChrome.tsx) so it is never re-anchored by a
+   transformed ancestor. */
+.eko-quickfab {
   position: fixed;
   left: 0.6rem;
-  top: 42%;
-  transform: translateY(-50%);
+  bottom: calc(var(--sab, 0px) + 5.5rem);
+  width: 2.9rem;
+  height: 2.9rem;
+  border: none;
+  border-radius: 50%;
+  font-size: 1.3rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: inherit;
+  z-index: 30;
+  transition: transform 0.18s ease;
+}
+.eko-quickfab:active {
+  transform: scale(0.92);
+}
+.eko-quickpanel__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(8, 12, 20, 0.35);
+  animation: eko-quickpanel-fade 0.18s ease;
+}
+.eko-quickpanel {
+  position: fixed;
+  left: 0.6rem;
+  bottom: calc(var(--sab, 0px) + 9rem);
+  z-index: 61;
+  width: min(17rem, calc(100vw - 1.2rem));
+  border-radius: 1.25rem;
+  padding: 0.75rem;
+  animation: eko-quickpanel-pop 0.22s cubic-bezier(0.32, 1.35, 0.45, 1);
+  transform-origin: bottom left;
+}
+@keyframes eko-quickpanel-fade {
+  from { opacity: 0; }
+}
+@keyframes eko-quickpanel-pop {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+}
+.eko-quickpanel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.15rem 0.25rem 0.55rem;
+  font-size: 0.85rem;
+}
+.eko-quickpanel__close {
+  border: none;
+  background: rgba(120, 120, 128, 0.25);
+  border-radius: 50%;
+  width: 1.9rem;
+  height: 1.9rem;
+  font-size: 0.8rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: inherit;
+}
+.eko-quickpanel__close:active {
+  transform: scale(0.92);
+}
+
+/* ---- Quick cards (inside the panel) ---- */
+.eko-sidecards {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  z-index: 20;
-  max-width: 11rem;
 }
 .eko-sidecard {
   display: flex;
@@ -220,7 +288,7 @@
 
 /* ---- Clean-screen mode: everything except the top pill goes away ---- */
 .eko-game--clean .eko-hud__stats,
-.eko-game--clean .eko-sidecards,
+.eko-game--clean .eko-quickfab,
 .eko-game--clean .eko-workpills,
 .eko-game--clean .eko-hint,
 .eko-game--clean .eko-daybanner,
@@ -290,9 +358,8 @@
   .eko-top-pill__mood-text {
     display: none;
   }
-  .eko-sidecards {
-    max-width: 8.5rem;
-    top: 36%;
+  .eko-quickfab {
+    bottom: calc(var(--sab, 0px) + 5.25rem);
   }
   .eko-sidecard__text {
     max-width: 5.5rem;
