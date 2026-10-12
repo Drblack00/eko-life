@@ -1498,6 +1498,15 @@ export async function hasVoted(electionId, voterId) {
   return !!r;
 }
 
+/** Which candidate a voter picked in an election (null = hasn't voted). */
+export async function getVote(electionId, voterId) {
+  const r = await getOne(
+    'SELECT candidate_id FROM votes WHERE election_id = ? AND voter_id = ?',
+    'SELECT candidate_id FROM votes WHERE election_id = $1 AND voter_id = $2',
+    [electionId, voterId]);
+  return r ? Number(r.candidate_id) : null;
+}
+
 // One vote per voter per election: the PK rejects doubles, reported as false.
 export async function castVote(electionId, voterId, candidateId) {
   try {
@@ -2001,8 +2010,10 @@ export const NEWS_PAGE = 20;
 /**
  * Author badge tiers (original names — not copied from any reference).
  * Tycoon tier overrides on net worth; the rest are account-age tiers.
+ * Phase 8: the sitting governor always shows the Governor badge.
  */
-export function gistBadge(accountCreatedAt, netWorth) {
+export function gistBadge(accountCreatedAt, netWorth, isGovernor = false) {
+  if (isGovernor) return 'Governor';
   const ageDays = (Date.now() - Number(accountCreatedAt || Date.now())) / 86400000;
   if (Number(netWorth) >= 1000000) return 'Odogwu';
   if (ageDays >= 90) return 'Legend';
@@ -2022,12 +2033,13 @@ export async function getGistAuthor(userId) {
      FROM users u LEFT JOIN characters c ON c.user_id = u.id WHERE u.id = $1`,
     [Number(userId)]);
   if (!r) return null;
+  const govId = Number(await getMeta('governor_id')) || 0;
   return {
     user_id: Number(r.id),
     username: r.username,
     avatar: r.avatar || '🧑',
     color: r.color || '#22d3ee',
-    badge: gistBadge(r.account_created, Number(r.money) + Number(r.savings)),
+    badge: gistBadge(r.account_created, Number(r.money) + Number(r.savings), govId !== 0 && govId === Number(r.id)),
   };
 }
 
@@ -2152,8 +2164,9 @@ export async function listGists({ viewerId, tab = 'latest', cursor = null, limit
   const next_cursor = rows.length > lim && last
     ? (cursorKey === 'likes' ? `${Number(last.like_count)}:${Number(last.id)}` : String(Number(last.id)))
     : null;
+  const govId = Number(await getMeta('governor_id')) || 0;
   return {
-    gists: page.map(r => ({ ...shapeGist(r, v), badge: gistBadge(r.account_created, r.net_worth) })),
+    gists: page.map(r => ({ ...shapeGist(r, v), badge: gistBadge(r.account_created, r.net_worth, govId !== 0 && Number(r.user_id) === govId) })),
     next_cursor,
   };
 }
@@ -2275,6 +2288,7 @@ export async function listGistComments(gistId, cursor = null, limit = 20) {
     idCursor ? [Number(gistId), idCursor, lim + 1] : [Number(gistId), lim + 1]);
   const page = rows.slice(0, lim);
   const last = page[page.length - 1];
+  const govId = Number(await getMeta('governor_id')) || 0;
   return {
     comments: page.map(r => ({
       id: Number(r.id),
@@ -2283,7 +2297,7 @@ export async function listGistComments(gistId, cursor = null, limit = 20) {
       username: r.username,
       avatar: r.avatar || '🧑',
       color: r.color || '#22d3ee',
-      badge: gistBadge(r.account_created, r.net_worth),
+      badge: gistBadge(r.account_created, r.net_worth, govId !== 0 && Number(r.user_id) === govId),
       text: r.text,
       created_at: Number(r.created_at),
     })),
