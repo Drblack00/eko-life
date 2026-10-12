@@ -28,6 +28,7 @@ import {
   currentGovernorId, currentGovernorName,
 } from '../game/elections.js';
 import { createSocial } from './social.js';
+import { createNotifications } from '../game/notifications.js';
 // V2 milestones: needs/moodlets (M8), daily perks (M9), economy (M10),
 // governance (M11), skills (M12) — snapshots, decay, day ticks.
 import { activeShiftOf } from '../game/v2/m7.js';
@@ -75,12 +76,18 @@ export function createHub({ getDay }) {
   let wss = null;
   let governorId = 0; // M5: current governor (restored from meta at boot)
 
+  // M21: notifications (persistent rows + live `notification:new` events).
+  // sendTo targets the single live session per user (hub kicks old sessions).
+  // (sendTo is a hoisted function declaration — safe to reference here.)
+  const notifications = createNotifications({ sendTo });
+
   // M5: social layer (news ring, friends, rooms, DMs, blocks, reports, mentions)
   const social = createSocial({
     online,
     broadcast: (msg) => broadcast(msg),
     getDay,
     isGovernor: (pid) => Number(pid) === governorId,
+    notifications,
   });
 
   // ---- M3: street finds (spawns) — id -> {id,x,y,kind,icon,amount,expires} ----
@@ -250,6 +257,10 @@ export function createHub({ getDay }) {
     online.set(id, conn);
     // M4: roster last_seen — cheap fire-and-forget; never blocks the connect.
     setLastSeen(id).catch(e => console.error('[hub] last_seen:', e.message));
+    // M21: friend-online notifications (pref + 30-min per-friend cooldown
+    // inside the service; never blocks the connect).
+    try { notifications.notifyFriendOnline(id, user.username); }
+    catch (e) { console.error('[notif] friend_online:', e.message); }
 
     let visits = 0;
     try { visits = await bumpVisits(); } catch (e) { console.error('[hub] bumpVisits:', e.message); }
@@ -386,6 +397,7 @@ export function createHub({ getDay }) {
           pushElectionAll,
           pushYou, // V2: re-read + push one player's `you`
           social,
+          notifications, // M21: notification service (friend_online/room_message/money_received)
         };
         handleAct(ctx, m).catch(e => {
           console.error('[act]', e.message);
@@ -649,5 +661,6 @@ export function createHub({ getDay }) {
     attach, broadcast, onlineCount, online, dayRollover, decayTickAll, spawnTick, spawnAPI,
     bootGame, forceTally, getNews, governorName, forceDisconnect, pushYou, sendTo,
     pushNews: (type, text) => social.pushNews(type, text),
+    notifications,
   };
 }

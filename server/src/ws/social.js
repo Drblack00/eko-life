@@ -33,8 +33,10 @@ const FRIEND_ADD_MAX = 20;
 const ROOM_CREATE_MAX = 5;
 const RATE_WINDOW_MS = 3600 * 1000;
 
-export function createSocial({ online, broadcast, getDay, isGovernor }) {
+export function createSocial({ online, broadcast, getDay, isGovernor, notifications }) {
   const govOf = typeof isGovernor === 'function' ? isGovernor : () => false;
+  // M21: notification service (may be null in unit tests that build social standalone).
+  const notif = notifications || null;
   // ---- news ticker ring (in-memory, last 20) ----
   const news = []; // { type, text, ts, day }
   function pushNews(type, text) {
@@ -334,6 +336,17 @@ export function createSocial({ online, broadcast, getDay, isGovernor }) {
       }
       notifyMentions(text, conn.user.username, id,
         { kind: 'room', roomId, roomName: room ? room.name : '' });
+      // M21: room-message notifications for joined members (sender skipped;
+      // blocked-by-sender skipped; client suppresses while the room is open).
+      if (notif) {
+        try {
+          await notif.notifyRoomMessage({
+            roomId, roomName: room ? room.name : '',
+            senderId: id, senderName: conn.user.username, text,
+            members, isBlocked,
+          });
+        } catch (e) { console.error('[notif] room_message:', e.message); }
+      }
       return true;
     }
     if (t === 'room_members') {
