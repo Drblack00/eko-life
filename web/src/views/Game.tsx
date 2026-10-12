@@ -75,7 +75,7 @@ import {
 } from "./home/HomeChrome";
 import "./home/HomeChrome.css";
 import { moodFor } from "./home/homeChrome";
-import { blip } from "../lib/sound";
+import { blip, isSoundEnabled, setSoundEnabled } from "../lib/sound";
 // Phase 5: venue dialogs with activities ("things to do").
 import { ThingsToDoDialog, VenueExtras } from "./VenuePanel";
 import "./VenuePanel.css";
@@ -546,6 +546,13 @@ function MeTab({
   sendAct: (a: ActName, params?: Record<string, unknown>) => void;
 }) {
   const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [soundOn, setSoundOn] = useState(isSoundEnabled());
+  const toggleSound = () => {
+    const next = !soundOn;
+    setSoundEnabled(next);
+    setSoundOn(next);
+    if (next) blip("tap");
+  };
   const className =
     config?.classes?.[you.class]?.name ?? you.class ?? "Wanderer";
   const housingName =
@@ -702,6 +709,27 @@ function MeTab({
           🎬 Replay walkthrough
         </Button>
         <ThemePicker />
+        {/* Sound effects — lives here in the Me panel (it was removed from
+            the top header in v3.6; the CharacterPanel copy stays too). */}
+        <div className="eko-me__notifprefs">
+          <h3 className="eko-me__notifprefs-title">🔊 Sound</h3>
+          <label className="eko-me__notifpref">
+            <span className="eko-me__notifpref-text">
+              <strong>Sound effects</strong>
+              <small>Tap and success sounds</small>
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={soundOn}
+              aria-label="Sound effects"
+              className={`eko-switch${soundOn ? " eko-switch--on" : ""}`}
+              onClick={toggleSound}
+            >
+              <span className="eko-switch__knob" aria-hidden="true" />
+            </button>
+          </label>
+        </div>
         {/* M21: notification preferences */}
         <div className="eko-me__notifprefs">
           <h3 className="eko-me__notifprefs-title">🔔 Notifications</h3>
