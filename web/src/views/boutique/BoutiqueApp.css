@@ -1,0 +1,247 @@
+/* ---- Phase 6: Boutique clothing shop ---- */
+.eko-boutique {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) calc(var(--space-4) + var(--sab));
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.eko-boutique__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.eko-boutique__title {
+  font-size: 1.35rem;
+  margin: 0;
+  color: var(--text);
+}
+
+.eko-boutique__sub {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.eko-boutique__balance {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.eko-boutique__balance-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.eko-boutique__balance-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.eko-boutique__tabs {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.eko-boutique__tab {
+  flex: 1;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--surface-2);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.eko-boutique__tab--active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.eko-boutique__chips {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.eko-boutique__chip {
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  border: 1px solid var(--surface-2);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.eko-boutique__chip--active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.eko-boutique__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+@media (min-width: 560px) {
+  .eko-boutique__grid {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+.eko-boutique__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--surface-2);
+  background: var(--surface-1);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  min-height: 96px;
+}
+
+.eko-boutique__card:active {
+  transform: scale(0.98);
+}
+
+.eko-boutique__card-occasion {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.eko-boutique__card-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.eko-boutique__card-price {
+  margin-top: auto;
+  font-size: 0.9rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.eko-boutique__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-boutique__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--surface-2);
+  background: var(--surface-1);
+}
+
+.eko-boutique__row-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.eko-boutique__row-sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+
+.eko-boutique__back {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: var(--space-1) 0;
+}
+
+.eko-boutique__preview {
+  height: 320px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--surface-2);
+  background: var(--surface-1);
+}
+
+.eko-boutique__detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-boutique__name {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text);
+}
+
+.eko-boutique__blurb {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.eko-boutique__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.eko-boutique__occasion {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.eko-boutique__price {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.eko-boutique__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.eko-boutique__error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  color: #fca5a5;
+  font-size: 0.9rem;
+}
+
+.eko-boutique__notice {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, #22c55e 12%, transparent);
+  color: #86efac;
+  font-size: 0.9rem;
+}
