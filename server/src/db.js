@@ -981,6 +981,16 @@ export async function setBanned(id, banned) {
   await runQ('UPDATE users SET banned=? WHERE id=?', 'UPDATE users SET banned=$1 WHERE id=$2', [banned ? 1 : 0, id]);
 }
 
+/** Character panel: change login username (validated by the caller). */
+export async function setUsername(id, username) {
+  await runQ('UPDATE users SET username=? WHERE id=?', 'UPDATE users SET username=$1 WHERE id=$2', [username, id]);
+}
+
+/** Character panel: change display name (validated by the caller). */
+export async function setCharacterName(userId, name) {
+  await runQ('UPDATE characters SET name=? WHERE user_id=?', 'UPDATE characters SET name=$1 WHERE user_id=$2', [name, userId]);
+}
+
 export async function setLastSeen(id) {
   await runQ('UPDATE users SET last_seen=? WHERE id=?', 'UPDATE users SET last_seen=$1 WHERE id=$2', [Date.now(), id]);
 }
