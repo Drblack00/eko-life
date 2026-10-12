@@ -670,6 +670,8 @@ export function createHub({ getDay }) {
     attach, broadcast, onlineCount, online, dayRollover, decayTickAll, spawnTick, spawnAPI,
     bootGame, forceTally, getNews, governorName, forceDisconnect, pushYou, sendTo,
     pushNews: (type, text) => social.pushNews(type, text),
+    pushElectionAll,
+    createCampaignRoom: (playerId, username) => social.createCampaignRoom(playerId, username),
     notifications,
   };
 }
