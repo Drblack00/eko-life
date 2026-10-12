@@ -149,7 +149,7 @@ describe("catalog honesty", () => {
   });
 
   it("outfit cards: each row resolves to its exact outfit with no fallback", () => {
-    expect(OUTFIT_ROWS).toHaveLength(8);
+    expect(OUTFIT_ROWS).toHaveLength(20); // 8 free + 12 boutique premium
     for (const row of OUTFIT_ROWS) {
       const app = applyOutfitRow(cloneApp(), row);
       const notes: string[] = [];
@@ -159,6 +159,36 @@ describe("catalog honesty", () => {
       expect(outfit).toBe(row.outfitId);
       expect(notes).toEqual([]);
     }
+  });
+
+  it("premium rows carry boutique linkage and unique decompositions", () => {
+    const premium = OUTFIT_ROWS.filter((r) => r.premium);
+    expect(premium).toHaveLength(12);
+    const keys = premium.map(
+      (r) => `${r.topId}|${r.bottomId}|${r.outerwearId ?? ""}|${r.shoeId}`
+    );
+    expect(new Set(keys).size).toBe(12); // all invertible, no collisions
+    for (const r of premium) {
+      expect(r.premium!.price).toBeGreaterThanOrEqual(15000);
+      expect(r.premium!.price).toBeLessThanOrEqual(1800000);
+      expect(["owambe", "street", "office", "traditional"]).toContain(
+        r.premium!.occasion
+      );
+      // signature garment colors: the try-on look is the worn look.
+      expect(r.premium!.signature.topColor).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(r.premium!.signature.bottomColor).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+  });
+
+  it("applyOutfitRow applies premium signature colors, leaves free rows alone", () => {
+    const app = cloneApp();
+    const origTop = app.clothing.topColor;
+    const premium = OUTFIT_ROWS.find((r) => r.outfitId === "tuxedo")!;
+    const worn = applyOutfitRow(app, premium);
+    expect(worn.clothing.topColor).toBe("#111418");
+    expect(worn.clothing.bottomColor).toBe("#111418");
+    const free = OUTFIT_ROWS.find((r) => r.outfitId === "casual")!;
+    expect(applyOutfitRow(app, free).clothing.topColor).toBe(origTop);
   });
 
   it("outfitRowForClothing round-trips every card; unknown combos → null (honest)", () => {
@@ -193,8 +223,9 @@ describe("catalog honesty", () => {
     expect(BOTTOM_COLOR_OPTIONS.map((o) => o.hex)).toEqual([
       ...AVATAR_BOTTOM_COLORS,
     ]);
-    expect(TOP_COLOR_OPTIONS).toHaveLength(10);
-    expect(BOTTOM_COLOR_OPTIONS).toHaveLength(10);
+    // Phase 6: palettes grew to include boutique signature garment colors.
+    expect(TOP_COLOR_OPTIONS).toHaveLength(21);
+    expect(BOTTOM_COLOR_OPTIONS).toHaveLength(20);
   });
 
   it("categories shipped: face/body/skin/hair/accessories/clothing — morph sliders omitted for cause", () => {
