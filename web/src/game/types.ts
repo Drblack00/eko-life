@@ -443,6 +443,66 @@ export interface ServerMsg {
   isGov?: boolean;
   members?: unknown;
   username?: string;
+  /** M21: live notification payload (`{t:'notification:new', notification}`). */
+  notification?: unknown;
+}
+
+/* ------------------------------------------------------------------ */
+/* M21 — notifications (in-app; web-push hook comes later).             */
+/* ------------------------------------------------------------------ */
+
+/** Notification type ids (server source of truth). */
+export type NotificationType = "friend_online" | "room_message" | "money_received";
+
+/** One notification row. */
+export interface NotificationEntry {
+  id: number;
+  type: string;
+  title: string;
+  body: string | null;
+  data: Record<string, unknown> | null;
+  read: boolean;
+  created_at: number;
+}
+
+/** Per-user notification toggles (all default true). */
+export interface NotificationPrefs {
+  friend_online: boolean;
+  room_message: boolean;
+  money_received: boolean;
+}
+
+export const NOTIFICATION_PREF_LABELS: Record<keyof NotificationPrefs, { title: string; hint: string }> = {
+  friend_online: { title: "Friend online", hint: "When a friend comes online" },
+  room_message: { title: "Room messages", hint: "New messages in rooms you joined" },
+  money_received: { title: "Coins received", hint: "When someone sends you coins" },
+};
+
+/** Defensive parse of a server notification payload. */
+export function normalizeNotification(p: unknown): NotificationEntry | null {
+  if (!p || typeof p !== "object") return null;
+  const o = p as Record<string, unknown>;
+  const id = Number(o.id);
+  if (!Number.isFinite(id)) return null;
+  return {
+    id,
+    type: typeof o.type === "string" ? o.type : "unknown",
+    title: typeof o.title === "string" ? o.title : "Notification",
+    body: typeof o.body === "string" ? o.body : null,
+    data: o.data && typeof o.data === "object" ? (o.data as Record<string, unknown>) : null,
+    read: o.read === true || o.read === 1,
+    created_at: Number(o.created_at) || Date.now(),
+  };
+}
+
+/** Icon per notification type. */
+export function notificationIcon(type: string): string {
+  switch (type) {
+    case "friend_online": return "🟢";
+    case "room_message": return "💬";
+    case "money_received": return "💰";
+    default: return "🔔";
+  }
 }
 
 /** Format integer naira with ₦. Never compute money — display only. */

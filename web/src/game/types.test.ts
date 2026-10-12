@@ -7,6 +7,8 @@ import {
   furnitureItemId,
   furnitureKey,
   naira,
+  normalizeNotification,
+  notificationIcon,
   refId,
   refName,
   spawnEmoji,
@@ -91,5 +93,53 @@ describe("furniture helpers", () => {
   it("furnitureKey prefers the instance id", () => {
     expect(furnitureKey({ id: 7, item: "bed" })).toBe("7");
     expect(furnitureKey({ item: "bed" })).toBe("bed");
+  });
+});
+
+/* M21 — notification helpers: defensive parse + icons. Display-only. */
+describe("normalizeNotification()", () => {
+  it("parses a full server payload", () => {
+    const n = normalizeNotification({
+      id: 12,
+      type: "friend_online",
+      title: "🟢 Friend online",
+      body: "admin is online now.",
+      data: { userId: 1, username: "admin" },
+      read: 0,
+      created_at: 1728000000000,
+    });
+    expect(n).not.toBeNull();
+    expect(n!.id).toBe(12);
+    expect(n!.type).toBe("friend_online");
+    expect(n!.title).toBe("🟢 Friend online");
+    expect(n!.body).toBe("admin is online now.");
+    expect(n!.data).toEqual({ userId: 1, username: "admin" });
+    expect(n!.read).toBe(false);
+    expect(n!.created_at).toBe(1728000000000);
+  });
+
+  it("treats read=1/true as read, fills defaults for missing fields", () => {
+    const n = normalizeNotification({ id: 3, type: "room_message", read: 1 });
+    expect(n!.read).toBe(true);
+    expect(n!.title).toBe("Notification");
+    expect(n!.body).toBeNull();
+    expect(n!.data).toBeNull();
+    expect(typeof n!.created_at).toBe("number");
+  });
+
+  it("rejects non-objects and id-less payloads", () => {
+    expect(normalizeNotification(null)).toBeNull();
+    expect(normalizeNotification("nope")).toBeNull();
+    expect(normalizeNotification({ type: "friend_online" })).toBeNull();
+    expect(normalizeNotification({ id: "abc" })).toBeNull();
+  });
+});
+
+describe("notificationIcon()", () => {
+  it("maps each type to an icon, unknown falls back to the bell", () => {
+    expect(notificationIcon("friend_online")).toBe("🟢");
+    expect(notificationIcon("room_message")).toBe("💬");
+    expect(notificationIcon("money_received")).toBe("💰");
+    expect(notificationIcon("whatever")).toBe("🔔");
   });
 });
