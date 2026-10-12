@@ -2419,6 +2419,73 @@ export async function listTopByMoney(limit = 10) {
 }
 
 // ============================================================
+// Phase 7 — Èkó Rich List (rank players by net worth, public board)
+// Net-worth formula (identical to bank.js netWorth):
+//   wallet coins + savings + ACTIVE bond principal.
+// Matured bonds already paid out into the wallet, so they are
+// counted once (in money), never twice.
+// Admin stealth-money note: ranking reads the STORED money/savings/
+// bond values only. The admin purchase bypass never inflates stored
+// balances, so no unlimited flag can leak through this board.
+// ============================================================
+const RICH_NW_FROM = `
+  FROM users u
+  LEFT JOIN characters c ON c.user_id = u.id
+  LEFT JOIN (
+    SELECT user_id, SUM(principal) AS active_principal
+    FROM bank_bonds WHERE matured = 0 GROUP BY user_id
+  ) b ON b.user_id = u.id
+  WHERE COALESCE(u.banned, 0) = 0`;
+const RICH_NW_EXPR = `COALESCE(c.money,0) + COALESCE(c.savings,0) + COALESCE(b.active_principal,0)`;
+
+/** Top players by net worth. Banned users excluded. Limit capped at 50. */
+export async function listTopByNetWorth(limit = 25) {
+  const lim = Math.max(1, Math.min(50, Math.floor(Number(limit) || 25)));
+  const rows = await getAll(
+    `SELECT u.id, u.username, COALESCE(c.avatar,'🧑') AS avatar, COALESCE(c.color,'#22d3ee') AS color,
+       ${RICH_NW_EXPR} AS net_worth ${RICH_NW_FROM}
+     ORDER BY net_worth DESC, u.id ASC LIMIT ?`,
+    `SELECT u.id, u.username, COALESCE(c.avatar,'🧑') AS avatar, COALESCE(c.color,'#22d3ee') AS color,
+       ${RICH_NW_EXPR} AS net_worth ${RICH_NW_FROM}
+     ORDER BY net_worth DESC, u.id ASC LIMIT $1`,
+    [lim]);
+  return rows.map(r => ({
+    id: Number(r.id),
+    username: r.username,
+    avatar: r.avatar,
+    color: r.color,
+    netWorth: Math.floor(Number(r.net_worth) || 0),
+  }));
+}
+
+/**
+ * 1-based net-worth rank of a user (1 + players strictly richer; ties
+ * share the rank below them), plus total ranked players and the user's
+ * own net worth. Returns nulls when the user has no rankable row.
+ */
+export async function getNetWorthRank(userId) {
+  const me = await getOne(
+    `SELECT ${RICH_NW_EXPR} AS net_worth ${RICH_NW_FROM} AND u.id = ?`,
+    `SELECT ${RICH_NW_EXPR} AS net_worth ${RICH_NW_FROM} AND u.id = $1`,
+    [Number(userId)]);
+  if (!me) return { rank: null, totalPlayers: 0, netWorth: 0 };
+  const myNw = Math.floor(Number(me.net_worth) || 0);
+  const higher = await getOne(
+    `SELECT COUNT(*) AS n FROM (SELECT ${RICH_NW_EXPR} AS net_worth ${RICH_NW_FROM}) t WHERE t.net_worth > ?`,
+    `SELECT COUNT(*) AS n FROM (SELECT ${RICH_NW_EXPR} AS net_worth ${RICH_NW_FROM}) t WHERE t.net_worth > $1`,
+    [myNw]);
+  const total = await getOne(
+    `SELECT COUNT(*) AS n ${RICH_NW_FROM}`,
+    `SELECT COUNT(*) AS n ${RICH_NW_FROM}`,
+    []);
+  return {
+    rank: Number(higher.n) + 1,
+    totalPlayers: Number(total.n),
+    netWorth: myNw,
+  };
+}
+
+// ============================================================
 // M21: notifications — backend-agnostic CRUD + preferences.
 // data is stored as a JSON string; callers pass a plain object.
 // Preferences: absent row = all toggles on (lazy default).
