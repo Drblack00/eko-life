@@ -41,12 +41,19 @@ export function NeedsBar({
   you,
   sock,
   config,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   you: You;
   sock: GameSocket;
   config: GameConfig | null;
+  /** Optional controlled mode — the dashboard Eat button drives this. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [innerOpen, setInnerOpen] = useState(false);
+  const open = controlledOpen ?? innerOpen;
+  const setOpen = onOpenChange ?? setInnerOpen;
   const sendAct = (a: ActName, params?: Record<string, unknown>) =>
     sock.sendAct(a, params);
 
