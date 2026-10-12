@@ -114,6 +114,36 @@ test('prefs default all-on; PUT updates; auth required', async () => {
   assert.equal(anon.status, 401);
 });
 
+test('prefs PUT merges partials: turning one toggle off never flips the others back on', async () => {
+  // Reset to all-on first.
+  await put('/api/notifications/preferences', { friend_online: true, room_message: true, money_received: true }, userTok);
+
+  // User turns friend_online OFF…
+  const a = await put('/api/notifications/preferences', { friend_online: false }, userTok);
+  assert.deepEqual(a.json.preferences, { friend_online: false, room_message: true, money_received: true });
+
+  // …then turns room_message OFF: friend_online must STAY off (2026-10-12
+  // bug: missing keys were reset to true, so the first toggle flipped on).
+  const b = await put('/api/notifications/preferences', { room_message: false }, userTok);
+  assert.deepEqual(b.json.preferences, { friend_online: false, room_message: false, money_received: true });
+
+  // …then money_received OFF: the other two stay off.
+  const c = await put('/api/notifications/preferences', { money_received: false }, userTok);
+  assert.deepEqual(c.json.preferences, { friend_online: false, room_message: false, money_received: false });
+
+  // An empty partial changes nothing.
+  const d = await put('/api/notifications/preferences', {}, userTok);
+  assert.deepEqual(d.json.preferences, { friend_online: false, room_message: false, money_received: false });
+
+  // And turning one back on leaves the others off.
+  const e = await put('/api/notifications/preferences', { room_message: true }, userTok);
+  assert.deepEqual(e.json.preferences, { friend_online: false, room_message: true, money_received: false });
+
+  // Reset to all-on: later tests share this user.
+  const f = await put('/api/notifications/preferences', { friend_online: true, room_message: true, money_received: true }, userTok);
+  assert.deepEqual(f.json.preferences, { friend_online: true, room_message: true, money_received: true });
+});
+
 // ---------------- friend-online: live event + cooldown ----------------
 test('friend online: offline→online flip notifies the friend live', async () => {
   // become friends: regular requests, admin accepts
