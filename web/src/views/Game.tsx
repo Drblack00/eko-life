@@ -57,6 +57,18 @@ import { NOTIFICATION_PREF_LABELS, type NotificationEntry, type NotificationPref
 import "./Walkthrough.css";
 import "./Admin.css";
 import "./Game.css";
+// Home screen chrome (Phase 1 of the reference audit): top status pill,
+// floating cards, work/travel pills, announcement pill, shortcuts.
+import {
+  AnnouncementPill,
+  HomeOverlays,
+  ShortcutsDialog,
+  TopUpDialog,
+  useVisits,
+} from "./home/HomeChrome";
+import "./home/HomeChrome.css";
+import { compactNum, moodFor } from "./home/homeChrome";
+import { blip, isSoundEnabled, setSoundEnabled, SOUND_EVENT } from "../lib/sound";
 // V2 milestones: shifts (M7), needs (M8), daily (M9), economy (M10),
 // governance (M11), skills/academy (M12).
 import { Clock, JobsTab } from "./v2/m7";
@@ -71,48 +83,116 @@ import "./v2/m10/m10.css";
 import { SkillsPanel, AcademyView } from "./v2/m12";
 import "./v2/m12/m12.css";
 
-/** HUD: money, day pill, governor pill, avatar — plus connection/offline state. */
+/**
+ * HUD: top status pill (avatar · live clock · mood · visits/online ·
+ * sound toggle · wallet + top-up · notification bell · governor) plus
+ * the needs bars and connection/offline state.
+ */
 function Hud({
   you,
-  day,
   status,
   queued,
   lastError,
   governorName,
+  online,
   unreadNotifications,
+  onOpenMe,
   onOpenNotifications,
   onGovOpen,
   onRetry,
+  onTopUp,
 }: {
   you: You;
-  day: number;
   status: string;
   queued: number;
   lastError: string | null;
   governorName: string | null;
+  online: number;
   unreadNotifications: number;
+  onOpenMe: () => void;
   onOpenNotifications: () => void;
   onGovOpen: () => void;
   onRetry: () => void;
+  onTopUp: () => void;
 }) {
+  const visits = useVisits();
+  const [soundOn, setSoundOn] = useState(isSoundEnabled());
+  useEffect(() => {
+    const onSound = (e: Event) =>
+      setSoundOn((e as CustomEvent<boolean>).detail !== false);
+    window.addEventListener(SOUND_EVENT, onSound);
+    return () => window.removeEventListener(SOUND_EVENT, onSound);
+  }, []);
+  const mood = moodFor(you.happiness);
+  const balance = you.is_admin ? "∞ Unlimited" : naira(you.money);
+  const toggleSound = () => {
+    const next = !soundOn;
+    setSoundEnabled(next);
+    setSoundOn(next);
+    if (next) blip("tap");
+  };
   return (
     <header className="eko-hud">
-      <div className="eko-hud__row">
-        <span
-          className="eko-hud__avatar"
+      <div className="eko-top-pill glass" role="status" aria-label="Status">
+        <button
+          type="button"
+          className="eko-top-pill__avatar"
           style={{ backgroundColor: you.color }}
-          aria-hidden="true"
+          onClick={onOpenMe}
+          title="My profile"
+          aria-label="Open my profile"
         >
           {you.avatar}
+        </button>
+        <strong className="eko-top-pill__name">{you.name}</strong>
+        <span className="eko-top-pill__sep" aria-hidden="true" />
+        <Clock />
+        <span
+          className="eko-top-pill__mood"
+          title={`Happiness ${Math.round(you.happiness)}`}
+        >
+          <span aria-hidden="true">{mood.emoji}</span>{" "}
+          <span className="eko-top-pill__mood-text">{mood.label}</span>
         </span>
-        <div className="eko-hud__identity">
-          <strong className="eko-hud__name">{you.name}</strong>
-          <span className="eko-hud__money" aria-label={you.is_admin ? "Unlimited admin balance" : `Balance ${naira(you.money)}`}>
-            {/* M21: admins see unlimited here (private view); everyone else
-                sees the real coins column — including the leaderboard. */}
-            {you.is_admin ? "∞ Unlimited" : naira(you.money)}
-          </span>
-        </div>
+        <span
+          className="eko-top-pill__online"
+          title="City visits · players online"
+        >
+          {visits !== null ? `${compactNum(visits)} · ` : ""}
+          {online} online
+        </span>
+        <span className="eko-top-pill__sep" aria-hidden="true" />
+        <button
+          type="button"
+          className="eko-top-pill__iconbtn"
+          onClick={toggleSound}
+          aria-pressed={soundOn}
+          title={soundOn ? "Mute sounds" : "Unmute sounds"}
+          aria-label={soundOn ? "Mute sounds" : "Unmute sounds"}
+        >
+          {soundOn ? "🔊" : "🔇"}
+        </button>
+        <span
+          className="eko-top-pill__wallet"
+          aria-label={
+            you.is_admin ? "Unlimited admin balance" : `Balance ${naira(you.money)}`
+          }
+        >
+          {balance}
+          <button
+            type="button"
+            className="eko-top-pill__topup"
+            onClick={() => {
+              blip("tap");
+              onTopUp();
+            }}
+            aria-label="Top up wallet"
+            title="Top up wallet"
+          >
+            +
+          </button>
+        </span>
+        <NotificationBell unread={unreadNotifications} onOpen={onOpenNotifications} />
         <button
           type="button"
           className="eko-hud__gov"
@@ -122,11 +202,6 @@ function Hud({
         >
           {governorName ? `👑 @${governorName}` : "🏛️ No governor"}
         </button>
-        <span className="eko-hud__day" aria-label={`Day ${day}`}>
-          Day {day}
-        </span>
-        <NotificationBell unread={unreadNotifications} onOpen={onOpenNotifications} />
-        <Clock />
       </div>
       <div className="eko-hud__stats">
         <StatBar label="Energy" value={you.energy} icon="⚡" />
@@ -679,6 +754,12 @@ export function Game({
   const [electionOpen, setElectionOpen] = useState(false);
   // M21: notification panel visibility.
   const [notifOpen, setNotifOpen] = useState(false);
+  // Home screen chrome (Phase 1): clean-screen mode, shortcuts dialog,
+  // top-up dialog, and the session-dismissed announcement pill.
+  const [cleanMode, setCleanMode] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+  const [announceDismissed, setAnnounceDismissed] = useState(false);
   /** Tap a notification (panel row or live toast) → jump to the right screen. */
   const onNotificationTap = useCallback(
     (n: NotificationEntry) => {
@@ -700,6 +781,64 @@ export function Game({
     },
     [sock, openPhoneApp]
   );
+  // Keyboard shortcuts (Phase 1 of the reference audit) — adapted to our
+  // tabs (Home / Buy / Map / Phone). Ignored while typing in a field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable)
+      )
+        return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      const closeTop = () => {
+        if (shortcutsOpen) {
+          setShortcutsOpen(false);
+          return true;
+        }
+        if (phoneOpen) {
+          setPhoneOpen(false);
+          setPhoneApp(null);
+          return true;
+        }
+        if (notifOpen) {
+          setNotifOpen(false);
+          return true;
+        }
+        return false;
+      };
+      if (k === "escape") {
+        if (closeTop()) e.preventDefault();
+        return;
+      }
+      if (k === "?") {
+        setShortcutsOpen(true);
+        return;
+      }
+      if (k === "h") setTab("home");
+      else if (k === "b") setTab("buy");
+      else if (k === "m") setTab("map");
+      else if (k === "p") {
+        if (phoneOpen) {
+          setPhoneOpen(false);
+          setPhoneApp(null);
+        } else setPhoneOpen(true);
+      } else if (k === "n") {
+        setNotifOpen(true);
+        sock.openNotifications();
+      } else if (k === "d") openPhoneApp("daily");
+      else if (k === "j") openPhoneApp("jobs");
+      else return;
+      blip("tap");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [shortcutsOpen, phoneOpen, notifOpen, openPhoneApp, sock]);
+
   const [restConfig, setRestConfig] = useState<GameConfig | null>(null);
   const [slow, setSlow] = useState(false);
   const [homeFocus, setHomeFocus] = useState<HomeFocus>(null);
@@ -943,22 +1082,28 @@ export function Game({
     !pinIsHere && you.energy >= 5 && you.money >= fare;
 
   return (
-    <div className="eko-game">
+    <div className={cleanMode ? "eko-game eko-game--clean" : "eko-game"}>
       <Hud
         you={you}
-        day={sock.day}
         status={sock.status}
         queued={sock.queued}
         lastError={sock.lastError}
         governorName={sock.governor?.name ?? null}
+        online={sock.online}
         unreadNotifications={sock.unreadNotifications}
+        onOpenMe={() => openPhoneApp("me")}
         onOpenNotifications={() => {
           setNotifOpen(true);
           sock.openNotifications(); // loads the list + clears the badge
         }}
         onGovOpen={() => setElectionOpen(true)}
         onRetry={sock.retryNow}
+        onTopUp={() => setTopUpOpen(true)}
       />
+
+      {!announceDismissed && (
+        <AnnouncementPill onDismiss={() => setAnnounceDismissed(true)} />
+      )}
 
       {sock.govBanner?.name && (
         <div className="eko-govbanner" role="status">
@@ -976,6 +1121,44 @@ export function Game({
       )}
 
       {!buySheetOpen && <HintBar you={you} onGo={openPhoneApp} />}
+
+      {/* Phase 1 home chrome: floating cards + work/travel pills (home tab only). */}
+      {tab === "home" && (
+        <HomeOverlays
+          token={token}
+          shift={you.shift ?? null}
+          fares={config?.travelFares}
+          cleanMode={cleanMode}
+          onToggleClean={() => setCleanMode((c) => !c)}
+          onOpenApp={openPhoneApp}
+          onTab={(t) => (t === "phone" ? setPhoneOpen(true) : setTab(t))}
+          onOpenShortcuts={() => setShortcutsOpen(true)}
+        />
+      )}
+
+      {cleanMode && (
+        <button
+          type="button"
+          className="eko-cleanrestore glass"
+          onClick={() => {
+            blip("tap");
+            setCleanMode(false);
+          }}
+        >
+          📺 Show UI
+        </button>
+      )}
+
+      <ShortcutsDialog
+        open={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
+      <TopUpDialog
+        open={topUpOpen}
+        balance={you.is_admin ? "∞ Unlimited" : naira(you.money)}
+        onClose={() => setTopUpOpen(false)}
+        onEarn={() => openPhoneApp("jobs")}
+      />
 
       <ElectionSheet
         open={electionOpen}
