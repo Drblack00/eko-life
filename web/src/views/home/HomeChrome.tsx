@@ -188,11 +188,14 @@ function useHustle(token: string) {
 function SideCards({
   token,
   onOpenApp,
+  onOpenGoals,
   cleanMode,
   onToggleClean,
 }: {
   token: string;
   onOpenApp: (app: string) => void;
+  /** Reference audit B4: the goal card opens the character panel at Goals. */
+  onOpenGoals: () => void;
   cleanMode: boolean;
   onToggleClean: () => void;
 }) {
@@ -205,7 +208,15 @@ function SideCards({
   return (
     <div className="eko-sidecards" aria-label="Quick cards">
       {top && (
-        <button type="button" className="eko-sidecard glass" onClick={tap("daily")}>
+        <button
+          type="button"
+          className="eko-sidecard glass"
+          onClick={() => {
+            blip("tap");
+            onOpenGoals();
+          }}
+          aria-label="Open character goals"
+        >
           <span className="eko-sidecard__icon" aria-hidden="true">
             🎯
           </span>
@@ -329,6 +340,7 @@ export function HomeOverlays({
   onOpenApp,
   onTab,
   onOpenShortcuts,
+  onOpenCharacter,
 }: {
   token: string;
   shift?: { job: string; name: string; endsAt: number } | null;
@@ -338,6 +350,7 @@ export function HomeOverlays({
   onOpenApp: (app: string) => void;
   onTab: (t: "home" | "buy" | "map" | "phone") => void;
   onOpenShortcuts: () => void;
+  onOpenCharacter: (tab: "goals") => void;
 }) {
   const goMap = useCallback(() => onTab("map"), [onTab]);
   return (
@@ -345,6 +358,7 @@ export function HomeOverlays({
       <SideCards
         token={token}
         onOpenApp={onOpenApp}
+        onOpenGoals={() => onOpenCharacter("goals")}
         cleanMode={cleanMode}
         onToggleClean={onToggleClean}
       />
