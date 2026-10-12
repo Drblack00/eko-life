@@ -2,8 +2,9 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    // Pure-logic unit tests only — no DOM, no Three.js. Node is enough.
+    // Default: pure-logic unit tests (node). Files that render components
+    // opt into jsdom per-file with `// @vitest-environment jsdom`.
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },
 });
