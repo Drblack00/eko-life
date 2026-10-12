@@ -1,21 +1,45 @@
 /* Home screen chrome — Phase 1 of the reference audit rebuild.
    Original styling; liquid-glass treatment matches the app theme. */
 
-/* ---- Top status pill (replaces the old HUD row) ---- */
+/* ---- Top status pills: status (left) + quick actions (right).
+   Two glass pills in a flex row — no horizontal scrolling; everything must
+   fit a 390px phone. The gov button is the only shrinkable item and
+   ellipsizes gracefully (full text stays in its title attr). ---- */
+.eko-hud__pills {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 .eko-top-pill {
   display: flex;
   align-items: center;
   gap: 0.45rem;
   padding: 0.4rem 0.6rem;
   border-radius: 999px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
+  min-width: 0;
 }
-.eko-top-pill::-webkit-scrollbar {
-  display: none;
+.eko-top-pill--status {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
 }
-.eko-top-pill > * {
+.eko-top-pill--status > * {
+  flex: none;
+}
+.eko-top-pill--actions {
+  flex: none;
+}
+/* The gov button may shrink inside the actions pill (overrides the
+   flex:none pin in Game.css, which existed for the old scrollable row). */
+.eko-hud .eko-top-pill--actions .eko-hud__gov {
+  flex: 0 1 auto;
+  min-width: 2.4rem;
+}
+/* Compact the bell inside the actions pill. */
+.eko-top-pill--actions .eko-notifbell {
+  width: 34px;
+  height: 34px;
+  font-size: 17px;
   flex: none;
 }
 .eko-top-pill__avatar {
@@ -73,6 +97,13 @@
   font-weight: 700;
   font-size: 0.85rem;
   white-space: nowrap;
+  min-width: 0;
+}
+.eko-top-pill__wallet-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 .eko-top-pill__topup {
   width: 1.6rem;
@@ -350,12 +381,62 @@
   font-size: 0.8rem;
 }
 
-/* ---- Small screens: keep the pill one scrollable row, slim the cards ---- */
+/* ---- Small screens: the two pills share one row with zero clipping ---- */
 @media (max-width: 560px) {
   .eko-top-pill__name {
     display: none;
   }
   .eko-top-pill__mood-text {
+    display: none;
+  }
+  .eko-hud__pills {
+    gap: 0.4rem;
+  }
+  .eko-top-pill {
+    padding: 0.32rem 0.5rem;
+    gap: 0.35rem;
+  }
+  .eko-top-pill__avatar {
+    width: 1.7rem;
+    height: 1.7rem;
+    font-size: 1rem;
+  }
+  /* Phone status bar already shows Lagos time — the ambient game clock
+     hides on small phones so the status pill never clips. */
+  .eko-hud .m7-clock {
+    display: none;
+  }
+  .eko-top-pill__mood,
+  .eko-top-pill__online {
+    font-size: 0.72rem;
+  }
+  .eko-top-pill__iconbtn {
+    font-size: 0.95rem;
+    padding: 0.2rem;
+  }
+  .eko-top-pill__wallet {
+    font-size: 0.78rem;
+    gap: 0.25rem;
+  }
+  .eko-top-pill__topup {
+    width: 1.45rem;
+    height: 1.45rem;
+    font-size: 0.95rem;
+  }
+  .eko-top-pill--actions .eko-notifbell {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+  /* Governor pill: icon-only on phones (full text stays in title);
+     the text span keeps its ellipsis behavior on wider screens. */
+  .eko-hud .eko-top-pill--actions .eko-hud__gov {
+    max-width: none;
+    font-size: 0.95rem;
+    padding: 6px 10px;
+    min-height: 32px;
+  }
+  .eko-hud .eko-top-pill--actions .eko-hud__gov-text {
     display: none;
   }
   .eko-quickfab {
