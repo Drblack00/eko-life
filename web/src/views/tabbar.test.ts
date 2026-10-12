@@ -7,12 +7,16 @@ import { describe, expect, it } from "vitest";
  * Tab-bar contract tests. The vitest setup is node-only (no DOM), so these
  * verify the tab bar at the source level: the TABS structure + FLIP logic in
  * TabBar.tsx and the .eko-tabs rules in Game.css / glass.css. Real-browser
- * screenshots are the visual proof (see workstream A report).
+ * screenshots are the visual proof.
  *
- * Contract (iOS Liquid Glass reference video):
- * - exactly 4 tabs: Home, Buy, Map, Phone — icon ABOVE a visible label;
- * - the selected tab sits in a magnifying liquid-glass bubble, its
- *   icon+label rendered TAB_ZOOM (1.28x) larger than unselected tabs;
+ * Contract (icons-only dock, 2026-10-12 user request — iOS reference photo):
+ * - exactly 4 tabs: Home, Buy, Map, Phone — icons ONLY, no visible labels
+ *   (buttons keep aria-label for screen readers);
+ * - hand-drawn inline SVG icons: outline artwork for inactive tabs, FILLED
+ *   artwork for the active tab (filled house vs outlined rest);
+ * - red notification dot on the Phone tab when hasUnread is set;
+ * - the selected tab sits in a magnifying liquid-glass bubble, its icon
+ *   rendered TAB_ZOOM (1.28x) larger than unselected tabs;
  * - the bubble FLIP-morphs between tabs with a mid-flight liquid stretch
  *   and spring easing; reduced-motion jumps instantly.
  */
@@ -23,21 +27,19 @@ const gameCss = readFileSync(join(here, "Game.css"), "utf8");
 const glassCss = readFileSync(join(here, "..", "styles", "glass.css"), "utf8");
 
 const EXPECTED_TABS = [
-  { id: "home", label: "Home", icon: "🏠" },
-  { id: "buy", label: "Buy", icon: "🛒" },
-  { id: "map", label: "Map", icon: "🗺️" },
-  { id: "phone", label: "Phone", icon: "📱" },
+  { id: "home", label: "Home" },
+  { id: "buy", label: "Buy" },
+  { id: "map", label: "Map" },
+  { id: "phone", label: "Phone" },
 ];
 
-function parseTabs(src: string): Array<{ id: string; label: string; icon: string }> {
-  const m = src.match(/const TABS[^=]*=\s*\[(.*?)\];/s);
+function parseTabs(src: string): Array<{ id: string; label: string }> {
+  const m = src.match(/export const TABS[^=]*=\s*\[(.*?)\];/s);
   if (!m) throw new Error("TABS array not found in TabBar.tsx");
   const entries = [
-    ...m[1].matchAll(
-      /\{\s*id:\s*"([^"]+)"\s*,\s*label:\s*"([^"]+)"\s*,\s*icon:\s*"([^"]+)"\s*\}/g,
-    ),
+    ...m[1].matchAll(/\{\s*id:\s*"([^"]+)"\s*,\s*label:\s*"([^"]+)"\s*\}/g),
   ];
-  return entries.map((e) => ({ id: e[1], label: e[2], icon: e[3] }));
+  return entries.map((e) => ({ id: e[1], label: e[2] }));
 }
 
 function ruleBlock(css: string, selector: string): string {
@@ -47,8 +49,14 @@ function ruleBlock(css: string, selector: string): string {
   return m[1];
 }
 
+function navMarkup(): string {
+  const nav = tabTsx.match(/<nav className="eko-tabs"[\s\S]*?<\/nav>/);
+  if (!nav) throw new Error("nav.eko-tabs not found in TabBar.tsx");
+  return nav[0];
+}
+
 describe("tab bar structure (TabBar.tsx)", () => {
-  it("has exactly the 4 tabs, in order, with unchanged labels and icons", () => {
+  it("has exactly the 4 tabs, in order, with unchanged ids and labels", () => {
     expect(parseTabs(tabTsx)).toEqual(EXPECTED_TABS);
   });
 
@@ -57,34 +65,55 @@ describe("tab bar structure (TabBar.tsx)", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("renders icon ABOVE a visible text label per tab", () => {
-    const nav = tabTsx.match(/<nav className="eko-tabs"[\s\S]*?<\/nav>/);
-    expect(nav).not.toBeNull();
-    // Visible label elements exist (labels are back — video-exact dock).
-    expect(nav![0]).toMatch(/eko-tabs__label/);
-    expect(nav![0]).toMatch(/\{t\.label\}/);
-    // Icon comes before the label inside the content column.
-    const content = nav![0].match(
-      /eko-tabs__content"[\s\S]*?eko-tabs__icon"[\s\S]*?eko-tabs__label"/
-    );
-    expect(content).not.toBeNull();
+  it("renders icons only — no visible text labels", () => {
+    const nav = navMarkup();
+    expect(nav).not.toMatch(/eko-tabs__label/);
+    // {t.label} survives only inside the button's aria-label (screen
+    // readers); it is never rendered as visible text.
+    expect(nav.match(/\{t\.label\}/g) ?? []).toHaveLength(1);
+    expect(nav).toMatch(/aria-label=\{t\.label\}/);
   });
 
-  it("keeps aria-labels on the tab buttons", () => {
-    const nav = tabTsx.match(/<nav className="eko-tabs"[\s\S]*?<\/nav>/);
-    expect(nav).not.toBeNull();
-    expect(nav![0]).toMatch(/aria-label=\{t\.label\}/);
+  it("keeps aria-labels on the tab buttons for screen readers", () => {
+    expect(navMarkup()).toMatch(/aria-label=\{t\.label\}/);
+  });
+
+  it("renders hand-drawn inline SVG icons (no emoji)", () => {
+    const nav = navMarkup();
+    expect(nav).toMatch(/<TabIcon tab=\{t\.id\} active=\{tab === t\.id\} \/>/);
+    expect(tabTsx).toMatch(/function TabIcon/);
+    expect(tabTsx).toMatch(/viewBox="0 0 24 24"/);
+    // No emoji tab icons remain.
+    expect(tabTsx).not.toMatch(/"🏠"|"🛒"|"🗺️"|"📱"/);
+  });
+
+  it("draws outline artwork for inactive tabs and filled for the active tab", () => {
+    // Outline: stroke-based, no fill.
+    expect(tabTsx).toMatch(/stroke:\s*"currentColor"/);
+    // Filled: solid currentColor paths per tab.
+    for (const id of ["home", "buy", "map", "phone"]) {
+      expect(tabTsx).toMatch(new RegExp(`${id}:\\s*\\(\\s*<path`));
+    }
+    expect(tabTsx).toMatch(/fill="currentColor"/);
   });
 
   it("marks the active tab with aria-current", () => {
     expect(tabTsx).toMatch(/aria-current=\{tab === t\.id \? "page" : undefined\}/);
   });
 
+  it("accepts a hasUnread prop and shows the red dot on the Phone tab", () => {
+    expect(tabTsx).toMatch(/hasUnread\?: boolean/);
+    expect(tabTsx).toMatch(/hasUnread = false/);
+    const nav = navMarkup();
+    expect(nav).toMatch(/t\.id === "phone" && hasUnread/);
+    expect(nav).toMatch(/eko-tabs__dot/);
+  });
+
   it("exports the selected-tab magnification ratio (1.28x per the reference video)", () => {
     expect(tabTsx).toMatch(/export const TAB_ZOOM = 1\.28/);
   });
 
-  it("sizes the bubble from the content column (icon+label), not the icon alone", () => {
+  it("sizes the bubble from the icon content, not the button box", () => {
     expect(tabTsx).toMatch(/querySelector\("\.eko-tabs__content"\)/);
   });
 
@@ -101,18 +130,18 @@ describe("tab bar structure (TabBar.tsx)", () => {
 });
 
 describe("tab bar styling (Game.css)", () => {
-  it("lays all 4 tabs out in a single row — repeat(4, 1fr), not 9", () => {
+  it("lays all 4 tabs out in a single row — repeat(4, 1fr)", () => {
     const block = ruleBlock(gameCss, ".eko-tabs");
     expect(block).toMatch(/grid-template-columns:\s*repeat\(\s*4\s*,\s*1fr\s*\)/);
-    expect(block).not.toMatch(/repeat\(\s*9\s*,/);
   });
 
-  it("stacks icon above label in the content column", () => {
-    const block = ruleBlock(gameCss, ".eko-tabs__content");
-    expect(block).toMatch(/flex-direction:\s*column/);
+  it("sizes the SVG icons (26px) without layout shift", () => {
+    const block = ruleBlock(gameCss, ".eko-tabs__icon svg");
+    expect(block).toMatch(/width:\s*26px/);
+    expect(block).toMatch(/height:\s*26px/);
   });
 
-  it("zooms the active tab's content to 1.28x via transform (no layout shift)", () => {
+  it("zooms the active tab's icon to 1.28x via transform (no layout shift)", () => {
     const block = ruleBlock(gameCss, ".eko-tabs__btn--active .eko-tabs__content");
     expect(block).toMatch(/transform:\s*scale\(1\.28\)/);
   });
@@ -133,13 +162,19 @@ describe("tab bar styling (Game.css)", () => {
     expect(block).toMatch(/color:\s*var\(--palm-700\)/);
   });
 
+  it("renders the unread dot as an absolutely-positioned red badge", () => {
+    const block = ruleBlock(gameCss, ".eko-tabs__dot");
+    expect(block).toMatch(/position:\s*absolute/);
+    expect(block).toMatch(/background:\s*#ef4444/);
+    expect(block).toMatch(/border-radius:\s*50%/);
+  });
+
   it("renders the bubble as a single absolutely-positioned lens", () => {
     const pill = ruleBlock(gameCss, ".eko-tabs__pill");
     expect(pill).toMatch(/position:\s*absolute/);
     expect(pill).toMatch(/pointer-events:\s*none/);
     expect(pill).toMatch(/transform-origin:\s*left top/);
-    const nav = tabTsx.match(/<nav className="eko-tabs"[\s\S]*?<\/nav>/);
-    const pills = nav![0].match(/className="eko-tabs__pill"/g) ?? [];
+    const pills = navMarkup().match(/className="eko-tabs__pill"/g) ?? [];
     expect(pills).toHaveLength(1);
   });
 
