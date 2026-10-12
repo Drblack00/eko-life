@@ -39,6 +39,8 @@ export interface You {
   y?: number;
   is_admin: boolean;
   guest: boolean;
+  /** Character panel: masked account email (null when the account has none). */
+  email_masked?: string | null;
   /* ---------------- V2 ---------------- */
   /** M8: six needs (hunger is legacy). */
   fun?: number;
