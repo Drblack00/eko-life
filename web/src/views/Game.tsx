@@ -129,7 +129,7 @@ function Hud({
   onTopUp: () => void;
 }) {
   const mood = moodFor(you.happiness);
-  const balance = you.is_admin ? "∞ Unlimited" : naira(you.money);
+  const balance = you.is_admin ? "∞" : naira(you.money);
   return (
     <header className="eko-hud">
       <div className="eko-hud__pills">
