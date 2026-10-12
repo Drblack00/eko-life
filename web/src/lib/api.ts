@@ -212,6 +212,19 @@ export interface WallFloorOption {
   desc?: string;
 }
 
+/** Phase 5: one venue activity (server is the source of truth; see v2/venues.js). */
+export interface VenueActivity {
+  id: string;
+  name: string;
+  icon: string;
+  cost: number;
+  needs: Record<string, number>;
+  skillXp?: { skill: string; xp: number };
+  blurb: string;
+  teaser: string;
+  tags: string[];
+}
+
 export interface GameConfig {
   classes: Record<string, ClassInfo>;
   locations: ApiLocation[];
@@ -238,6 +251,8 @@ export interface GameConfig {
   /** M15: home wall / floor style catalogs for `buy_home_style`. */
   walls?: WallFloorOption[];
   floors?: WallFloorOption[];
+  /** Phase 5: venue activities — flat list; match against a location's tags. */
+  venueActivities?: VenueActivity[];
 }
 
 /**
@@ -297,6 +312,7 @@ export function normalizeConfig(raw: Record<string, unknown> | undefined): GameC
     avatarLook,
     walls: asList(r.walls as GameConfig["walls"]),
     floors: asList(r.floors as GameConfig["floors"]),
+    venueActivities: asList(r.venueActivities as GameConfig["venueActivities"]),
   };
 }
 
