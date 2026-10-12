@@ -364,7 +364,9 @@ export type ActName =
   | "gov_dismiss"
   | "skill_train"
   | "academy_lesson"
-  | "academy_quiz";
+  | "academy_quiz"
+  /* ---------------- Phase 5: venue activities ---------------- */
+  | "venue_activity";
 
 /** Server → client message envelope (only fields we route). */
 export interface ServerMsg {
