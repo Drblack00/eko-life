@@ -34,7 +34,9 @@ import { INTENTS as M8_INTENTS, triggerMoodlet } from './v2/m8.js';
 import { INTENTS as M9_INTENTS } from './v2/m9.js';
 import * as m10 from './v2/m10.js';
 import { INTENTS as M11_INTENTS } from './v2/m11.js';
-import { INTENTS as M12_INTENTS, m12YouSnapshot } from './v2/m12.js';
+import { INTENTS as M12_INTENTS, m12YouSnapshot, addSkillXp, xpBoostMult } from './v2/m12.js';
+// Phase 5: venue activities ("things to do").
+import { findActivity, activityOfferedAt, VENUE_COOLDOWN_MS } from './v2/venues.js';
 // M8: modest fun restoration per food item (FOOD table untouched).
 const M8_FOOD_FUN = { mama_put: 4, agege_bread: 3, suya: 6, ofada: 5, shawarma: 8 };
 const M8_EAT_MOODLET = { suya: 'suya_spice_rush', ofada: 'food_coma', shawarma: 'shawarma_charge' };
@@ -657,6 +659,41 @@ export async function handleAct(ctx, msg) {
     broadcast({ t: 'sys', text: `👑 Governor ${conn.user.username}: ${text}` });
     ctx.pushNews('governor', `👑 Governor ${conn.user.username}: ${text.slice(0, 80)}`);
     console.log(`[gov] ${conn.user.username} broadcast: ${text.slice(0, 60)}`);
+    return;
+  }
+
+  // ---------- venue_activity (Phase 5: "things to do" at a venue) ----------
+  // Server validates everything: location exists, activity exists, the
+  // activity belongs to one of the location's tags, the player is there,
+  // 60s per-activity cooldown, integer coin math, needs clamped 0-100.
+  if (a === 'venue_activity') {
+    const loc = LOCATIONS.find(x => x.id === String(msg.locationId));
+    if (!loc) { err('Unknown venue.'); return; }
+    const act = findActivity(msg.activityId);
+    if (!act) { err('Unknown activity.'); return; }
+    if (c.location_id !== loc.id) { err(`Travel to ${loc.name} first.`); return; }
+    if (!activityOfferedAt(loc, act.id)) { err(`You can't do that at ${loc.name}.`); return; }
+    const left = cdLeft('venue:' + act.id);
+    if (left) { err(`Catch your breath — try again in ${left}s.`); return; }
+    if (!afford(act.cost)) { err(`You need ${naira(act.cost)} for that.`); return; }
+    if (act.cost > 0) payFor(act.cost);
+    conn.cds['venue:' + act.id] = now + VENUE_COOLDOWN_MS;
+    for (const [need, d] of Object.entries(act.needs || {})) {
+      c[need] = clamp((Number(c[need]) || 0) + Number(d), 0, 100);
+    }
+    let note = `${act.icon} ${act.name} — done.`;
+    if (act.skillXp) {
+      const granted = Math.max(1, Math.round(act.skillXp.xp * xpBoostMult(c)));
+      const r = addSkillXp(c, act.skillXp.skill, granted);
+      note += r.leveledUp ? ` ⬆️ ${act.skillXp.skill} is now level ${r.level}!` : ` (+${granted} ${act.skillXp.skill} XP)`;
+    }
+    console.log(`[act] ${conn.user.username} venue_activity ${act.id} @ ${loc.id} (−${naira(act.cost)})`);
+    await commit({
+      kind: act.cost > 0 ? 'venue_activity' : null,
+      amount: act.cost > 0 ? -act.cost : 0,
+      meta: act.cost > 0 ? { location: loc.id, activity: act.id } : null,
+      note,
+    });
     return;
   }
 
