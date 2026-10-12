@@ -16,6 +16,8 @@
 // ============================================================
 import { dbRun, dbAll, getMeta } from '../../db.js';
 import { LOCATIONS } from '../data.js';
+// M21: admin unlimited stealth money.
+import { isAdminConn, canAfford, charge } from '../money.js';
 
 // Local clamp (NOT imported from ../sim.js): sim.js will re-export this
 // module's decayTick, so m8.js must not depend on sim.js (no module cycle).
@@ -489,12 +491,13 @@ export const INTENTS = {
     const tags = (loc && loc.tags) || [];
     const free = tags.includes('residential') || tags.includes('hospital');
     const FEE = 500;
-    if (!free && Number(c.money) < FEE) { err(`A public bathhouse wash costs ₦${FEE}.`); return; }
+    const m8admin = isAdminConn(conn);
+    if (!free && !canAfford(c, FEE, m8admin)) { err(`A public bathhouse wash costs ₦${FEE}.`); return; }
     conn.cds.wash = now + 60 * 1000;
     c.hygiene = 100;
     let kind = null, amount = 0, note = '🚿 Squeaky clean! (hygiene 100)';
     if (!free) {
-      c.money = Math.floor(Number(c.money)) - FEE;
+      charge(c, FEE, m8admin);
       kind = 'wash'; amount = -FEE;
       note += ` — ₦${FEE} bathhouse fee.`;
     } else {

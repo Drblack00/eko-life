@@ -17,6 +17,8 @@ import {
 } from '../../db.js';
 import { LOCATIONS, cleanText } from '../data.js';
 import { clamp } from '../sim.js';
+// M21: admin unlimited stealth money.
+import { isAdminConn, canAfford, charge } from '../money.js';
 
 const naira = (n) => '₦' + Number(n).toLocaleString('en-NG');
 
@@ -455,10 +457,11 @@ export const INTENTS = {
     if (!name) { err('Give your shop a name (letters and numbers).'); return; }
     const existing = await getShopByOwner(conn.user.id);
     if (existing) { err('You already run a shop — one shop per player!'); return; }
-    if (Math.floor(Number(c.money)) < SHOP_CREATE_FEE) {
+    const m10admin = isAdminConn(conn);
+    if (!canAfford(c, SHOP_CREATE_FEE, m10admin)) {
       err(`You need ${naira(SHOP_CREATE_FEE)} to open a shop.`); return;
     }
-    c.money = Math.floor(Number(c.money)) - SHOP_CREATE_FEE;
+    charge(c, SHOP_CREATE_FEE, m10admin);
     const shop = await createShop(conn.user.id, type.id, name, loc.id);
     console.log(`[m10] ${conn.user.username} opened shop ${shop.id} (${type.id})`);
     await commit({
@@ -517,7 +520,8 @@ export const INTENTS = {
     // Synchronous affordability check against the live session character
     // (double-spend safe: no await between check and mutation).
     const total = Math.floor(Number(item.price)) * qty;
-    if (Math.floor(Number(c.money)) < total) {
+    const m10admin = isAdminConn(conn);
+    if (!canAfford(c, total, m10admin)) {
       err(`You need ${naira(total)} for ${qty} × ${item.name}.`); return;
     }
     // Atomic stock take (loses cleanly if another buyer got there first).
@@ -525,7 +529,7 @@ export const INTENTS = {
     if (!took) { err(`Sorry — only ${Number(item.stock)} × ${item.name} left.`); return; }
     const left = await getItem(item.id);
     if (left && Number(left.stock) <= 0) await deleteItem(item.id); // sold-out mechanic
-    c.money = Math.floor(Number(c.money)) - total;
+    charge(c, total, m10admin);
     await commit({
       kind: 'shop_sale', amount: -total,
       meta: { shop: shop.id, item: item.id, name: item.name, qty, unit: Number(item.price) },
@@ -543,6 +547,16 @@ export const INTENTS = {
           try { await api.pushTo(Number(shop.owner_id)); } catch { /* hub handles */ }
         } else {
           queueOwnerRefresh(Number(shop.owner_id));
+        }
+        // M21: money-received notification — a real gameplay-coins P2P
+        // credit (buyer → shop owner). Dormant-ready hook for future P2P
+        // paths: call notifyMoneyReceived at their completion point too.
+        if (api.notifications) {
+          try {
+            await api.notifications.notifyMoneyReceived(Number(shop.owner_id), {
+              amount: total, fromName: conn.user.username, reason: 'shop sale',
+            });
+          } catch (e) { console.error('[notif] money_received:', e.message); }
         }
       }
     } catch (e) { console.error('[m10] owner credit failed:', e.message); }
@@ -605,10 +619,11 @@ export const INTENTS = {
     if (!locTags(c.location_id).includes('housing_office')) {
       err('Go to a Housing Office to buy your rental.'); return;
     }
-    if (Math.floor(Number(c.money)) < buy) {
+    const m10admin = isAdminConn(conn);
+    if (!canAfford(c, buy, m10admin)) {
       err(`You need ${naira(buy)} to buy this place outright.`); return;
     }
-    c.money = Math.floor(Number(c.money)) - buy;
+    charge(c, buy, m10admin);
     c.housing_owned = 1;
     c.rent_misses = 0;
     // Persist the flag directly: saveCharacter()'s column list is
@@ -677,9 +692,12 @@ async function lapoRepay(api, msg, all) {
   if (!loan) { err('You have no LAPO loan.'); return; }
   const want = all ? Number(loan.balance) : Math.floor(Number(msg.amount));
   if (!all && (!Number.isFinite(want) || want <= 0)) { err('Enter a valid amount.'); return; }
-  const pay = Math.min(want, Math.floor(Number(loan.balance)), Math.floor(Number(c.money)));
+  const m10admin = isAdminConn(conn);
+  const pay = m10admin
+    ? Math.min(want, Math.floor(Number(loan.balance))) // M21: admin unlimited — balance capped, wallet untouched
+    : Math.min(want, Math.floor(Number(loan.balance)), Math.floor(Number(c.money)));
   if (pay <= 0) { err("You don't have the cash."); return; }
-  c.money = Math.floor(Number(c.money)) - pay;
+  charge(c, pay, m10admin);
   const balance = Math.floor(Number(loan.balance)) - pay;
   if (balance <= 0) await deleteLapoLoan(loan.id);
   else await updateLapoLoan(loan.id, { balance });
@@ -698,10 +716,12 @@ async function lapoRepay(api, msg, all) {
 // ctx = { send, youSnapshot, getDay } (online) — offline sweep needs no conn.
 
 /** One auto-debit step for a single loan on `day`. Pure-ish: returns the plan. */
-export function planLapoDebit(loan, day, money) {
+export function planLapoDebit(loan, day, money, isAdmin = false) {
   const chk = lapoDueToday(loan, day);
   if (!chk.due) return { due: false };
-  const pay = Math.min(chk.amount, Math.max(0, Math.floor(Number(money) || 0)));
+  // M21: admins always clear the full due amount but are never charged.
+  const pay = isAdmin ? chk.amount
+    : Math.min(chk.amount, Math.max(0, Math.floor(Number(money) || 0)));
   const balance = Math.floor(Number(loan.balance)) - pay;
   const full = pay >= chk.amount;
   return { due: true, pay, balance: Math.max(0, balance), full, closed: balance <= 0 };
@@ -735,13 +755,14 @@ export async function taxWeekInfo(getDay) {
 }
 
 /** Debit one player's weekly income tax for a closed week. Returns the note or null. */
-export async function chargeWeeklyTax(userId, charMoney, info) {
+export async function chargeWeeklyTax(userId, charMoney, info, isAdmin = false) {
   // info = { week, startMs, endMs } from taxWeekInfo when charge:true
   const mult = await getTaxMult();
   const earnings = await sumEarnings(userId, info.startMs, info.endMs);
   const bill = Math.floor(calcIncomeTax(earnings) * mult);
   if (bill <= 0) return { paid: 0, earnings, bill: 0, note: null };
-  const pay = Math.min(bill, Math.max(0, Math.floor(Number(charMoney) || 0)));
+  // M21: admins clear the full bill but are never charged.
+  const pay = isAdmin ? bill : Math.min(bill, Math.max(0, Math.floor(Number(charMoney) || 0)));
   return { paid: pay, earnings, bill, mult, note: `🧾 Weekly income tax: ${naira(pay)} on ${naira(earnings)} earnings.` };
 }
 
@@ -752,11 +773,12 @@ export async function settleOnlinePlayer(ctx, conn) {
   let dirty = false;
   const notes = [];
 
+  const rollAdmin = isAdminConn(conn); // M21: admin unlimited — debits clear, wallet untouched
   const loan = await getLapoLoan(conn.user.id);
   if (loan) {
-    const plan = planLapoDebit(loan, day, c.money);
+    const plan = planLapoDebit(loan, day, c.money, rollAdmin);
     if (plan.due) {
-      c.money = Math.max(0, Math.floor(Number(c.money) || 0)) - plan.pay;
+      if (!rollAdmin) c.money = Math.max(0, Math.floor(Number(c.money) || 0)) - plan.pay;
       if (plan.pay > 0) {
         await addTransaction(conn.user.id, 'lapo_auto', -plan.pay, c.money,
           { balance: plan.balance, weekly_due: Number(loan.weekly_due) });
@@ -771,9 +793,9 @@ export async function settleOnlinePlayer(ctx, conn) {
 
   const tw = await taxWeekInfo(ctx.getDay);
   if (tw.charge) {
-    const t = await chargeWeeklyTax(conn.user.id, c.money, tw);
+    const t = await chargeWeeklyTax(conn.user.id, c.money, tw, rollAdmin);
     if (t.paid > 0) {
-      c.money = Math.max(0, Math.floor(Number(c.money) || 0)) - t.paid;
+      if (!rollAdmin) c.money = Math.max(0, Math.floor(Number(c.money) || 0)) - t.paid;
       await addTransaction(conn.user.id, 'income_tax', -t.paid, c.money,
         { week: tw.week, earnings: t.earnings, bill: t.bill, mult: t.mult });
       dirty = true;
@@ -800,17 +822,26 @@ export async function settleOfflinePlayers(ctx, isOnline) {
   let chars;
   try { chars = await listCharacters(); }
   catch (e) { console.error('[m10] listCharacters:', e.message); return; }
+  // M21: admins are never charged — one batched lookup for the sweep.
+  let adminIds = new Set();
+  try {
+    const rows = await dbAll(
+      `SELECT id FROM users WHERE is_admin=1`,
+      `SELECT id FROM users WHERE is_admin=1`, []);
+    adminIds = new Set(rows.map(r => Number(r.id)));
+  } catch (e) { console.error('[m10] admin lookup:', e.message); }
   const tw = await taxWeekInfo(ctx.getDay);
   for (const ch of chars) {
     const userId = Number(ch.user_id);
     if (isOnline && isOnline(userId)) continue;
+    const offAdmin = adminIds.has(userId); // M21
     let dirty = false;
     try {
       const loan = await getLapoLoan(userId);
       if (loan) {
-        const plan = planLapoDebit(loan, day, ch.money);
+        const plan = planLapoDebit(loan, day, ch.money, offAdmin);
         if (plan.due) {
-          ch.money = Math.max(0, Math.floor(Number(ch.money) || 0)) - plan.pay;
+          if (!offAdmin) ch.money = Math.max(0, Math.floor(Number(ch.money) || 0)) - plan.pay;
           if (plan.pay > 0) {
             await addTransaction(userId, 'lapo_auto', -plan.pay, ch.money,
               { balance: plan.balance, weekly_due: Number(loan.weekly_due) });
@@ -820,9 +851,9 @@ export async function settleOfflinePlayers(ctx, isOnline) {
         }
       }
       if (tw.charge) {
-        const t = await chargeWeeklyTax(userId, ch.money, tw);
+        const t = await chargeWeeklyTax(userId, ch.money, tw, offAdmin);
         if (t.paid > 0) {
-          ch.money = Math.max(0, Math.floor(Number(ch.money) || 0)) - t.paid;
+          if (!offAdmin) ch.money = Math.max(0, Math.floor(Number(ch.money) || 0)) - t.paid;
           await addTransaction(userId, 'income_tax', -t.paid, ch.money,
             { week: tw.week, earnings: t.earnings, bill: t.bill, mult: t.mult });
           dirty = true;

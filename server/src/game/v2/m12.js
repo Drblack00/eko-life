@@ -14,6 +14,8 @@
 // ============================================================
 import { dbRun, dbGet, dbAll } from '../../db.js';
 import { LOCATIONS } from '../data.js';
+// M21: admin unlimited stealth money.
+import { isAdminConn, canAfford, charge } from '../money.js';
 
 // ---------------- 1. Storage ----------------
 export const SCHEMA_SQLITE = `
@@ -475,10 +477,11 @@ export const INTENTS = {
       err(`Catch your breath — train ${def.name} again soon.`); return;
     }
     if (Number(c.energy) < SKILL_TUNING.trainEnergy) { err('Too tired to train. Eat or sleep first.'); return; }
-    if (Number(c.money) < gate.fee) { err(`This session costs ${naira(gate.fee)}.`); return; }
+    const m12admin = isAdminConn(conn);
+    if (!canAfford(c, gate.fee, m12admin)) { err(`This session costs ${naira(gate.fee)}.`); return; }
     conn.cds[cdKey] = now + SKILL_TUNING.trainCooldownSec * 1000;
     c.energy = Number(c.energy) - SKILL_TUNING.trainEnergy;
-    c.money = Number(c.money) - gate.fee;
+    charge(c, gate.fee, m12admin);
     const xp = Math.round(SKILL_TUNING.trainXp * xpBoostMult(c));
     const { leveledUp, level } = addSkillXp(c, skillId, xp);
     await commit({
@@ -538,8 +541,9 @@ export const INTENTS = {
     if (todayCount >= SKILL_TUNING.maxDailyLessons) {
       err('Two lessons a day is the max — your brain needs rest. Come back tomorrow.'); return;
     }
-    if (Number(c.money) < course.feePerLesson) { err(`This lesson costs ${naira(course.feePerLesson)}.`); return; }
-    c.money = Number(c.money) - course.feePerLesson;
+    const m12admin = isAdminConn(conn);
+    if (!canAfford(c, course.feePerLesson, m12admin)) { err(`This lesson costs ${naira(course.feePerLesson)}.`); return; }
+    charge(c, course.feePerLesson, m12admin);
     const xp = Math.round(course.skillBoost.xp * xpBoostMult(c));
     const skillDef = SKILLS.find(s => s.id === course.skillBoost.skill);
     const { leveledUp, level } = addSkillXp(c, course.skillBoost.skill, xp);
