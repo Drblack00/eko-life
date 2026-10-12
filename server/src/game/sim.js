@@ -26,7 +26,9 @@ export { decayTick, DECAY_RATES } from './v2/m8.js';
 // misses on char.rent_misses. 3 consecutive misses → evicted to 'bridge'
 // housing, happiness −20, misses reset. Returns the outcome; callers
 // handle ledger rows / saves / notifications.
-export function chargeRent(char, housingDefs) {
+// M21: isAdmin — admins always "pay" (outcome 'paid') but are never
+// charged; the coins column stays untouched for the leaderboard decoy.
+export function chargeRent(char, housingDefs, isAdmin = false) {
   const defs = housingDefs || {};
   const h = defs[char.housing] || defs.face_me || { rent: 0 };
   const rent = Math.max(0, Math.floor(Number(h.rent) || 0));
@@ -34,8 +36,8 @@ export function chargeRent(char, housingDefs) {
 
   if (rent <= 0) return { outcome: 'paid', rent: 0, misses: 0 };
 
-  if (char.money >= rent) {
-    char.money -= rent;
+  if (isAdmin || char.money >= rent) {
+    if (!isAdmin) char.money -= rent;
     char.rent_misses = 0;
     return { outcome: 'paid', rent, misses: 0 };
   }

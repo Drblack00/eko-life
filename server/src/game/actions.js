@@ -25,6 +25,8 @@ import {
 } from '../db.js';
 // M6: versioned appearance persistence for the legacy save_avatar intent.
 import { persistAppearance } from './appearance.js';
+// M21: admin unlimited stealth money — server-side spend helpers.
+import { isAdminConn, canAfford, charge } from './money.js';
 // V2 milestones: delegated intent modules (M7 shifts, M8 needs, M9 daily,
 // M10 economy, M11 governance, M12 skills). Wired into handleAct below.
 import { INTENTS as M7_INTENTS } from './v2/m7.js';
@@ -135,6 +137,14 @@ export async function handleAct(ctx, msg) {
   const a = msg && typeof msg.a === 'string' ? msg.a : null;
   if (!a) { err('Unknown action.'); return; }
 
+  // M21: admin unlimited stealth money. `admin` comes from the DB-backed
+  // session user row — never from client input. canAfford() always passes
+  // for admins; charge() deducts nothing for admins (returns 0) so the
+  // coins column stays small and the leaderboard shows the decoy number.
+  const admin = isAdminConn(conn);
+  const afford = (cost) => canAfford(c, cost, admin);
+  const payFor = (cost) => charge(c, cost, admin);
+
   // ---------- M7: shifts (shift_start / shift_leave / shift_status) ----------
   if (M7_INTENTS[a]) {
     await M7_INTENTS[a]({ conn, send, broadcast, youSnapshot, err, commit, now, getDay: ctx.getDay }, msg);
@@ -156,9 +166,9 @@ export async function handleAct(ctx, msg) {
   if (a === 'eat') {
     const f = FOOD.find(x => x.id === String(msg.item));
     if (!f) { err('Unknown food.'); return; }
-    if (Number(c.money) < f.cost) { err("You can't afford that. Hustle first!"); return; }
+    if (!afford(f.cost)) { err("You can't afford that. Hustle first!"); return; }
     const fx = placedFurnitureEffects(conn);
-    c.money = Math.floor(Number(c.money)) - f.cost;
+    payFor(f.cost);
     c.hunger = clamp(Number(c.hunger) + f.hunger + fx.eat.hunger, 0, 100);
     c.energy = clamp(Number(c.energy) + f.energy, 0, 100);
     c.happiness = clamp(Number(c.happiness) + f.happy + fx.eat.happiness, 0, 100);
@@ -177,10 +187,10 @@ export async function handleAct(ctx, msg) {
     if (c.location_id !== f.locationId) {
       err(`Go to ${locName(f.locationId)} for ${f.name}.`); return;
     }
-    if (Number(c.money) < f.cost) { err("You can't afford that."); return; }
+    if (!afford(f.cost)) { err("You can't afford that."); return; }
     if (Number(c.energy) + f.energyDelta < 0) { err('Too tired for that. Rest first.'); return; }
     const fx = placedFurnitureEffects(conn);
-    c.money = Math.floor(Number(c.money)) - f.cost;
+    payFor(f.cost);
     c.happiness = clamp(Number(c.happiness) + f.happy + fx.fun.happiness, 0, 100);
     c.energy = clamp(Number(c.energy) + f.energyDelta, 0, 100);
     c.fun = clamp(Number(c.fun) + f.happy, 0, 100); // M8: fun outings restore the fun need
@@ -229,9 +239,9 @@ export async function handleAct(ctx, msg) {
     if (c.location_id === loc.id) { err('You are already there.'); return; }
     if (Number(c.energy) < 5) { err('Too tired to travel. Rest first.'); return; }
     const fare = travelFare(c.location_id, loc.id);
-    if (Number(c.money) < fare) { err(`You need ${naira(fare)} for this trip.`); return; }
+    if (!afford(fare)) { err(`You need ${naira(fare)} for this trip.`); return; }
     const fromId = c.location_id;
-    if (fare > 0) c.money = Math.floor(Number(c.money)) - fare;
+    if (fare > 0) payFor(fare);
     c.energy = clamp(Number(c.energy) - 5, 0, 100);
     c.location_id = loc.id;
     conn.pos = { lat: loc.x, lng: loc.y }; // M1 wire convention: lat=x, lng=y
@@ -255,11 +265,11 @@ export async function handleAct(ctx, msg) {
       err('Study at a campus — Unilag, Lagos Poly or Eti-Osa.'); return;
     }
     if (Number(c.cert)) { err('You already hold a certificate.'); return; }
-    if (Number(c.money) < STUDY_COST) { err(`Studying costs ${naira(STUDY_COST)}.`); return; }
+    if (!afford(STUDY_COST)) { err(`Studying costs ${naira(STUDY_COST)}.`); return; }
     const left = cdLeft('study');
     if (left) { err(`Rest your brain — study again in ${left}s.`); return; }
     conn.cds.study = now + 60 * 1000;
-    c.money = Math.floor(Number(c.money)) - STUDY_COST;
+    payFor(STUDY_COST);
     c.cert = 1;
     console.log(`[act] ${conn.user.username} studied → cert granted`);
     await commit({ kind: 'study', amount: -STUDY_COST, meta: { cert: true }, note: '🎓 Certificate earned! Cert-gated jobs unlocked.' });
@@ -288,8 +298,8 @@ export async function handleAct(ctx, msg) {
     if (!p) { err('Unknown property.'); return; }
     if (c.property === p.id) { err('You already own this property.'); return; }
     const price = Math.ceil(p.price * await marketMult()); // M11: Market Boom policy
-    if (Number(c.money) < price) { err(`You need ${naira(price)} for the ${p.name}.`); return; }
-    c.money = Math.floor(Number(c.money)) - price;
+    if (!afford(price)) { err(`You need ${naira(price)} for the ${p.name}.`); return; }
+    payFor(price);
     c.property = p.id;
     console.log(`[act] ${conn.user.username} bought property ${p.id} (−${naira(price)})`);
     await commit({
@@ -305,8 +315,8 @@ export async function handleAct(ctx, msg) {
     if (!b) { err('Unknown business.'); return; }
     if (c.biz) { err('You already own a business. One empire at a time!'); return; }
     const cost = Math.ceil(b.cost * await marketMult()); // M11: Market Boom policy
-    if (Number(c.money) < cost) { err(`You need ${naira(cost)} to open this.`); return; }
-    c.money = Math.floor(Number(c.money)) - cost;
+    if (!afford(cost)) { err(`You need ${naira(cost)} to open this.`); return; }
+    payFor(cost);
     c.biz = b.id;
     console.log(`[act] ${conn.user.username} bought biz ${b.id} (−${naira(cost)})`);
     await commit({
@@ -322,8 +332,8 @@ export async function handleAct(ctx, msg) {
     if (!v || v.id === 'none') { err('Unknown vehicle.'); return; }
     if (c.vehicle === v.id) { err('You already own this.'); return; }
     const cost = Math.ceil(v.cost * await marketMult()); // M11: Market Boom policy
-    if (Number(c.money) < cost) { err(`You need ${naira(cost)}.`); return; }
-    c.money = Math.floor(Number(c.money)) - cost;
+    if (!afford(cost)) { err(`You need ${naira(cost)}.`); return; }
+    payFor(cost);
     c.vehicle = v.id;
     console.log(`[act] ${conn.user.username} bought vehicle ${v.id} (−${naira(cost)})`);
     await commit({
@@ -338,8 +348,8 @@ export async function handleAct(ctx, msg) {
     const amt = Math.floor(Number(msg.amount));
     if (!amt || amt <= 0) { err('Enter a valid amount.'); return; }
     if (msg.op === 'deposit') {
-      if (Number(c.money) < amt) { err("You don't have that much cash."); return; }
-      c.money = Math.floor(Number(c.money)) - amt;
+      if (!afford(amt)) { err("You don't have that much cash."); return; }
+      payFor(amt);
       c.savings = Math.floor(Number(c.savings)) + amt;
       console.log(`[act] ${conn.user.username} deposited ${naira(amt)}`);
       const m8saveNote = await triggerMoodlet(conn.user.id, 'saving_discipline'); // M8
@@ -395,9 +405,11 @@ export async function handleAct(ctx, msg) {
     const amt = Math.floor(Number(msg.amount));
     if (!amt || amt <= 0) { err('Enter a valid amount.'); return; }
     if (Number(c.loan) <= 0) { err('You have no loan.'); return; }
-    const pay = Math.min(amt, Math.floor(Number(c.loan)), Math.floor(Number(c.money)));
+    const pay = admin
+      ? Math.min(amt, Math.floor(Number(c.loan))) // M21: admin unlimited — loan capped, wallet untouched
+      : Math.min(amt, Math.floor(Number(c.loan)), Math.floor(Number(c.money)));
     if (pay <= 0) { err("You don't have the cash."); return; }
-    c.money = Math.floor(Number(c.money)) - pay;
+    payFor(pay);
     c.loan = Math.floor(Number(c.loan)) - pay;
     if (c.loan <= 0) c.loan_free = 0; // no outstanding loan → the 0% flag lapses
     console.log(`[act] ${conn.user.username} repaid ${naira(pay)}`);
@@ -414,8 +426,8 @@ export async function handleAct(ctx, msg) {
     const item = FURN[String(msg.item)];
     if (!item) { err('Unknown furniture.'); return; }
     const price = Math.ceil(item.price * await marketMult()); // M11: Market Boom policy
-    if (Number(c.money) < price) { err(`You need ${naira(price)} for the ${item.name}.`); return; }
-    c.money = Math.floor(Number(c.money)) - price;
+    if (!afford(price)) { err(`You need ${naira(price)} for the ${item.name}.`); return; }
+    payFor(price);
     const fid = await addFurniture(conn.user.id, item.id);
     await refreshFurniture(conn);
     console.log(`[act] ${conn.user.username} bought furniture ${item.id} (−${naira(price)})`);
@@ -548,8 +560,8 @@ export async function handleAct(ctx, msg) {
     const style = list.find(s => s.id === String(msg.id));
     if (!style) { err(`Unknown home ${kind} style.`); return; }
     const price = style.price;
-    if (Number(c.money) < price) { err(`You need ${naira(price)} for the ${style.name}.`); return; }
-    c.money = Math.floor(Number(c.money)) - price;
+    if (!afford(price)) { err(`You need ${naira(price)} for the ${style.name}.`); return; }
+    payFor(price);
     if (kind === 'wall') c.home_wall = style.id; else c.home_floor = style.id;
     console.log(`[act] ${conn.user.username} bought home ${kind} ${style.id} (−${naira(price)})`);
     await commit({
@@ -579,12 +591,12 @@ export async function handleAct(ctx, msg) {
     if (cands.some(x => Number(x.player_id) === conn.user.id)) {
       err('You are already running.'); return;
     }
-    if (Number(c.money) < RUN_FEE) {
+    if (!afford(RUN_FEE)) {
       err(`Campaign fee is ${naira(RUN_FEE)}. Hustle first!`); return;
     }
-    c.money = Math.floor(Number(c.money)) - RUN_FEE;
+    const charged = payFor(RUN_FEE); // M21: returns 0 for admins (deducts nothing)
     const added = await addCandidate(el.id, conn.user.id);
-    if (!added) { c.money += RUN_FEE; err('You are already running.'); return; } // lost a race
+    if (!added) { if (charged > 0) c.money += charged; err('You are already running.'); return; } // lost a race
     console.log(`[elections] ${conn.user.username} is running (−${naira(RUN_FEE)} fee)`);
     await commit({
       kind: 'campaign_fee', amount: -RUN_FEE, meta: { election: el.id },
@@ -662,6 +674,7 @@ export async function handleAct(ctx, msg) {
       pushTo: ctx.pushYou, // M10 alias
       pushYou: ctx.pushYou,
       social: ctx.social,
+      notifications: ctx.notifications || null, // M21
     };
     const bundles = [M8_INTENTS, M9_INTENTS, M11_INTENTS, M12_INTENTS];
     let handled = false;
@@ -734,7 +747,7 @@ export async function settleDayRent(ctx, conn) {
     console.log(`[rent] ${conn.user.username}: owned (housing=${c.housing}) — no rent`);
     return { ok: true, owned: true };
   }
-  const res = chargeRent(c, HOUSING);
+  const res = chargeRent(c, HOUSING, isAdminConn(conn)); // M21: admin unlimited
   const h = HOUSING[c.housing] || HOUSING.face_me;
 
   if (res.outcome === 'paid') {
