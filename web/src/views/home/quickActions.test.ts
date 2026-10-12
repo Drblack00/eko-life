@@ -34,8 +34,9 @@ function ruleBlock(selector: string): string {
 function sideCardsSrc(): string {
   const start = tsx.indexOf("function SideCards({");
   if (start < 0) throw new Error("SideCards not found in HomeChrome.tsx");
-  // SideCards is followed by a blank line + "function WorkPill(".
-  const end = tsx.indexOf("\nfunction WorkPill(", start);
+  // SideCards is followed by the "Combined overlay root" banner comment and
+  // then "export function HomeOverlays(".
+  const end = tsx.indexOf("\nexport function HomeOverlays(", start);
   if (end < 0) throw new Error("SideCards end not found in HomeChrome.tsx");
   return tsx.slice(start, end);
 }
