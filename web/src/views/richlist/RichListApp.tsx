@@ -161,6 +161,11 @@ export function RichListApp({
                     {isYou ? (
                       <span className="eko-rich__you">you</span>
                     ) : null}
+                    {l.isGovernor ? (
+                      <span className="eko-rich__gov" title="Sitting Governor">
+                        👑
+                      </span>
+                    ) : null}
                   </span>
                   <span className="eko-rich__worth">
                     {formatNaira(l.netWorth)}

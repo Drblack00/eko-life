@@ -134,6 +134,12 @@
   vertical-align: middle;
 }
 
+.eko-rich__gov {
+  margin-left: 6px;
+  font-size: 0.85rem;
+  vertical-align: middle;
+}
+
 .eko-rich__worth {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
