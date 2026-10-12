@@ -6,20 +6,26 @@ import type { AvatarLook } from "../../../game/types";
  * locally inside their own part files rather than editing this file.
  */
 
-/** Full 12-tone skin map (mirrors the server allowlist ids). */
+/** Full 18-tone skin map (mirrors the server allowlist ids). */
 export const SKIN_HEX: Record<string, string> = {
+  onyx: "#291709",
   deep_espresso: "#3b2314",
   dark_cocoa: "#4a2c17",
+  truffle: "#553521",
   burnt_caramel: "#5d3a1f",
   mahogany: "#6f4426",
   walnut: "#7d5330",
+  sienna: "#835c36",
   cocoa: "#8a5f38",
   coffee: "#9a6f45",
+  caramel: "#a37a4e",
   latte: "#ab8054",
   honey: "#bc9066",
   sand: "#cda077",
+  butterscotch: "#d4a878",
   amber: "#dcb07e",
   cream: "#e8cfa3",
+  ivory: "#f2e0bd",
 };
 
 export const HAIR_HEX = "#171110";
