@@ -1004,13 +1004,16 @@
   font-size: 12px;
   opacity: 0.65;
 }
-/* Modern toggle switch: slimmer track, smaller knob, the game's green
-   accent (palm-500, shared with the selected dock tab), spring motion.
+/* Modern toggle switch: iOS-native size (51x31, 27px knob), the game's
+   green accent (palm-500), spring motion. Hard min-size floors so iOS
+   Safari can never squeeze the track into a circle (2026-10-12 bug).
    Markup contract: button[role="switch"][aria-checked] > .eko-switch__knob. */
 .eko-switch {
   flex: none;
-  width: 44px;
-  height: 26px;
+  width: 51px;
+  height: 31px;
+  min-width: 51px;
+  min-height: 31px;
   border-radius: 999px;
   border: none;
   background: rgba(120, 120, 128, 0.32);
@@ -1022,7 +1025,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 4px;
+  padding: 2px;
   transition: background 0.25s cubic-bezier(0.32, 1.2, 0.4, 1);
 }
 .eko-switch--on {
@@ -1030,16 +1033,18 @@
 }
 .eko-switch__knob {
   flex: none;
-  width: 18px;
-  height: 18px;
+  width: 27px;
+  height: 27px;
+  min-width: 27px;
+  min-height: 27px;
   border-radius: 999px;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
   transform: translateX(0);
   transition: transform 0.3s cubic-bezier(0.32, 1.45, 0.4, 1);
 }
 .eko-switch--on .eko-switch__knob {
-  transform: translateX(18px);
+  transform: translateX(20px);
 }
 .eko-switch:focus-visible {
   outline: 2px solid var(--ring);
