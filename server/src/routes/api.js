@@ -39,6 +39,7 @@ import { REST_SPEC as M8_REST, CONFIG_DATA as M8_CONFIG } from '../game/v2/m8.js
 import { REST_SPEC as M9_REST } from '../game/v2/m9.js';
 import { REST_SPEC as M10_REST, CONFIG_DATA as M10_CONFIG } from '../game/v2/m10.js';
 import { CONFIG_DATA as M12_CONFIG } from '../game/v2/m12.js'; // M12 has no REST_SPEC — all WS intents
+import { VENUE_ACTIVITIES } from '../game/v2/venues.js'; // Phase 5: venue activities
 import { REST_SPEC as M13_REST } from '../game/v2/m13.js';
 
 // Mount a v2 module's REST_SPEC on the router. Entries declare
@@ -248,7 +249,23 @@ export function createApiRouter({ hub, getDay }) {
       },
       walls: WALLS,
       floors: FLOORS,
+      // Phase 5: venue activities — flat list; client matches by location tags.
+      venueActivities: VENUE_ACTIVITIES,
     });
+  });
+
+  // ---- Phase 5: live venue presence (public) ----
+  // Returns online player counts keyed by location id, e.g.
+  // { presence: { ojuelegba: 3, tejuosho: 1 } }. Locations with zero
+  // players are omitted; an empty object is always valid.
+  router.get('/venues/presence', (req, res) => {
+    const counts = {};
+    for (const [, conn] of hub.online) {
+      const lid = conn.character?.location_id;
+      if (typeof lid !== 'string' || !lid) continue;
+      counts[lid] = (counts[lid] || 0) + 1;
+    }
+    res.json({ presence: counts });
   });
 
   // ---- V2 REST endpoints (see each module's REST_SPEC) ----
