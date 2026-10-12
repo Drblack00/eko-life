@@ -493,6 +493,8 @@ export interface GameSocket {
   /** Preference toggles (null until loaded). */
   notifPrefs: NotificationPrefs | null;
   updateNotifPrefs: (prefs: Partial<NotificationPrefs>) => void;
+  /** Merge a local patch into the `you` snapshot (e.g. after a profile rename). */
+  patchYou: (patch: Partial<You>) => void;
   /** Load the panel list, then clear the badge (mark all read). */
   openNotifications: () => void;
   markNotificationRead: (id: number) => void;
@@ -1528,6 +1530,9 @@ export function useGameSocket(token: string | null): GameSocket {
     connected: status === "open",
     attempts,
     you,
+    /** Merge a local patch into the `you` snapshot (e.g. after a profile rename). */
+    patchYou: (patch: Partial<You>) =>
+      setYou((prev) => (prev ? { ...prev, ...patch } : prev)),
     players,
     day,
     endsIn,
