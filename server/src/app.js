@@ -24,6 +24,10 @@ import { ensureSchema as m12Schema } from './game/v2/m12.js';
 import { ensureSchema as m13Schema } from './game/v2/m13.js';
 // Fintech foundation (M5/M6a): chart of accounts + fee policy v1 seeding.
 import { ensureChartOfAccounts, ensureFeePolicyV1 } from './fintech/seed.js';
+// Phase 3 (News tab): headline-aggregator refresh job (title + source +
+// link + short snippet only; failures logged and skipped per-feed).
+import { refreshNewsFeeds } from './news.js';
+import { NEWS_CACHE_MS } from './db.js';
 // Fintech cash-wallet routes (Milestones 5-9): every route sits behind
 // requireCashOps, so all return 403 while CASH_OPS_ENABLED is off.
 import { createCashWalletRouter } from './routes/cashWallet.js';
@@ -75,6 +79,22 @@ export async function createApp() {
 
   const hub = createHub({ getDay });
 
+  // Phase 3: news headline cache refresh — every 30 min + once at boot
+  // (fire-and-forget; a dead feed never blocks startup or requests).
+  // triggerNewsRefresh is debounced: overlapping refreshes are skipped.
+  let newsRefreshing = false;
+  const triggerNewsRefresh = () => {
+    if (newsRefreshing) return;
+    newsRefreshing = true;
+    refreshNewsFeeds()
+      .catch((e) => console.error('[news] refresh:', e.message))
+      .finally(() => { newsRefreshing = false; });
+  };
+  hub.triggerNewsRefresh = triggerNewsRefresh;
+  const newsTimer = setInterval(triggerNewsRefresh, NEWS_CACHE_MS);
+  if (newsTimer.unref) newsTimer.unref();
+  triggerNewsRefresh();
+
   // M5: seed rooms, ensure an election cycle, restore the governor —
   // before any WS client connects.
   await hub.bootGame();
@@ -91,7 +111,6 @@ export async function createApp() {
 
   // ---- API ----
   app.use('/api', createApiRouter({ hub, getDay }));
-
   // ---- Cash wallet (fintech): inert 403s while CASH_OPS_ENABLED is off ----
   app.use('/api/cash-wallet', createCashWalletRouter());
   app.use('/api/cash-wallet', createCashFlowsRouter());
@@ -188,6 +207,7 @@ export async function createApp() {
     clearInterval(spawns);
     clearInterval(clock);
     clearInterval(v2tick);
+    clearInterval(newsTimer);
     await new Promise((resolve) => server.close(resolve));
   }
 

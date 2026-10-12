@@ -201,6 +201,51 @@ CREATE TABLE IF NOT EXISTS reports (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports(reported_id);
+-- Phase 3 (Gist social feed): short public posts, likes, comments, reports.
+CREATE TABLE IF NOT EXISTS gists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gists_user ON gists(user_id);
+CREATE INDEX IF NOT EXISTS idx_gists_created ON gists(created_at DESC);
+CREATE TABLE IF NOT EXISTS gist_likes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  gist_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  UNIQUE (gist_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_gist_likes_gist ON gist_likes(gist_id);
+CREATE TABLE IF NOT EXISTS gist_comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  gist_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gist_comments_gist ON gist_comments(gist_id);
+CREATE TABLE IF NOT EXISTS gist_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  gist_id INTEGER NOT NULL,
+  reporter_id INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gist_reports_gist ON gist_reports(gist_id);
+-- Phase 3 (News tab): headline-aggregator cache; dedupe by link.
+CREATE TABLE IF NOT EXISTS news_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source TEXT NOT NULL,
+  title TEXT NOT NULL,
+  link TEXT NOT NULL UNIQUE,
+  snippet TEXT NOT NULL DEFAULT '',
+  published_at INTEGER,
+  fetched_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_news_items_fetched ON news_items(fetched_at DESC);
 -- ============================================================
 -- FINTECH FOUNDATION (Worker A) — real-money cash ledger.
 -- ADDITIVE ONLY: no existing game table, game code, or the
@@ -563,6 +608,51 @@ CREATE TABLE IF NOT EXISTS reports (
   created_at BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports(reported_id);
+-- Phase 3 (Gist social feed): short public posts, likes, comments, reports.
+CREATE TABLE IF NOT EXISTS gists (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gists_user ON gists(user_id);
+CREATE INDEX IF NOT EXISTS idx_gists_created ON gists(created_at DESC);
+CREATE TABLE IF NOT EXISTS gist_likes (
+  id SERIAL PRIMARY KEY,
+  gist_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at BIGINT NOT NULL,
+  UNIQUE (gist_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_gist_likes_gist ON gist_likes(gist_id);
+CREATE TABLE IF NOT EXISTS gist_comments (
+  id SERIAL PRIMARY KEY,
+  gist_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gist_comments_gist ON gist_comments(gist_id);
+CREATE TABLE IF NOT EXISTS gist_reports (
+  id SERIAL PRIMARY KEY,
+  gist_id INTEGER NOT NULL,
+  reporter_id INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',
+  created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gist_reports_gist ON gist_reports(gist_id);
+-- Phase 3 (News tab): headline-aggregator cache; dedupe by link.
+CREATE TABLE IF NOT EXISTS news_items (
+  id SERIAL PRIMARY KEY,
+  source TEXT NOT NULL,
+  title TEXT NOT NULL,
+  link TEXT NOT NULL UNIQUE,
+  snippet TEXT NOT NULL DEFAULT '',
+  published_at BIGINT,
+  fetched_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_news_items_fetched ON news_items(fetched_at DESC);
 -- ============================================================
 -- FINTECH FOUNDATION (Worker A) — real-money cash ledger.
 -- ADDITIVE ONLY: no existing game table, game code, or the
@@ -1802,6 +1892,418 @@ export async function listReports(limit = 50) {
     reported_id: Number(r.reported_id), reported: r.reported,
     reason: r.reason, status: r.status, created_at: Number(r.created_at),
   }));
+}
+
+// ============================================================
+// Phase 3 — Gist social feed + News aggregator (original social layer).
+// Gist text is stored plain; sanitization happens in routes/gists.js.
+// ============================================================
+export const GIST_MAX = 280;
+export const NEWS_CACHE_MS = 30 * 60 * 1000;
+export const NEWS_PAGE = 20;
+
+/**
+ * Author badge tiers (original names — not copied from any reference).
+ * Tycoon tier overrides on net worth; the rest are account-age tiers.
+ */
+export function gistBadge(accountCreatedAt, netWorth) {
+  const ageDays = (Date.now() - Number(accountCreatedAt || Date.now())) / 86400000;
+  if (Number(netWorth) >= 1000000) return 'Odogwu';
+  if (ageDays >= 90) return 'Legend';
+  if (ageDays >= 30) return 'Veteran';
+  if (ageDays >= 7) return 'Hustler';
+  return 'New Kid';
+}
+
+/** Author profile for gist attribution (avatar/color/net worth/badge). */
+export async function getGistAuthor(userId) {
+  const r = await getOne(
+    `SELECT u.id, u.username, u.created_at AS account_created,
+            c.avatar, c.color, COALESCE(c.money,0) AS money, COALESCE(c.savings,0) AS savings
+     FROM users u LEFT JOIN characters c ON c.user_id = u.id WHERE u.id = ?`,
+    `SELECT u.id, u.username, u.created_at AS account_created,
+            c.avatar, c.color, COALESCE(c.money,0) AS money, COALESCE(c.savings,0) AS savings
+     FROM users u LEFT JOIN characters c ON c.user_id = u.id WHERE u.id = $1`,
+    [Number(userId)]);
+  if (!r) return null;
+  return {
+    user_id: Number(r.id),
+    username: r.username,
+    avatar: r.avatar || '🧑',
+    color: r.color || '#22d3ee',
+    badge: gistBadge(r.account_created, Number(r.money) + Number(r.savings)),
+  };
+}
+
+function shapeGist(row, viewerId) {
+  return {
+    id: Number(row.id),
+    user_id: Number(row.user_id),
+    username: row.username,
+    avatar: row.avatar || '🧑',
+    color: row.color || '#22d3ee',
+    badge: row.badge || 'New Kid',
+    text: row.text,
+    created_at: Number(row.created_at),
+    like_count: Number(row.like_count || 0),
+    comment_count: Number(row.comment_count || 0),
+    liked: !!Number(row.liked || 0),
+    mine: Number(row.user_id) === Number(viewerId),
+  };
+}
+
+// Shared FROM/JOIN: gists + author + like/comment counts + viewer's like flag.
+const GIST_SELECT_SQLITE = `
+  SELECT g.id, g.user_id, g.text, g.created_at,
+         u.username, u.created_at AS account_created,
+         c.avatar, c.color,
+         COALESCE(c.money,0)+COALESCE(c.savings,0) AS net_worth,
+         (SELECT COUNT(*) FROM gist_likes l WHERE l.gist_id = g.id) AS like_count,
+         (SELECT COUNT(*) FROM gist_comments m WHERE m.gist_id = g.id) AS comment_count,
+         EXISTS(SELECT 1 FROM gist_likes l2 WHERE l2.gist_id = g.id AND l2.user_id = ?) AS liked
+  FROM gists g
+  JOIN users u ON u.id = g.user_id
+  LEFT JOIN characters c ON c.user_id = u.id`;
+const GIST_SELECT_PG = `
+  SELECT g.id, g.user_id, g.text, g.created_at,
+         u.username, u.created_at AS account_created,
+         c.avatar, c.color,
+         COALESCE(c.money,0)+COALESCE(c.savings,0) AS net_worth,
+         (SELECT COUNT(*) FROM gist_likes l WHERE l.gist_id = g.id) AS like_count,
+         (SELECT COUNT(*) FROM gist_comments m WHERE m.gist_id = g.id) AS comment_count,
+         EXISTS(SELECT 1 FROM gist_likes l2 WHERE l2.gist_id = g.id AND l2.user_id = $1) AS liked
+  FROM gists g
+  JOIN users u ON u.id = g.user_id
+  LEFT JOIN characters c ON c.user_id = u.id`;
+
+/**
+ * Cursor-paginated gist feed.
+ * tabs: latest | trending | following | me.
+ * Cursor: last seen gist id for latest/me/following; "likes:id" for trending.
+ * Returns { gists, next_cursor } — next_cursor null when the page is full-short.
+ */
+export async function listGists({ viewerId, tab = 'latest', cursor = null, limit = 15 }) {
+  const lim = Math.max(1, Math.min(50, Math.floor(Number(limit) || 15)));
+  const v = Number(viewerId);
+  const t = ['latest', 'trending', 'following', 'me'].includes(tab) ? tab : 'latest';
+
+  // Condition list in dialect-neutral form: each entry is
+  // { s: <sqlite fragment with ?>, p: <pg fragment with @n>, vals: [...] }.
+  // params[0] is always the viewer id (liked-flag EXISTS in the SELECT).
+  const conds = [];
+  const LIKE_COUNT = '(SELECT COUNT(*) FROM gist_likes l WHERE l.gist_id = g.id)';
+
+  if (t === 'me') {
+    conds.push({ s: 'g.user_id = ?', p: 'g.user_id = @1', vals: [v] });
+  } else if (t === 'following') {
+    conds.push({
+      s: `g.user_id IN (
+        SELECT CASE WHEN requester_id = ? THEN addressee_id ELSE requester_id END
+        FROM friendships WHERE status = 'accepted' AND (requester_id = ? OR addressee_id = ?))`,
+      p: `g.user_id IN (
+        SELECT CASE WHEN requester_id = @1 THEN addressee_id ELSE requester_id END
+        FROM friendships WHERE status = 'accepted' AND (requester_id = @2 OR addressee_id = @3))`,
+      vals: [v, v, v],
+    });
+  }
+
+  let orderS, orderP, cursorKey;
+  if (t === 'trending') {
+    conds.push({ s: 'g.created_at >= ?', p: 'g.created_at >= @1', vals: [Date.now() - 7 * 86400000] });
+    let likesCursor = null, idCursor = null;
+    if (cursor) {
+      const m = /^(\d+):(\d+)$/.exec(String(cursor));
+      if (m) { likesCursor = Number(m[1]); idCursor = Number(m[2]); }
+    }
+    if (likesCursor != null) {
+      conds.push({
+        s: `(${LIKE_COUNT} < ? OR (${LIKE_COUNT} = ? AND g.id < ?))`,
+        p: `(${LIKE_COUNT} < @1 OR (${LIKE_COUNT} = @2 AND g.id < @3))`,
+        vals: [likesCursor, likesCursor, idCursor],
+      });
+    }
+    orderS = 'ORDER BY like_count DESC, g.id DESC';
+    orderP = 'ORDER BY like_count DESC, g.id DESC';
+    cursorKey = 'likes';
+  } else {
+    const idCursor = cursor ? Number(cursor) : null;
+    if (idCursor) conds.push({ s: 'g.id < ?', p: 'g.id < @1', vals: [idCursor] });
+    orderS = 'ORDER BY g.id DESC';
+    orderP = 'ORDER BY g.id DESC';
+    cursorKey = 'id';
+  }
+
+  // Compile: sqlite keeps '?'; pg renumbers @1..@n across all fragments.
+  const vals = [v];
+  const fragS = [], fragP = [];
+  for (const c of conds) {
+    fragS.push(`(${c.s})`);
+    let n = vals.length;
+    fragP.push('(' + c.p.replace(/@(\\d+)/g, () => '$' + (++n)) + ')');
+    vals.push(...c.vals);
+  }
+  const whereS = fragS.length ? 'WHERE ' + fragS.join(' AND ') : '';
+  const whereP = fragP.length ? 'WHERE ' + fragP.join(' AND ') : '';
+  const allVals = [...vals, lim + 1];
+  const limitP = '$' + allVals.length;
+
+  const rows = await getAll(
+    `${GIST_SELECT_SQLITE} ${whereS} ${orderS} LIMIT ?`,
+    `${GIST_SELECT_PG} ${whereP} ${orderP} LIMIT ${limitP}`,
+    allVals);
+  const page = rows.slice(0, lim);
+  const last = page[page.length - 1];
+  const next_cursor = rows.length > lim && last
+    ? (cursorKey === 'likes' ? `${Number(last.like_count)}:${Number(last.id)}` : String(Number(last.id)))
+    : null;
+  return {
+    gists: page.map(r => ({ ...shapeGist(r, v), badge: gistBadge(r.account_created, r.net_worth) })),
+    next_cursor,
+  };
+}
+
+export async function createGist(userId, text) {
+  const now = Date.now();
+  let id;
+  if (pool) {
+    const r = await pool.query(
+      'INSERT INTO gists (user_id, text, created_at) VALUES ($1,$2,$3) RETURNING id',
+      [Number(userId), String(text), now]);
+    id = Number(r.rows[0].id);
+  } else {
+    const r = sdb.prepare('INSERT INTO gists (user_id, text, created_at) VALUES (?,?,?)')
+      .run(Number(userId), String(text), now);
+    id = Number(r.lastInsertRowid);
+  }
+  const author = await getGistAuthor(userId);
+  return {
+    id,
+    user_id: Number(userId),
+    username: author ? author.username : '',
+    avatar: author ? author.avatar : '🧑',
+    color: author ? author.color : '#22d3ee',
+    badge: author ? author.badge : 'New Kid',
+    text: String(text),
+    created_at: now,
+    like_count: 0,
+    comment_count: 0,
+    liked: false,
+    mine: true,
+  };
+}
+
+export async function getGist(id) {
+  return getOne(
+    'SELECT id, user_id, text, created_at FROM gists WHERE id = ?',
+    'SELECT id, user_id, text, created_at FROM gists WHERE id = $1',
+    [Number(id)]);
+}
+
+export async function deleteGist(id) {
+  await runQ('DELETE FROM gist_likes WHERE gist_id = ?', 'DELETE FROM gist_likes WHERE gist_id = $1', [Number(id)]);
+  await runQ('DELETE FROM gist_comments WHERE gist_id = ?', 'DELETE FROM gist_comments WHERE gist_id = $1', [Number(id)]);
+  await runQ('DELETE FROM gist_reports WHERE gist_id = ?', 'DELETE FROM gist_reports WHERE gist_id = $1', [Number(id)]);
+  await runQ('DELETE FROM gists WHERE id = ?', 'DELETE FROM gists WHERE id = $1', [Number(id)]);
+}
+
+export async function likeGist(gistId, userId) {
+  const now = Date.now();
+  await runQ(
+    'INSERT OR IGNORE INTO gist_likes (gist_id, user_id, created_at) VALUES (?,?,?)',
+    `INSERT INTO gist_likes (gist_id, user_id, created_at) VALUES ($1,$2,$3)
+     ON CONFLICT (gist_id, user_id) DO NOTHING`,
+    [Number(gistId), Number(userId), now]);
+}
+
+export async function unlikeGist(gistId, userId) {
+  await runQ(
+    'DELETE FROM gist_likes WHERE gist_id = ? AND user_id = ?',
+    'DELETE FROM gist_likes WHERE gist_id = $1 AND user_id = $2',
+    [Number(gistId), Number(userId)]);
+}
+
+export async function likeCount(gistId) {
+  const r = await getOne(
+    'SELECT COUNT(*) AS n FROM gist_likes WHERE gist_id = ?',
+    'SELECT COUNT(*) AS n FROM gist_likes WHERE gist_id = $1',
+    [Number(gistId)]);
+  return Number(r && r.n ? r.n : 0);
+}
+
+export async function addGistComment(gistId, userId, text) {
+  const now = Date.now();
+  let id;
+  if (pool) {
+    const r = await pool.query(
+      'INSERT INTO gist_comments (gist_id, user_id, text, created_at) VALUES ($1,$2,$3,$4) RETURNING id',
+      [Number(gistId), Number(userId), String(text), now]);
+    id = Number(r.rows[0].id);
+  } else {
+    const r = sdb.prepare('INSERT INTO gist_comments (gist_id, user_id, text, created_at) VALUES (?,?,?,?)')
+      .run(Number(gistId), Number(userId), String(text), now);
+    id = Number(r.lastInsertRowid);
+  }
+  const author = await getGistAuthor(userId);
+  return {
+    id,
+    gist_id: Number(gistId),
+    user_id: Number(userId),
+    username: author ? author.username : '',
+    avatar: author ? author.avatar : '🧑',
+    color: author ? author.color : '#22d3ee',
+    badge: author ? author.badge : 'New Kid',
+    text: String(text),
+    created_at: now,
+  };
+}
+
+/** Oldest-first comments; cursor = last seen comment id. */
+export async function listGistComments(gistId, cursor = null, limit = 20) {
+  const lim = Math.max(1, Math.min(50, Math.floor(Number(limit) || 20)));
+  const idCursor = cursor ? Number(cursor) : null;
+  const rows = await getAll(
+    `SELECT m.id, m.gist_id, m.user_id, m.text, m.created_at,
+            u.username, u.created_at AS account_created, c.avatar, c.color,
+            COALESCE(c.money,0)+COALESCE(c.savings,0) AS net_worth
+     FROM gist_comments m JOIN users u ON u.id = m.user_id
+     LEFT JOIN characters c ON c.user_id = u.id
+     WHERE m.gist_id = ?${idCursor ? ' AND m.id > ?' : ''}
+     ORDER BY m.id ASC LIMIT ?`,
+    `SELECT m.id, m.gist_id, m.user_id, m.text, m.created_at,
+            u.username, u.created_at AS account_created, c.avatar, c.color,
+            COALESCE(c.money,0)+COALESCE(c.savings,0) AS net_worth
+     FROM gist_comments m JOIN users u ON u.id = m.user_id
+     LEFT JOIN characters c ON c.user_id = u.id
+     WHERE m.gist_id = $1${idCursor ? ' AND m.id > $2' : ''}
+     ORDER BY m.id ASC LIMIT $${idCursor ? 3 : 2}`,
+    idCursor ? [Number(gistId), idCursor, lim + 1] : [Number(gistId), lim + 1]);
+  const page = rows.slice(0, lim);
+  const last = page[page.length - 1];
+  return {
+    comments: page.map(r => ({
+      id: Number(r.id),
+      gist_id: Number(r.gist_id),
+      user_id: Number(r.user_id),
+      username: r.username,
+      avatar: r.avatar || '🧑',
+      color: r.color || '#22d3ee',
+      badge: gistBadge(r.account_created, r.net_worth),
+      text: r.text,
+      created_at: Number(r.created_at),
+    })),
+    next_cursor: rows.length > lim && last ? String(Number(last.id)) : null,
+  };
+}
+
+export async function addGistReport(gistId, reporterId, reason) {
+  const now = Date.now();
+  if (pool) {
+    const r = await pool.query(
+      `INSERT INTO gist_reports (gist_id, reporter_id, reason, status, created_at)
+       VALUES ($1,$2,$3,'open',$4) RETURNING id`,
+      [Number(gistId), Number(reporterId), String(reason).slice(0, 200), now]);
+    return Number(r.rows[0].id);
+  }
+  const r = sdb.prepare(
+    `INSERT INTO gist_reports (gist_id, reporter_id, reason, status, created_at)
+     VALUES (?,?,?,?,?)`)
+    .run(Number(gistId), Number(reporterId), String(reason).slice(0, 200), 'open', now);
+  return Number(r.lastInsertRowid);
+}
+
+export async function listGistReports(limit = 50) {
+  const lim = Math.max(1, Math.min(200, Math.floor(Number(limit) || 50)));
+  const rows = await getAll(
+    `SELECT r.id, r.gist_id, g.text AS gist_text, r.reporter_id, ru.username AS reporter,
+            r.reason, r.status, r.created_at
+     FROM gist_reports r JOIN users ru ON ru.id = r.reporter_id
+     LEFT JOIN gists g ON g.id = r.gist_id
+     ORDER BY r.id DESC LIMIT ?`,
+    `SELECT r.id, r.gist_id, g.text AS gist_text, r.reporter_id, ru.username AS reporter,
+            r.reason, r.status, r.created_at
+     FROM gist_reports r JOIN users ru ON ru.id = r.reporter_id
+     LEFT JOIN gists g ON g.id = r.gist_id
+     ORDER BY r.id DESC LIMIT $1`,
+    [lim]);
+  return rows.map(r => ({
+    id: Number(r.id),
+    gist_id: Number(r.gist_id),
+    gist_text: r.gist_text || null,
+    reporter_id: Number(r.reporter_id),
+    reporter: r.reporter,
+    reason: r.reason,
+    status: r.status,
+    created_at: Number(r.created_at),
+  }));
+}
+
+// ============================================================
+// Phase 3 — News aggregator cache (headline aggregator hygiene:
+// title + source + link + short snippet only, never article bodies).
+// ============================================================
+export async function upsertNewsItem({ source, title, link, snippet = '', published_at = null }) {
+  const now = Date.now();
+  const snip = String(snippet || '').slice(0, 160);
+  const pub = published_at == null ? null : Number(published_at);
+  await runQ(
+    `INSERT INTO news_items (source, title, link, snippet, published_at, fetched_at)
+     VALUES (?,?,?,?,?,?)
+     ON CONFLICT(link) DO UPDATE SET fetched_at = excluded.fetched_at`,
+    `INSERT INTO news_items (source, title, link, snippet, published_at, fetched_at)
+     VALUES ($1,$2,$3,$4,$5,$6)
+     ON CONFLICT(link) DO UPDATE SET fetched_at = excluded.fetched_at`,
+    [String(source), String(title).slice(0, 300), String(link), snip, pub, now]);
+}
+
+export async function pruneNewsItems(maxAgeMs = 48 * 3600 * 1000) {
+  await runQ(
+    'DELETE FROM news_items WHERE fetched_at < ?',
+    'DELETE FROM news_items WHERE fetched_at < $1',
+    [Date.now() - maxAgeMs]);
+}
+
+/** Newest-first; cursor = "publishedAt:id". */
+export async function listNewsItems(cursor = null, limit = NEWS_PAGE) {
+  const lim = Math.max(1, Math.min(50, Math.floor(Number(limit) || NEWS_PAGE)));
+  let pubCursor = null, idCursor = null;
+  if (cursor) {
+    const m = /^(-?\d+):(\d+)$/.exec(String(cursor));
+    if (m) { pubCursor = Number(m[1]); idCursor = Number(m[2]); }
+  }
+  const andS = pubCursor == null ? '' : ' AND (COALESCE(published_at, 0) < ? OR (COALESCE(published_at, 0) = ? AND id < ?))';
+  const andP = pubCursor == null ? '' : ' AND (COALESCE(published_at, 0) < $1 OR (COALESCE(published_at, 0) = $1 AND id < $2))';
+  const rows = await getAll(
+    `SELECT id, source, title, link, snippet, published_at, fetched_at
+     FROM news_items WHERE 1=1${andS}
+     ORDER BY COALESCE(published_at, 0) DESC, id DESC LIMIT ?`,
+    `SELECT id, source, title, link, snippet, published_at, fetched_at
+     FROM news_items WHERE 1=1${andP}
+     ORDER BY COALESCE(published_at, 0) DESC, id DESC LIMIT $${pubCursor == null ? 1 : 3}`,
+    pubCursor == null ? [lim + 1] : [pubCursor, pubCursor, idCursor, lim + 1]);
+  const page = rows.slice(0, lim);
+  const last = page[page.length - 1];
+  return {
+    items: page.map(r => ({
+      id: Number(r.id),
+      source: r.source,
+      title: r.title,
+      link: r.link,
+      snippet: r.snippet || '',
+      published_at: r.published_at == null ? null : Number(r.published_at),
+      fetched_at: Number(r.fetched_at),
+    })),
+    next_cursor: rows.length > lim && last
+      ? `${Number(last.published_at) || 0}:${Number(last.id)}` : null,
+  };
+}
+
+/** ms since the cache was last refreshed (Infinity when empty). */
+export async function newsCacheAgeMs() {
+  const r = await getOne(
+    'SELECT MAX(fetched_at) AS m FROM news_items',
+    'SELECT MAX(fetched_at) AS m FROM news_items', []);
+  const m = r && r.m != null ? Number(r.m) : null;
+  return m == null ? Infinity : Date.now() - m;
 }
 
 // ============================================================
