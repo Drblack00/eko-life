@@ -72,11 +72,10 @@ import {
   HomeOverlays,
   ShortcutsDialog,
   TopUpDialog,
-  useVisits,
 } from "./home/HomeChrome";
 import "./home/HomeChrome.css";
-import { compactNum, moodFor } from "./home/homeChrome";
-import { blip, isSoundEnabled, setSoundEnabled, SOUND_EVENT } from "../lib/sound";
+import { moodFor } from "./home/homeChrome";
+import { blip } from "../lib/sound";
 // Phase 5: venue dialogs with activities ("things to do").
 import { ThingsToDoDialog, VenueExtras } from "./VenuePanel";
 import "./VenuePanel.css";
@@ -96,8 +95,8 @@ import { SkillsPanel, AcademyView } from "./v2/m12";
 import "./v2/m12/m12.css";
 
 /**
- * HUD: top status pill (avatar · live clock · mood · visits/online ·
- * sound toggle · wallet + top-up · notification bell · governor) plus
+ * HUD: top status pill (avatar · name · live clock · mood · online) plus
+ * floating action orbs (wallet + top-up · notification bell · governor),
  * the needs bars and connection/offline state.
  */
 function Hud({
@@ -129,22 +128,8 @@ function Hud({
   onRetry: () => void;
   onTopUp: () => void;
 }) {
-  const visits = useVisits();
-  const [soundOn, setSoundOn] = useState(isSoundEnabled());
-  useEffect(() => {
-    const onSound = (e: Event) =>
-      setSoundOn((e as CustomEvent<boolean>).detail !== false);
-    window.addEventListener(SOUND_EVENT, onSound);
-    return () => window.removeEventListener(SOUND_EVENT, onSound);
-  }, []);
   const mood = moodFor(you.happiness);
   const balance = you.is_admin ? "∞ Unlimited" : naira(you.money);
-  const toggleSound = () => {
-    const next = !soundOn;
-    setSoundEnabled(next);
-    setSoundOn(next);
-    if (next) blip("tap");
-  };
   return (
     <header className="eko-hud">
       <div className="eko-hud__pills">
@@ -159,42 +144,34 @@ function Hud({
         >
           {you.avatar}
         </button>
-        <strong className="eko-top-pill__name">{you.name}</strong>
-        <span className="eko-top-pill__sep" aria-hidden="true" />
-        <Clock />
-        <span
-          className="eko-top-pill__mood"
-          title={`Happiness ${Math.round(you.happiness)}`}
-        >
-          <span aria-hidden="true">{mood.emoji}</span>{" "}
-          <span className="eko-top-pill__mood-text">{mood.label}</span>
-        </span>
-        <span
-          className="eko-top-pill__online"
-          title="City visits · players online"
-        >
-          {visits !== null ? `${compactNum(visits)} · ` : ""}
-          {online} online
+        <span className="eko-top-pill__stack">
+          <strong className="eko-top-pill__name">{you.name}</strong>
+          <span className="eko-top-pill__meta">
+            <Clock />
+            <span
+              className="eko-top-pill__mood"
+              title={`Happiness ${Math.round(you.happiness)}`}
+            >
+              <span aria-hidden="true">{mood.emoji}</span>{" "}
+              <span className="eko-top-pill__mood-text">{mood.label} · </span>
+            </span>
+            <span
+              className="eko-top-pill__online"
+              title="Players online"
+            >
+              {online} online
+            </span>
+          </span>
         </span>
       </div>
-      <div className="eko-top-pill eko-top-pill--actions glass" aria-label="Quick actions">
-        <button
-          type="button"
-          className="eko-top-pill__iconbtn"
-          onClick={toggleSound}
-          aria-pressed={soundOn}
-          title={soundOn ? "Mute sounds" : "Unmute sounds"}
-          aria-label={soundOn ? "Mute sounds" : "Unmute sounds"}
-        >
-          {soundOn ? "🔊" : "🔇"}
-        </button>
+      <div className="eko-hud__orbs" aria-label="Quick actions">
         <span
-          className="eko-top-pill__wallet"
+          className="eko-orb eko-orb--wallet glass"
           aria-label={
             you.is_admin ? "Unlimited admin balance" : `Balance ${naira(you.money)}`
           }
         >
-          <span className="eko-top-pill__wallet-text">{balance}</span>
+          <span className="eko-orb__wallet-text">{balance}</span>
           <button
             type="button"
             className="eko-top-pill__topup"
@@ -208,25 +185,18 @@ function Hud({
             +
           </button>
         </span>
-        <NotificationBell unread={unreadNotifications} onOpen={onOpenNotifications} />
+        <span className="eko-orb glass">
+          <NotificationBell unread={unreadNotifications} onOpen={onOpenNotifications} />
+        </span>
         <button
           type="button"
-          className="eko-hud__gov"
+          className="eko-orb eko-orb--gov glass"
           onClick={onGovOpen}
           aria-haspopup="dialog"
+          aria-label={governorName ? `State House — governor @${governorName}` : "State House — elections"}
           title={governorName ? `State House — governor @${governorName}` : "State House — elections"}
         >
-          {governorName ? (
-            <>
-              <span aria-hidden="true">👑</span>
-              <span className="eko-hud__gov-text"> @{governorName}</span>
-            </>
-          ) : (
-            <>
-              <span aria-hidden="true">🏛️</span>
-              <span className="eko-hud__gov-text"> No governor</span>
-            </>
-          )}
+          <span aria-hidden="true">{governorName ? "👑" : "🏛️"}</span>
         </button>
       </div>
       </div>
