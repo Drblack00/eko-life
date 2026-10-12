@@ -19,7 +19,15 @@ import {
  * scaling it ±1.6% on x/z (see avatarModel.ts).
  */
 
-export type OutfitId = "casual" | "hoodie" | "office" | "chill" | "sitework";
+export type OutfitId =
+  | "casual"
+  | "hoodie"
+  | "office"
+  | "chill"
+  | "sitework"
+  | "gym"
+  | "agbada"
+  | "owambe";
 
 export interface GarmentCtx {
   outfit: OutfitId;
@@ -240,13 +248,132 @@ function stitchStrip(
 /* Footwear: sneakers / office oxfords / sitework boots               */
 /* ------------------------------------------------------------------ */
 
+/** M8: leather sandals — flat sole, thong + ankle straps. */
+function buildSandal(
+  T: typeof import("three"),
+  _mats: AvatarMaterials,
+  gm: GarmentMats
+): THREE.Group {
+  const g = new T.Group();
+  const leather = new T.MeshStandardMaterial({
+    color: "#5b3a21",
+    roughness: 0.7,
+    metalness: 0.05,
+  });
+  // Flat sole.
+  g.add(
+    mesh(T, new T.BoxGeometry(0.105, 0.022, 0.27), gm.sole, 0, -0.734, 0.035)
+  );
+  // Footbed.
+  g.add(
+    mesh(T, new T.BoxGeometry(0.095, 0.012, 0.25), leather, 0, -0.717, 0.035)
+  );
+  // Thong: toe post + two straps to the sides.
+  g.add(
+    mesh(T, new T.CylinderGeometry(0.006, 0.006, 0.05, 6), leather, 0, -0.69, 0.13)
+  );
+  for (const sx of [-1, 1]) {
+    const strap = mesh(
+      T,
+      new T.BoxGeometry(0.055, 0.008, 0.014),
+      leather,
+      sx * 0.028,
+      -0.678,
+      0.115
+    );
+    strap.rotation.z = sx * 0.5;
+    strap.rotation.y = sx * -0.25;
+    g.add(strap);
+    // Ankle strap.
+    const ankle = mesh(
+      T,
+      new T.TorusGeometry(0.048, 0.006, 6, 18, Math.PI * 1.2),
+      leather,
+      0,
+      -0.66,
+      -0.02
+    );
+    ankle.rotation.x = Math.PI / 2;
+    ankle.rotation.z = Math.PI * 0.9 + (sx > 0 ? 0 : Math.PI);
+    if (sx < 0) g.add(ankle);
+  }
+  return g;
+}
+
+/** M8: block heels — raised heel, platform sole, ankle strap. */
+function buildHeel(
+  T: typeof import("three"),
+  _mats: AvatarMaterials,
+  gm: GarmentMats
+): THREE.Group {
+  const g = new T.Group();
+  const upperMat = new T.MeshStandardMaterial({
+    color: "#7c2d12",
+    roughness: 0.5,
+    metalness: 0.08,
+  });
+  // Platform sole sloping up to the heel.
+  const sole = mesh(
+    T,
+    new T.BoxGeometry(0.095, 0.02, 0.24),
+    gm.sole,
+    0,
+    -0.72,
+    0.03
+  );
+  sole.rotation.x = 0.1;
+  g.add(sole);
+  // Block heel.
+  g.add(
+    mesh(T, new T.BoxGeometry(0.055, 0.09, 0.06), upperMat, 0, -0.70, -0.075)
+  );
+  // Toe strap.
+  const toe = mesh(
+    T,
+    new T.BoxGeometry(0.085, 0.014, 0.05),
+    upperMat,
+    0,
+    -0.685,
+    0.1
+  );
+  toe.rotation.x = 0.1;
+  g.add(toe);
+  // Ankle strap.
+  const strap = mesh(
+    T,
+    new T.TorusGeometry(0.047, 0.006, 6, 18, Math.PI * 1.3),
+    upperMat,
+    0,
+    -0.63,
+    -0.015
+  );
+  strap.rotation.x = Math.PI / 2;
+  strap.rotation.z = Math.PI * 0.85;
+  g.add(strap);
+  // Foot upper (the foot itself is bare skin — a slim vamp covers the toes).
+  const vamp = mesh(
+    T,
+    new T.SphereGeometry(0.048, 12, 10),
+    upperMat,
+    0,
+    -0.69,
+    0.055
+  );
+  vamp.scale.set(0.9, 0.45, 1.3);
+  g.add(vamp);
+  return g;
+}
+
 function buildFootwear(
   T: typeof import("three"),
   mats: AvatarMaterials,
   gm: GarmentMats,
-  kind: "sneaker" | "oxford" | "boot",
+  kind: "sneaker" | "oxford" | "boot" | "sandal" | "heel",
   twoTone?: string
 ): THREE.Group {
+  // M8: open footwear gets its own builders (no closed upper).
+  if (kind === "sandal") return buildSandal(T, mats, gm);
+  if (kind === "heel") return buildHeel(T, mats, gm);
   const g = new T.Group();
   const isBoot = kind === "boot";
   const isOxford = kind === "oxford";
@@ -436,10 +563,20 @@ function dressLegs(
   ctx: GarmentCtx
 ): void {
   const { outfit, limbScale, topColor } = ctx;
-  const shorts = outfit === "chill";
+  const shorts = outfit === "chill" || outfit === "gym";
   const cargo = outfit === "sitework" || outfit === "hoodie";
   const office = outfit === "office";
-  const footwearKind = outfit === "sitework" ? "boot" : office ? "oxford" : "sneaker";
+  const skirt = outfit === "owambe";
+  const footwearKind =
+    outfit === "sitework"
+      ? "boot"
+      : office
+        ? "oxford"
+        : outfit === "agbada"
+          ? "sandal"
+          : outfit === "owambe"
+            ? "heel"
+            : "sneaker";
   const bottomStd = std(mats.bottomMat);
   const creaseMat = new T.MeshStandardMaterial({
     color: "#" + bottomStd.color.clone().offsetHSL(0, 0, 0.08).getHexString(),
@@ -457,15 +594,19 @@ function dressLegs(
       )
     );
 
-    // Leg shell.
-    const prof = trouserProfile(shorts).map(
-      ([r, y]) => [r * limbScale, y] as [number, number]
-    );
-    const shell = lathe(T, prof, mats.bottomMat, 14);
-    shell.scale.z = 0.94;
-    legG.add(shell);
+    // Leg shell — skipped for the skirt outfit (bare legs under the skirt).
+    if (!skirt) {
+      const prof = trouserProfile(shorts).map(
+        ([r, y]) => [r * limbScale, y] as [number, number]
+      );
+      const shell = lathe(T, prof, mats.bottomMat, 14);
+      shell.scale.z = 0.94;
+      legG.add(shell);
+    }
 
-    if (shorts) {
+    if (skirt) {
+      // Bare legs — nothing else on the leg (the skirt hangs from the hips).
+    } else if (shorts) {
       // Shorts hem band.
       const hem = mesh(
         T,
@@ -556,7 +697,13 @@ function dressHips(
 ): void {
   const { outfit, isMan } = ctx;
   const LY = (absY: number) => absY - HIP_Y;
-  const shorts = outfit === "chill";
+  const shorts = outfit === "chill" || outfit === "gym";
+
+  // M8: wrapper skirt (owambe) replaces the whole hip assembly.
+  if (outfit === "owambe") {
+    dressSkirt(T, mats, gm, body, ctx);
+    return;
+  }
 
   // Hip shell (trousers top). Kept compact and tucked behind the
   // shirt/waistband so its edge never peeks out below the hem.
@@ -669,6 +816,68 @@ function dressHips(
 /* Shirts                                                             */
 /* ------------------------------------------------------------------ */
 
+/** M8: wrapper skirt — flared lathe from waist to knee + tie sash. */
+function dressSkirt(
+  T: typeof import("three"),
+  _mats: AvatarMaterials,
+  gm: GarmentMats,
+  body: BuiltBody,
+  ctx: GarmentCtx
+): void {
+  const { limbScale } = ctx;
+  const LY = (absY: number) => absY - HIP_Y;
+  // Flared skirt: waist radius → knee flare, in ascending y for lathe normals.
+  const prof: Array<[number, number]> = [
+    [0.205 * limbScale, LY(0.42)],
+    [0.185 * limbScale, LY(0.55)],
+    [0.168 * limbScale, LY(0.7)],
+    [0.158 * limbScale, LY(0.82)],
+    [0.155 * limbScale, LY(0.9)],
+    [0.158 * limbScale, LY(0.95)],
+  ];
+  const skirt = lathe(T, prof, gm.weave, 22);
+  skirt.scale.z = 0.86;
+  body.upper.add(skirt);
+  // Waistband + tie sash at the side.
+  const wb = mesh(
+    T,
+    new T.CylinderGeometry(0.158 * limbScale, 0.162 * limbScale, 0.05, 20),
+    gm.ribBottom,
+    0,
+    LY(0.93),
+    0
+  );
+  wb.scale.z = 0.86;
+  body.upper.add(wb);
+  const sash = mesh(
+    T,
+    new T.BoxGeometry(0.03, 0.09, 0.02),
+    gm.ribBottom,
+    0.15 * limbScale,
+    LY(0.86),
+    0.1
+  );
+  sash.rotation.z = 0.5;
+  body.upper.add(sash);
+  // Hem pleat folds.
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    body.upper.add(
+      foldArc(
+        T,
+        gm.foldBottom,
+        0.2 * limbScale,
+        0.006,
+        Math.sin(a) * 0.19 * limbScale,
+        LY(0.5),
+        Math.cos(a) * 0.165 * limbScale,
+        0.5,
+        a
+      )
+    );
+  }
+}
+
 function buildShirt(
   T: typeof import("three"),
   gm: GarmentMats,
@@ -676,12 +885,32 @@ function buildShirt(
 ): THREE.Mesh {
   const { outfit, isMan } = ctx;
   const LY = (absY: number) => absY - HIP_Y;
-  const looseness =
+  // M8: gym/agbada/owambe get their own silhouettes.
+  let looseness =
     outfit === "chill" ? 1.12 : outfit === "hoodie" ? 1.06 : 1;
-  const profile = shirtProfile(isMan, looseness).map(
-    ([r, y]) => [r, LY(y)] as [number, number]
-  );
-  const shirt = lathe(T, profile, gm.weave, 20);
+  let profile = shirtProfile(isMan, looseness);
+  if (outfit === "gym") {
+    // Tank: narrow shoulders, cropped at the waist.
+    profile = profile.map(([r, y]) =>
+      y > 1.2 ? [r * 0.78, y] : [r, y]
+    );
+    profile = profile.filter(([, y]) => y >= 0.82);
+    profile.unshift([0.168, 0.82]);
+  } else if (outfit === "agbada") {
+    // Flowing grand boubou: very loose, falls past the hips.
+    looseness = 1.42;
+    profile = shirtProfile(isMan, looseness);
+    profile.unshift([0.21, 0.64], [0.2, 0.7]);
+  } else if (outfit === "owambe") {
+    // Fitted dress bodice: close cut, flares slightly into the skirt.
+    profile = shirtProfile(isMan, 0.96).map(([r, y]) =>
+      y < 0.95 ? [r * 1.12, y] : [r, y]
+    );
+    profile = profile.filter(([, y]) => y >= 0.9);
+    profile.unshift([0.175, 0.9]);
+  }
+  const pts = profile.map(([r, y]) => [r, LY(y)] as [number, number]);
+  const shirt = lathe(T, pts, gm.weave, 20);
   shirt.scale.z = 0.74;
   return shirt;
 }
@@ -731,6 +960,127 @@ function dressTeeTrim(
   upper.add(foldArc(T, gm.fold, 0.035, 0.005, -0.09, LY(0.88), 0.1, 0.4, 1.1));
   upper.add(foldArc(T, gm.fold, 0.032, 0.005, 0.09, LY(0.87), 0.1, 0.4, -1.1 + Math.PI));
   upper.add(foldArc(T, gm.fold, 0.03, 0.005, 0, LY(0.9), -0.11, -0.5, 0.2));
+}
+
+/** M8: tank trim — wide scoop collar + armhole binding, no hem band. */
+function dressTankTrim(
+  T: typeof import("three"),
+  gm: GarmentMats,
+  upper: THREE.Group,
+  _topColor: string
+): void {
+  const LY = (absY: number) => absY - HIP_Y;
+  // Scoop neckline.
+  const collar = mesh(
+    T,
+    new T.TorusGeometry(0.075, 0.011, 10, 24),
+    gm.rib,
+    0,
+    LY(1.315),
+    0.012
+  );
+  collar.rotation.x = Math.PI / 2 - 0.25;
+  collar.scale.set(1, 0.8, 1);
+  upper.add(collar);
+  // Armhole binding rings.
+  for (const sx of [-1, 1]) {
+    const bind = mesh(
+      T,
+      new T.TorusGeometry(0.052, 0.009, 8, 18),
+      gm.rib,
+      sx * 0.128,
+      LY(1.24),
+      0
+    );
+    bind.rotation.y = Math.PI / 2;
+    bind.rotation.z = 0.35;
+    upper.add(bind);
+  }
+  // Athletic side stripe.
+  for (const sx of [-1, 1]) {
+    upper.add(stitchStrip(T, gm, 0.02, 0.34, sx * 0.155, LY(1.05), 0.045));
+  }
+}
+
+/** M8: agbada trim — embroidered V neckline + front placket stitching. */
+function dressAgbadaTrim(
+  T: typeof import("three"),
+  gm: GarmentMats,
+  upper: THREE.Group,
+  _topColor: string
+): void {
+  const LY = (absY: number) => absY - HIP_Y;
+  const embMat = new T.MeshStandardMaterial({
+    color: "#e8cfa3",
+    roughness: 0.55,
+    metalness: 0.25,
+  });
+  // Embroidered V at the neckline.
+  for (const sx of [-1, 1]) {
+    const v = mesh(T, new T.BoxGeometry(0.018, 0.11, 0.008), embMat, sx * 0.032, LY(1.27), 0.115);
+    v.rotation.z = sx * -0.42;
+    v.rotation.x = -0.12;
+    upper.add(v);
+    // Second parallel row.
+    const v2 = mesh(T, new T.BoxGeometry(0.012, 0.09, 0.006), embMat, sx * 0.052, LY(1.265), 0.108);
+    v2.rotation.z = sx * -0.42;
+    v2.rotation.x = -0.12;
+    upper.add(v2);
+  }
+  // Collar band.
+  const collar = mesh(
+    T,
+    new T.TorusGeometry(0.085, 0.014, 10, 24),
+    gm.rib,
+    0,
+    LY(1.335),
+    0.004
+  );
+  collar.rotation.x = Math.PI / 2;
+  collar.scale.set(1, 0.82, 1);
+  upper.add(collar);
+  // Front placket stitching down the chest.
+  upper.add(stitchStrip(T, gm, 0.016, 0.42, 0, LY(1.05), 0.155));
+  // Flowing hem folds.
+  upper.add(foldArc(T, gm.fold, 0.05, 0.006, -0.12, LY(0.78), 0.1, 0.4, 1.1));
+  upper.add(foldArc(T, gm.fold, 0.05, 0.006, 0.12, LY(0.78), 0.1, 0.4, -1.1 + Math.PI));
+  upper.add(foldArc(T, gm.fold, 0.045, 0.006, 0, LY(0.76), -0.12, -0.5, 0.2));
+}
+
+/** M8: dress trim — sweetheart neckline + waist seam into the skirt. */
+function dressDressTrim(
+  T: typeof import("three"),
+  gm: GarmentMats,
+  upper: THREE.Group,
+  _topColor: string
+): void {
+  const LY = (absY: number) => absY - HIP_Y;
+  // Sweetheart neckline binding.
+  for (const sx of [-1, 1]) {
+    const cup = mesh(
+      T,
+      new T.TorusGeometry(0.055, 0.009, 8, 18, Math.PI * 0.8),
+      gm.rib,
+      sx * 0.058,
+      LY(1.28),
+      0.055
+    );
+    cup.rotation.x = Math.PI / 2 - 0.35;
+    cup.rotation.z = Math.PI * 1.1 + (sx > 0 ? 0.35 : -0.35);
+    upper.add(cup);
+  }
+  // Waist seam where the bodice meets the skirt.
+  const seam = mesh(
+    T,
+    new T.TorusGeometry(0.163, 0.008, 8, 24),
+    gm.rib,
+    0,
+    LY(0.93),
+    0
+  );
+  seam.rotation.x = Math.PI / 2;
+  seam.scale.set(1, 0.86, 1);
+  upper.add(seam);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1013,13 +1363,17 @@ function dressSleeves(
   ctx: GarmentCtx
 ): void {
   const { outfit, limbScale } = ctx;
+  // M8: the gym tank is sleeveless — bare shoulders, no caps.
+  if (outfit === "gym") return;
   const longSleeves = outfit === "hoodie" || outfit === "office";
+  const wideSleeves = outfit === "agbada";
   for (const [arm, sx] of [[body.armL, -1], [body.armR, 1]] as const) {
     // Shoulder cap — an ellipsoid stretched toward the torso that bridges
     // into the sleeve, swallowing the sleeve's top edge so no seam shows.
+    // Agbada caps are bigger to feed the wide flowing sleeve.
     const shoulderCap = mesh(
       T,
-      new T.SphereGeometry(0.064 * limbScale, 16, 12),
+      new T.SphereGeometry(0.064 * limbScale * (wideSleeves ? 1.5 : 1), 16, 12),
       gm.weave,
       -sx * 0.012 * limbScale,
       0.028,
@@ -1028,7 +1382,35 @@ function dressSleeves(
     shoulderCap.scale.set(1.3, 0.62, 0.9);
     arm.add(shoulderCap);
 
-    if (longSleeves) {
+    if (wideSleeves) {
+      // Flowing agbada sleeve: wide bell from shoulder to wrist.
+      const sl = lathe(
+        T,
+        [
+          [0.075, -0.42],
+          [0.082, -0.36],
+          [0.095, -0.26],
+          [0.105, -0.16],
+          [0.11, -0.06],
+          [0.105, 0.03],
+        ].map(([r, y]) => [r * limbScale, y] as [number, number]),
+        gm.weave,
+        14
+      );
+      arm.add(sl);
+      // Embroidered cuff ring.
+      const cuff = mesh(
+        T,
+        new T.TorusGeometry(0.078 * limbScale, 0.011, 8, 18),
+        gm.rib,
+        0,
+        -0.42,
+        0
+      );
+      cuff.rotation.x = Math.PI / 2;
+      arm.add(cuff);
+      arm.add(foldArc(T, gm.fold, 0.07, 0.005, 0, -0.3, 0.05, 0.6, 0.3));
+    } else if (longSleeves) {
       const sl = lathe(
         T,
         [
@@ -1112,7 +1494,13 @@ export function dressBody(
   const { outfit, topColor } = ctx;
   const gm = buildGarmentMats(T, mats, topColor);
   const looseness =
-    outfit === "chill" ? 1.12 : outfit === "hoodie" ? 1.06 : 1;
+    outfit === "chill"
+      ? 1.12
+      : outfit === "hoodie"
+        ? 1.06
+        : outfit === "agbada"
+          ? 1.42
+          : 1;
 
   dressLegs(T, mats, gm, body, ctx);
   dressHips(T, mats, gm, body, ctx);
@@ -1126,6 +1514,12 @@ export function dressBody(
     // Office shirt: no ribbed hem band (tucked look) — waist folds only.
     body.upper.add(foldArc(T, gm.fold, 0.035, 0.005, -0.09, 0.04, 0.1, 0.4, 1.1));
     body.upper.add(foldArc(T, gm.fold, 0.032, 0.005, 0.09, 0.03, 0.1, 0.4, -1.1 + Math.PI));
+  } else if (outfit === "gym") {
+    dressTankTrim(T, gm, body.upper, topColor);
+  } else if (outfit === "agbada") {
+    dressAgbadaTrim(T, gm, body.upper, topColor);
+  } else if (outfit === "owambe") {
+    dressDressTrim(T, gm, body.upper, topColor);
   } else {
     dressTeeTrim(T, gm, body.upper, looseness);
   }

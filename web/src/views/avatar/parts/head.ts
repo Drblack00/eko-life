@@ -2,8 +2,9 @@ import type * as THREE from "three";
 import { mesh, mulberry32 } from "./util";
 import { shade, type AvatarMaterials } from "./materials";
 import {
-  buildIrisImage,
+  buildIrisImageWithPalette,
   buildSkinMaterial,
+  EYE_COLOR_PALETTE,
   hashSeed,
   paintSkullRoughnessTexture,
   toCanvasTexture,
@@ -41,7 +42,33 @@ export interface HeadCtx {
   /** Skin hex (resolved). */
   skin: string;
   mats: AvatarMaterials;
+  /** M8: eye-colour asset id (selects the IRIS_PALETTES entry). */
+  eyeColorId?: string;
+  /** M8: brow style asset id (parameterizes the brow builder). */
+  browStyleId?: string;
 }
+
+/**
+ * M8 brow style parameters — each style tweaks the strand-card brow
+ * builder (count, thickness, arc, length, tint).
+ */
+export interface BrowStyleParams {
+  strands: number;
+  /** Strand card [width, length] multiplier vs natural. */
+  widthK: number;
+  lengthK: number;
+  /** Vertical arc lift added to the brow line. */
+  arcLift: number;
+  /** Colour offset applied to the hair-dark base (negative = darker). */
+  tintK: number;
+}
+
+export const BROW_STYLES: Record<string, BrowStyleParams> = {
+  brow_natural_01: { strands: 16, widthK: 1, lengthK: 1, arcLift: 0, tintK: 0 },
+  brow_bold_01: { strands: 20, widthK: 1.35, lengthK: 1.1, arcLift: 0.001, tintK: -18 },
+  brow_arched_01: { strands: 14, widthK: 0.8, lengthK: 0.95, arcLift: 0.005, tintK: 0 },
+  brow_trimmed_01: { strands: 12, widthK: 0.85, lengthK: 0.72, arcLift: 0, tintK: 8 },
+};
 
 export interface BuiltHead {
   group: THREE.Group;
@@ -203,7 +230,7 @@ function shapeGeo(
 /* ------------------------------------------------------------------ */
 
 export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
-  const { skin } = ctx;
+  const { skin, eyeColorId, browStyleId } = ctx;
   const head = new T.Group();
 
   /* ---------------- local enhanced materials ---------------- */
@@ -440,13 +467,26 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
 
   /* ---------------- eyes (the centrepiece) ---------------- */
   // One iris texture per build (both eyes share it — same person, same eyes),
-  // unique per skin tone, deterministic per seed.
-  const irisTex = toCanvasTexture(T, buildIrisImage(128, hashSeed(skin + ":iris")));
+  // unique per skin tone, deterministic per seed. M8: the palette comes
+  // from the eye-colour choice (default deep brown).
+  const eyeId = eyeColorId ?? "eye_brown_01";
+  const irisTex = toCanvasTexture(
+    T,
+    buildIrisImageWithPalette(
+      128,
+      hashSeed(skin + ":iris:" + eyeId),
+      EYE_COLOR_PALETTE[eyeId] ?? 0
+    )
+  );
   const irisMat = new T.MeshStandardMaterial({
     map: irisTex ?? undefined,
     color: irisTex ? "#ffffff" : "#3a2415",
     roughness: 0.3,
   });
+  // Tag for the assembler's findIrisMaterial (works with or without a DOM —
+  // the texture-sniffing fallback can't see the iris in Node, where canvas
+  // textures return null).
+  irisMat.userData.irisMaterial = true;
 
   const buildEye = (sx: number, irisMat: THREE.Material): { eye: THREE.Group; upperLid: THREE.Group } => {
     const eye = new T.Group();
@@ -559,19 +599,67 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
   /* ---------------- eyebrows: individual strand cards ---------------- */
   // Strands sit just proud of the skull surface (computed from the sphere —
   // the sculpt terms are negligible on the forehead) and below the hairline.
-  // Cuteness pass: slightly thicker, raised, gentler slope — no stern
-  // downward pinch at the inner ends.
-  const strandGeo = new T.PlaneGeometry(0.0038, 0.009);
+  // M8: parameterized by browStyleId (see BROW_STYLES above).
+  buildBrows(T, head, hm, { skin, hairDarkMat, browStyleId });
+
+  return {
+    group: head,
+    eyeL: eyeL.eye,
+    eyeR: eyeR.eye,
+    upperLidL: eyeL.upperLid,
+    upperLidR: eyeR.upperLid,
+  };
+}
+
+/**
+ * M8: procedural eyebrows. `hm` is buildHead's local mesh helper (tags
+ * meshes for triangle counting). Pure geometry — material isolation is
+ * the caller's (buildHead allocates hairDarkMat fresh per build).
+ */
+export function buildBrows(
+  T: typeof import("three"),
+  head: THREE.Group,
+  hm: (
+    geo: THREE.BufferGeometry,
+    mat: THREE.Material,
+    part: string,
+    x?: number,
+    y?: number,
+    z?: number
+  ) => THREE.Mesh,
+  ctx: { skin: string; hairDarkMat: THREE.Material; browStyleId?: string }
+): void {
+  const style =
+    BROW_STYLES[ctx.browStyleId ?? "brow_natural_01"] ??
+    BROW_STYLES.brow_natural_01;
+  // tintK shifts the strand colour (bold = darker, trimmed = softer).
+  const browMat =
+    style.tintK !== 0
+      ? new T.MeshStandardMaterial({
+          color: shade("#171110", style.tintK),
+          roughness: 0.9,
+        })
+      : ctx.hairDarkMat;
+  const strandGeo = new T.PlaneGeometry(
+    0.0038 * style.widthK,
+    0.009 * style.lengthK
+  );
   for (const sx of [-1, 1]) {
-    const browRand = mulberry32(hashSeed(skin) + (sx > 0 ? 101 : 202));
-    for (let i = 0; i < 16; i++) {
-      const t = i / 15;
+    const browRand = mulberry32(hashSeed(ctx.skin) + (sx > 0 ? 101 : 202));
+    for (let i = 0; i < style.strands; i++) {
+      const t = style.strands > 1 ? i / (style.strands - 1) : 0.5;
       const bx = sx * (0.02 + 0.046 * t);
-      const by = 0.1485 + 0.004 * Math.sin(Math.PI * Math.pow(t, 0.85)) - 0.0015 * t;
+      const by =
+        0.1485 +
+        0.004 * Math.sin(Math.PI * Math.pow(t, 0.85)) -
+        0.0015 * t +
+        style.arcLift * Math.sin(Math.PI * t);
       const yl = by - HC; // skull-local y
-      const surfZ = Math.sqrt(Math.max(1e-6, HEAD_R * HEAD_R - bx * bx - yl * yl));
+      const surfZ = Math.sqrt(
+        Math.max(1e-6, HEAD_R * HEAD_R - bx * bx - yl * yl)
+      );
       const bz = surfZ + 0.0028;
-      const strand = hm(strandGeo, hairDarkMat, "brow", bx, by, bz);
+      const strand = hm(strandGeo, browMat, "brow", bx, by, bz);
       strand.rotation.order = "ZYX";
       // Strands lie along the brow: inner hairs sweep up-out, outer down-out.
       strand.rotation.z = -sx * (1.12 + 0.38 * t) + (browRand() - 0.5) * 0.22;
@@ -581,12 +669,4 @@ export function buildHead(T: typeof import("three"), ctx: HeadCtx): BuiltHead {
       head.add(strand);
     }
   }
-
-  return {
-    group: head,
-    eyeL: eyeL.eye,
-    eyeR: eyeR.eye,
-    upperLidL: eyeL.upperLid,
-    upperLidR: eyeR.upperLid,
-  };
 }

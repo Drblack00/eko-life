@@ -64,6 +64,9 @@ export const HAIR_COLOR_HEX: Record<string, string> = {
   hair_black_01: HAIR_HEX,
   hair_dark_brown_01: "#3b2417",
   hair_brown_01: "#5b3a21",
+  hair_auburn_01: "#6e2f16",
+  hair_blonde_01: "#b98a3e",
+  hair_grey_01: "#8d8d94",
 };
 
 export interface HairTint {
@@ -964,6 +967,188 @@ function buildClassic(
   return parts;
 }
 
+/* ------------------------------------------------------------------ */
+/* M8 expansion styles: bun, ponytail, mohawk, bantu knots             */
+/* ------------------------------------------------------------------ */
+
+/** Top bun: sleek cap + a rounded knot high on the crown + wrap band. */
+function buildBun(
+  T: typeof import("three"),
+  mats: AvatarMaterials,
+  tint?: HairTint
+): THREE.Object3D[] {
+  const parts: THREE.Object3D[] = [];
+  const flowTex = canvasTexture(
+    T,
+    128,
+    (c) =>
+      paintStrandFlow(c, 128, {
+        seed: 71,
+        strands: 70,
+        angle: -1.2,
+        light: tint?.light ?? "#4e3d2f",
+      }),
+    { repeat: [3, 2] }
+  );
+  const flowMat = strandMat(T, mats, flowTex, 0.8);
+  parts.push(placeCap(T, capGeo(T, 0.1095, 0.32, 28, 16), flowMat));
+  // The knot: a slightly squashed sphere sitting high and a touch back.
+  const knot = new T.Mesh(new T.SphereGeometry(0.052, 20, 14), flowMat);
+  knot.position.set(0, 0.252, -0.028);
+  knot.scale.set(1, 0.92, 1);
+  afroNoise(T, knot.geometry, 17, 0.05);
+  parts.push(knot);
+  // Wrap band at the knot's base (twisted look).
+  const wrap = new T.Mesh(
+    new T.TorusGeometry(0.042, 0.011, 10, 24),
+    mats.hairMat
+  );
+  wrap.position.set(0, 0.222, -0.024);
+  wrap.rotation.x = Math.PI / 2 - 0.35;
+  parts.push(wrap);
+  return parts;
+}
+
+/** Ponytail: sleek swept cap + a curved tapered tail down the back. */
+function buildPonytail(
+  T: typeof import("three"),
+  mats: AvatarMaterials,
+  tint?: HairTint
+): THREE.Object3D[] {
+  const parts: THREE.Object3D[] = [];
+  const flowTex = canvasTexture(
+    T,
+    128,
+    (c) =>
+      paintStrandFlow(c, 128, {
+        seed: 73,
+        strands: 80,
+        angle: -1.35,
+        light: tint?.light ?? "#4e3d2f",
+      }),
+    { repeat: [3, 2] }
+  );
+  const flowMat = strandMat(T, mats, flowTex, 0.8);
+  parts.push(placeCap(T, capGeo(T, 0.1095, 0.34, 28, 16), flowMat));
+  // Tie band where the tail gathers.
+  const tie = new T.Mesh(
+    new T.TorusGeometry(0.028, 0.008, 8, 20),
+    mats.hairMat
+  );
+  tie.position.set(0, 0.196, -0.104);
+  tie.rotation.x = Math.PI / 2 - 0.5;
+  parts.push(tie);
+  // The tail: a tapered tube curving down the back.
+  const curve = new T.CatmullRomCurve3([
+    new T.Vector3(0, 0.196, -0.104),
+    new T.Vector3(0, 0.12, -0.15),
+    new T.Vector3(0, 0.02, -0.165),
+    new T.Vector3(0, -0.09, -0.15),
+  ]);
+  const tailGeo = new T.TubeGeometry(curve, 24, 0.026, 10, false);
+  taperTube(T, tailGeo, curve, 0.55);
+  const tailTex = canvasTexture(
+    T,
+    128,
+    (c) =>
+      paintStrandFlow(c, 128, {
+        seed: 74,
+        strands: 60,
+        angle: 0.1,
+        twist: true,
+        light: tint?.light ?? "#4e3d2f",
+      }),
+    { repeat: [1, 3] }
+  );
+  parts.push(new T.Mesh(tailGeo, strandMat(T, mats, tailTex, 0.82)));
+  return parts;
+}
+
+/** Mohawk: shaved sides (low cap) + a noise-textured fin along the crown. */
+function buildMohawk(
+  T: typeof import("three"),
+  mats: AvatarMaterials,
+  tint?: HairTint
+): THREE.Object3D[] {
+  const parts: THREE.Object3D[] = [];
+  // Very short sides — a thin dark cap.
+  parts.push(placeCap(T, capGeo(T, 0.1075, 0.22, 24, 12), mats.hairMat));
+  // The fin: a flattened, noise-displaced box running front-to-back.
+  const finGeo = new T.BoxGeometry(0.035, 0.075, 0.21, 3, 6, 12);
+  afroNoise(T, finGeo, 23, 0.09);
+  const frizzTex = canvasTexture(
+    T,
+    128,
+    (c) =>
+      paintFrizz(c, 128, {
+        seed: 77,
+        strokes: 700,
+        base: tint?.base ?? HAIR_HEX,
+        dark: tint?.dark ?? "#000000",
+        light: tint?.light ?? "#554130",
+      }),
+    { repeat: [2, 4] }
+  );
+  const fin = new T.Mesh(
+    finGeo,
+    frizzTex
+      ? new T.MeshStandardMaterial({
+          color: "#ffffff",
+          map: frizzTex,
+          bumpMap: frizzTex,
+          bumpScale: 0.6,
+          roughness: 0.95,
+        })
+      : mats.hairMat
+  );
+  fin.position.set(0, 0.245, -0.01);
+  fin.rotation.x = -0.06;
+  guardFace(T, fin.geometry, 0.012);
+  parts.push(fin);
+  return parts;
+}
+
+/** Bantu knots: a low cap + six rounded knots arranged on the crown. */
+function buildBantuKnots(
+  T: typeof import("three"),
+  mats: AvatarMaterials,
+  tint?: HairTint
+): THREE.Object3D[] {
+  const parts: THREE.Object3D[] = [];
+  const flowTex = canvasTexture(
+    T,
+    128,
+    (c) =>
+      paintStrandFlow(c, 128, {
+        seed: 79,
+        strands: 60,
+        angle: -0.9,
+        light: tint?.light ?? "#4e3d2f",
+      }),
+    { repeat: [3, 2] }
+  );
+  const flowMat = strandMat(T, mats, flowTex, 0.82);
+  parts.push(placeCap(T, capGeo(T, 0.1095, 0.3, 28, 16), flowMat));
+  // Six knots: front pair, mid pair, back pair.
+  const knots: Array<[number, number, number, number]> = [
+    // x, y, z, radius
+    [-0.055, 0.228, 0.045, 0.03],
+    [0.055, 0.228, 0.045, 0.03],
+    [-0.068, 0.222, -0.03, 0.033],
+    [0.068, 0.222, -0.03, 0.033],
+    [-0.045, 0.21, -0.095, 0.03],
+    [0.045, 0.21, -0.095, 0.03],
+  ];
+  for (const [x, y, z, r] of knots) {
+    const knot = new T.Mesh(new T.SphereGeometry(r, 16, 12), flowMat);
+    afroNoise(T, knot.geometry, 29 + Math.round(x * 1000), 0.06);
+    knot.position.set(x, y, z);
+    knot.scale.set(1, 0.9, 1);
+    parts.push(knot);
+  }
+  return parts;
+}
+
 /**
  * Build a hairstyle. `colorId` (optional, M3b) tints the hair: when it is a
  * registered colour other than hair_black_01, the solid hair material is
@@ -1009,6 +1194,14 @@ export function buildHair(
       return buildTaperFade(T, useMats, tint);
     case "hair_waves_01":
       return buildWaves(T, useMats, tint);
+    case "hair_bun_01":
+      return buildBun(T, useMats, tint);
+    case "hair_ponytail_01":
+      return buildPonytail(T, useMats, tint);
+    case "hair_mohawk_01":
+      return buildMohawk(T, useMats, tint);
+    case "hair_bantu_knots_01":
+      return buildBantuKnots(T, useMats, tint);
     default:
       // Unknown id → lowcut. Never a bare head.
       return buildLowcut(T, useMats, tint);

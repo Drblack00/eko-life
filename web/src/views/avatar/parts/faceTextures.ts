@@ -95,6 +95,14 @@ const IRIS_PALETTES: Array<[number, number, number][]> = [
   [[58, 34, 16], [78, 48, 24], [40, 22, 10]],
 ];
 
+/** M8: eye-colour asset id → IRIS_PALETTES index. */
+export const EYE_COLOR_PALETTE: Record<string, number> = {
+  eye_brown_01: 0,
+  eye_hazel_01: 1,
+  eye_amber_01: 2,
+  eye_green_01: 3,
+};
+
 /**
  * Procedural iris: radial fiber striations, limbal ring, collarette,
  * darker pupil core. Unique per seed (one seed per skin tone per build),
@@ -104,9 +112,30 @@ const IRIS_PALETTES: Array<[number, number, number][]> = [
  * (unused by CircleGeometry UVs).
  */
 export function buildIrisImage(size: number, seed: number): PixelImage {
+  const rand = mulberry32(seed);
+  return buildIrisImageWithPalette(
+    size,
+    seed,
+    Math.floor(rand() * IRIS_PALETTES.length)
+  );
+}
+
+/**
+ * M8: iris with an EXPLICIT palette (eye-colour choice). The seed still
+ * drives the per-fiber randomness, so the same eye colour keeps its
+ * unique fiber pattern across rebuilds.
+ */
+export function buildIrisImageWithPalette(
+  size: number,
+  seed: number,
+  paletteIndex: number
+): PixelImage {
   const img = makeImage(size);
   const rand = mulberry32(seed);
-  const palette = IRIS_PALETTES[Math.floor(rand() * IRIS_PALETTES.length)];
+  const palette =
+    IRIS_PALETTES[
+      Math.max(0, Math.min(IRIS_PALETTES.length - 1, paletteIndex | 0))
+    ];
   const [base, mid, dark] = palette;
 
   // Per-angle fiber brightness table (720 samples around the disc).
