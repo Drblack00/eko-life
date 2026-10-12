@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { authGet, type TravelFares } from "../../lib/api";
+import { authGet } from "../../lib/api";
 import { naira } from "../../game/types";
 import { Button, Dialog } from "../../components";
 import { blip } from "../../lib/sound";
-import { compactNum, moodFor, shiftCountdown, SHORTCUTS } from "./homeChrome";
+import { compactNum, moodFor, SHORTCUTS } from "./homeChrome";
 import { GemHuntCard } from "./GemHunt";
 import "./HomeChrome.css";
 
@@ -330,100 +330,26 @@ function SideCards({
 }
 
 /* ------------------------------------------------------------------ */
-/* Bottom-right pills: go to work, travel, shortcuts.                  */
-/* ------------------------------------------------------------------ */
-
-function WorkPill({
-  shift,
-  onOpenApp,
-}: {
-  shift?: { job: string; name: string; endsAt: number } | null;
-  onOpenApp: (app: string) => void;
-}) {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (!shift) return;
-    const iv = setInterval(() => setTick((t) => t + 1), 30_000);
-    return () => clearInterval(iv);
-  }, [shift]);
-  const tap = () => {
-    blip("tap");
-    onOpenApp("jobs");
-  };
-  if (shift) {
-    return (
-      <button type="button" className="eko-workpill glass" onClick={tap}>
-        <span aria-hidden="true">🔨</span>
-        <span>
-          <strong>On shift</strong>
-          <span className="eko-workpill__sub">
-            {shift.name || shift.job} · {shiftCountdown(shift.endsAt)}
-          </span>
-        </span>
-      </button>
-    );
-  }
-  return (
-    <button type="button" className="eko-workpill glass" onClick={tap}>
-      <span aria-hidden="true">💼</span>
-      <strong>Go to work</strong>
-    </button>
-  );
-}
-
-function TravelPill({
-  fares,
-  onGo,
-}: {
-  fares?: TravelFares;
-  onGo: () => void;
-}) {
-  const from = fares?.sameRegion ?? 0;
-  return (
-    <button
-      type="button"
-      className="eko-workpill glass"
-      onClick={() => {
-        blip("tap");
-        onGo();
-      }}
-      title="Open the map to travel"
-    >
-      <span aria-hidden="true">🚕</span>
-      <span>
-        <strong>Travel</strong>
-        <span className="eko-workpill__sub">From {naira(from)}</span>
-      </span>
-    </button>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Combined overlay root — rendered on the Home tab only.              */
+/* Combined overlay root — rendered on the Home tab only.               */
+/* Work/Travel live in the dashboard quick-actions row now, so the      */
+/* floating pills are gone; the ✨ FAB and shortcuts button stay.       */
 /* ------------------------------------------------------------------ */
 
 export function HomeOverlays({
   token,
-  shift,
-  fares,
   cleanMode,
   onToggleClean,
   onOpenApp,
-  onTab,
   onOpenShortcuts,
   onOpenCharacter,
 }: {
   token: string;
-  shift?: { job: string; name: string; endsAt: number } | null;
-  fares?: TravelFares;
   cleanMode: boolean;
   onToggleClean: () => void;
   onOpenApp: (app: string) => void;
-  onTab: (t: "home" | "buy" | "map" | "phone") => void;
   onOpenShortcuts: () => void;
   onOpenCharacter: (tab: "goals") => void;
 }) {
-  const goMap = useCallback(() => onTab("map"), [onTab]);
   return (
     <>
       <SideCards
@@ -433,9 +359,7 @@ export function HomeOverlays({
         cleanMode={cleanMode}
         onToggleClean={onToggleClean}
       />
-      <div className="eko-workpills" aria-label="Work and travel">
-        <WorkPill shift={shift} onOpenApp={onOpenApp} />
-        <TravelPill fares={fares} onGo={goMap} />
+      <div className="eko-workpills" aria-label="Shortcuts">
         <button
           type="button"
           className="eko-workpill eko-workpill--round glass"
