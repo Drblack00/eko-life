@@ -1,8 +1,16 @@
-# Èkó Life Avatar Engine — Architecture & Operations (2026-10-11)
+# Èkó Life Avatar Engine — Architecture & Operations (2026-10-12)
 
 Production-oriented 3D avatar system: 100% original procedural Three.js humans
 (no external models), canonical versioned appearance data, manifest-driven assembly,
 versioned persistence with optimistic concurrency.
+
+**M8 — Style app + catalog expansion (2026-10-12):** the editor moved out of
+Phone → Me into its own dedicated Phone app (**Style**, `✨`), redesigned as a
+full-screen studio with a hero-size live preview. Catalog expanded: 18 skin
+tones, 13 hairstyles, 6 hair colours, 4 eye colours + 4 brow styles (new Face
+category), 3 procedural accessories (new Extras category), 8 outfits
+(+gym/agbada/owambe). Schema stays v1 (new fields are optional with defaults —
+old saves migrate on read).
 
 ## 1. Architecture overview
 
@@ -22,9 +30,10 @@ web/src/views/avatar/
   avatarModel.ts                thin compat layer (legacy buildAvatarLook → v1)
   AvatarStudio.tsx              legacy studio OR new editor (characterId?)
   editor/                       M5: saved/draft/rendered editor (AvatarEditor)
-  AvatarEditButton.tsx          entry point (passes characterId through)
+  StyleApp.tsx                  M8: dedicated Phone app shell for the studio
   parts/                        procedural builders: body, head, hair,
-                                facialHair, clothing, materials, textures
+                                facialHair, accessories (M8), clothing,
+                                materials, textures
 server/src/game/appearance.js   server validator + persistAppearance + catalog
 server/src/routes/api.js        GET/PUT /api/characters/:id/appearance,
                                 GET /api/avatar/catalog
@@ -34,17 +43,19 @@ server/src/db.js                characters.appearance_rev (PG + SQLite)
 ## 2. Canonical appearance (v1)
 
 `AppearanceV1 { schemaVersion:1, characterId, base:{bodyType, bodyPresetId,
-facePresetId, skinToneId}, morphs{9 keys 0..1}, hair:{styleId,colorId,facialHairId},
+facePresetId, skinToneId, eyeColorId (M8), browStyleId (M8)},
+morphs{9 keys 0..1}, hair:{styleId,colorId,facialHairId},
 clothing:{topId,bottomId,outerwearId|null,shoeId,fabricId,topColor,bottomColor},
-accessories[] }`. Existing ids kept verbatim (stability protects saves).
-Validation: reject unknown ids/morphs/out-of-range; safe defaults; never
-renderer objects or URLs. Legacy flat looks migrate via `migrateAvatarLookToV1`.
+accessories[{slot, assetId}] (M8: 3 procedural assets) }`. Existing ids kept
+verbatim (stability protects saves). Validation: reject unknown ids/morphs/
+out-of-range; safe defaults; never renderer objects or URLs. Legacy flat
+looks migrate via `migrateAvatarLookToV1` (new M8 fields default on read).
 
 ## 3. Asset manifest
 
 `AvatarAsset {id, kind, source:"procedural"|"licensed-glb", status:"available"|
 "pending", version, skeletonId, materialProfile, compatibleBodyTypes,
-supportedMorphs, slots, fallbackAssetId, license}`. ~50 procedural assets are
+supportedMorphs, slots, fallbackAssetId, license}`. 81 procedural assets are
 `available` (`eko-proc-rig-v1` = Group pivots, honestly documented as NOT a
 skinned skeleton). Four `pending` licensed-GLB slots document the integration
 path. The resolver rejects arbitrary paths/URLs — only manifest ids load.
@@ -79,16 +90,26 @@ gesture via `userData.setAnimState("wave")`. No morph targets exist, so no
 lip-sync/facial expressions (documented, not faked). Legs are single rigid
 segments (no knees) — walk is stylized, honestly. Reduced-motion → static.
 
-## 6. Editor
+## 6. Editor (M8: dedicated Style app)
 
 Three states: saved (server-confirmed) / draft (local edits) / rendered
 (on-screen). Edits render immediately via diff; Save uses `expectedRev`;
 409 → conflict dialog (Load latest / Keep editing — never silent overwrite);
-400 → field errors; failure → draft kept, success never claimed. Categories
-shipped: Body, Skin, Hair (9 styles + 3 colors + 4 facial-hair), Clothing
-(5 outfits + 4 fabrics + colors; shoes are outfit-implied, captioned).
-**Omitted honestly:** Face (all 9 morphs stubbed, one face preset — a slider
-would move nothing) and Accessories (zero assets in manifest). Changing
+400 → field errors; failure → draft kept, success never claimed.
+
+The studio lives in its own Phone app (**Style**, `✨`) — full-screen with a
+hero-size live preview, animated category tabs, Face / Full-body / Reset-view
+camera controls, rebuild spinner for structural changes. On wide screens the
+phone panel widens to 860px (`eko-phone__panel--wide`) and the studio becomes
+two-column: large 3D preview left, tabs + options + Save/Cancel right; narrow
+phones keep the single-column bottom sheet. Categories shipped:
+Face (4 eye colours — in-place iris texture swap; 4 brow styles — head-subtree
+rebuild), Body, Skin (18 tones), Hair (13 styles + 6 colours + 4 facial-hair,
+masculine-only enforced at manifest + editor + assembler + save-repair),
+Extras (3 procedural accessories: shades, snapback, hoops — per-slot groups
+swapped in place), Outfit (8 outfits + 4 fabrics + colors; shoes are
+outfit-implied, captioned). **Omitted honestly:** face morph sliders (all 9
+morphs stubbed, one face preset — a slider would move nothing). Changing
 clothing never resets face/skin/hair (field-level draft, tested).
 
 ## 7. Persistence API
@@ -133,7 +154,9 @@ save; treat rollback as forward-fix preferred).
    no lip-sync, no expressions.
 3. 100% procedural — stylized-realistic, NOT photoreal (the reference photo
    was art direction only, never ingested).
-4. Accessories catalog is empty; Face category omitted (nothing real to drive).
+4. Accessories: 3 procedural assets ship (shades, snapback, hoops); the
+   pending licensed-GLB accessory pack remains the future path. Face morph
+   sliders stay omitted (nothing real to drive).
 5. Server validator (`appearance.js`) manually mirrors `web/src/avatar/*` —
    keep in sync; future: shared package.
 6. `migrate.ts` decomposes `hoodie` → `bottom_trouser_01` but the renderer
