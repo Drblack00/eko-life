@@ -54,6 +54,7 @@ import type {
   ShoeId,
   SkinToneId,
 } from "../../../avatar/schema";
+import type { OutfitId } from "../parts/clothing";
 
 /* ------------------------------------------------------------------ */
 /* Option shapes                                                       */
@@ -69,16 +70,8 @@ export interface SwatchOption extends CatalogOption {
 }
 
 export interface OutfitRow {
-  /** M8: 8 outfits (legacy 5 + gym/agbada/owambe). */
-  outfitId:
-    | "casual"
-    | "hoodie"
-    | "office"
-    | "chill"
-    | "sitework"
-    | "gym"
-    | "agbada"
-    | "owambe";
+  /** Phase 6: 8 free outfits + 12 boutique premium outfits. */
+  outfitId: OutfitId;
   name: string;
   /** What the card actually puts on the figure (honest caption). */
   caption: string;
@@ -86,6 +79,22 @@ export interface OutfitRow {
   bottomId: ClothingBottomId;
   outerwearId: OuterwearId | null;
   shoeId: ShoeId;
+  /**
+   * Phase 6: set for boutique outfits. The outfit is wearable only when
+   * the player owns the boutique item; the studio renders the card locked
+   * otherwise. `occasion` drives the boutique's filter chips.
+   */
+  premium?: {
+    itemId: string;
+    price: number;
+    occasion: "owambe" | "street" | "office" | "traditional";
+    /**
+     * Signature garment colors. The boutique try-on renders the outfit in
+     * these, and applying the card (boutique Wear or the studio) sets them —
+     * so the look you buy is the look you wear.
+     */
+    signature: { topColor: string; bottomColor: string };
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -422,6 +431,132 @@ export const OUTFIT_ROWS: readonly OutfitRow[] = [
     outerwearId: null,
     shoeId: "shoe_heel_01",
   },
+  /* ------------------------------------------------------------ */
+  /* Phase 6: Boutique premium outfits. Each row is a novel        */
+  /* decomposition (invertible via assembler.outfitIdForClothing) */
+  /* with distinct procedural geometry in parts/clothing.ts.      */
+  /* premium.itemId links to the boutique catalog (server).       */
+  /* ------------------------------------------------------------ */
+  {
+    outfitId: "senator",
+    name: "Senator Set",
+    caption: "Knee-length embroidered tunic · gold chest embroidery · oxfords",
+    topId: "top_agbada_01",
+    bottomId: "bottom_trouser_01",
+    outerwearId: null,
+    shoeId: "shoe_oxford_01",
+    premium: { itemId: "bq_senator", price: 85000, occasion: "traditional", signature: { topColor: "#f8fafc", bottomColor: "#1f2430" } },
+  },
+  {
+    outfitId: "dashiki",
+    name: "Dashiki Royale",
+    caption: "Relaxed dashiki · bold V embroidery · sandals",
+    topId: "top_tee_01",
+    bottomId: "bottom_trouser_01",
+    outerwearId: null,
+    shoeId: "shoe_sandal_01",
+    premium: { itemId: "bq_dashiki", price: 45000, occasion: "traditional", signature: { topColor: "#c2703d", bottomColor: "#3b2f2f" } },
+  },
+  {
+    outfitId: "kaftan",
+    name: "Kaftan Luxe",
+    caption: "Ankle-length flowing kaftan · neckline embroidery · sandals",
+    topId: "top_agbada_01",
+    bottomId: "bottom_skirt_01",
+    outerwearId: null,
+    shoeId: "shoe_sandal_01",
+    premium: { itemId: "bq_kaftan", price: 120000, occasion: "traditional", signature: { topColor: "#0f766e", bottomColor: "#134e4a" } },
+  },
+  {
+    outfitId: "adire_gown",
+    name: "Adire Gown",
+    caption: "Floor-length adire gown · fitted bodice · heels",
+    topId: "top_dress_01",
+    bottomId: "bottom_skirt_01",
+    outerwearId: null,
+    shoeId: "shoe_sneaker_01",
+    premium: { itemId: "bq_adire_gown", price: 150000, occasion: "owambe", signature: { topColor: "#1e3a8a", bottomColor: "#172554" } },
+  },
+  {
+    outfitId: "ankara_set",
+    name: "Ankara Two-Piece",
+    caption: "Fitted ankara top · wrapper skirt · sandals",
+    topId: "top_dress_01",
+    bottomId: "bottom_skirt_01",
+    outerwearId: null,
+    shoeId: "shoe_sandal_01",
+    premium: { itemId: "bq_ankara_set", price: 95000, occasion: "owambe", signature: { topColor: "#e11d48", bottomColor: "#b45309" } },
+  },
+  {
+    outfitId: "asoebi",
+    name: "Aso-Ebi Glam",
+    caption: "Peplum party dress · flared ruffle · heels",
+    topId: "top_dress_01",
+    bottomId: "bottom_short_01",
+    outerwearId: null,
+    shoeId: "shoe_heel_01",
+    premium: { itemId: "bq_asoebi", price: 250000, occasion: "owambe", signature: { topColor: "#f5d76e", bottomColor: "#92400e" } },
+  },
+  {
+    outfitId: "tuxedo",
+    name: "Black Tie Tuxedo",
+    caption: "Tuxedo · bow tie · peaked lapels · oxfords",
+    topId: "top_shirt_office_01",
+    bottomId: "bottom_cargo_01",
+    outerwearId: null,
+    shoeId: "shoe_oxford_01",
+    premium: { itemId: "bq_tuxedo", price: 550000, occasion: "office", signature: { topColor: "#111418", bottomColor: "#111418" } },
+  },
+  {
+    outfitId: "suit",
+    name: "Executive Suit",
+    caption: "Tailored suit · notch lapels · oxfords",
+    topId: "top_tee_01",
+    bottomId: "bottom_trouser_01",
+    outerwearId: null,
+    shoeId: "shoe_oxford_01",
+    premium: { itemId: "bq_suit", price: 350000, occasion: "office", signature: { topColor: "#374151", bottomColor: "#1f2937" } },
+  },
+  {
+    outfitId: "streetwear",
+    name: "Streetwear Drop",
+    caption: "Oversized hoodie · cargo · chain · sneakers",
+    topId: "top_tee_01",
+    bottomId: "bottom_cargo_01",
+    outerwearId: null,
+    shoeId: "shoe_sneaker_01",
+    premium: { itemId: "bq_streetwear", price: 60000, occasion: "street", signature: { topColor: "#7c3aed", bottomColor: "#18181b" } },
+  },
+  {
+    outfitId: "denim",
+    name: "Denim Culture",
+    caption: "Denim trucker jacket · jeans · sneakers",
+    topId: "top_tank_01",
+    bottomId: "bottom_trouser_01",
+    outerwearId: null,
+    shoeId: "shoe_sneaker_01",
+    premium: { itemId: "bq_denim", price: 75000, occasion: "street", signature: { topColor: "#3b82c4", bottomColor: "#1e40af" } },
+  },
+  {
+    outfitId: "sport_luxe",
+    name: "Sport Luxe Tracksuit",
+    caption: "Zip-up track jacket · track pants · sneakers",
+    topId: "top_tank_01",
+    bottomId: "bottom_trouser_01",
+    outerwearId: "outer_hoodie_01",
+    shoeId: "shoe_sneaker_01",
+    premium: { itemId: "bq_sport_luxe", price: 55000, occasion: "street", signature: { topColor: "#18181b", bottomColor: "#18181b" } },
+  },
+  {
+    outfitId: "royalty",
+    name: "Royalty Agbada",
+    caption: "Grand royal boubou · heavy gold embroidery · medallion · sandals",
+    topId: "top_agbada_01",
+    bottomId: "bottom_cargo_01",
+    outerwearId: null,
+    shoeId: "shoe_sandal_01",
+    premium: { itemId: "bq_royalty", price: 1800000, occasion: "traditional", signature: { topColor: "#1e3a8a", bottomColor: "#172554" } },
+  },
 ];
 
 /**
@@ -447,16 +582,22 @@ export function applyOutfitRow(
   draft: AppearanceV1,
   row: OutfitRow
 ): AppearanceV1 {
-  return {
-    ...draft,
-    clothing: {
-      ...draft.clothing,
-      topId: row.topId,
-      bottomId: row.bottomId,
-      outerwearId: row.outerwearId,
-      shoeId: row.shoeId,
-    },
+  const clothing = {
+    ...draft.clothing,
+    topId: row.topId,
+    bottomId: row.bottomId,
+    outerwearId: row.outerwearId,
+    shoeId: row.shoeId,
+    // Phase 6: premium outfits ship signature garment colors — the look
+    // you tried on is the look you wear. Free rows keep the user's colors.
+    ...(row.premium?.signature
+      ? {
+          topColor: row.premium.signature.topColor,
+          bottomColor: row.premium.signature.bottomColor,
+        }
+      : null),
   };
+  return { ...draft, clothing };
 }
 
 /* ---------------- fabrics + garment colours ---------------- */

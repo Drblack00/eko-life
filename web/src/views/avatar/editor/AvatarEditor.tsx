@@ -26,6 +26,9 @@ import { useToast } from "../../../components";
 import { AvatarLoader, type AvatarHandle } from "../../../avatar/loader";
 import { fetchAppearance } from "../../../avatar/persistence";
 import { repairAppearanceV1 } from "../../../avatar/migrate";
+import { boutiqueApi } from "../../../lib/api";
+import { getToken } from "../../../lib/auth";
+import { naira } from "../../../game/types";
 import {
   BODY_PRESET_TO_TYPE,
   type AppearanceV1,
@@ -88,6 +91,30 @@ export function AvatarEditor({
   const renderBusyRef = useRef(false);
   const mountedRef = useRef(true);
   const { toast } = useToast();
+
+  /* Phase 6: boutique wardrobe — premium outfit cards render locked
+   * until owned. Fetched once on mount; a failed fetch just leaves
+   * every premium card locked (never unlocked by default). */
+  const [ownedBoutique, setOwnedBoutique] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    const token = getToken();
+    if (!token) return;
+    let cancelled = false;
+    boutiqueApi
+      .catalog(token)
+      .then((res) => {
+        if (cancelled) return;
+        setOwnedBoutique(
+          new Set(res.items.filter((i) => i.owned).map((i) => i.id))
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setOwnedBoutique(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /* Machine + loader lifecycle. */
   useEffect(() => {
@@ -501,24 +528,41 @@ export function AvatarEditor({
                     role="radiogroup"
                     aria-label="Outfit"
                   >
-                    {OUTFIT_ROWS.map((row) => (
-                      <button
-                        key={row.outfitId}
-                        type="button"
-                        role="radio"
-                        aria-checked={activeRow?.outfitId === row.outfitId}
-                        disabled={rebuilding}
-                        className={`eko-studio__outfit glass${activeRow?.outfitId === row.outfitId ? " eko-studio__outfit--active" : ""}`}
-                        onClick={() => edit((d) => Object.assign(d, applyOutfitRow(d, row)))}
-                      >
-                        <span className="eko-studio__outfitname">
-                          {row.name}
-                        </span>
-                        <span className="eko-studio__outfitcaption">
-                          {row.caption}
-                        </span>
-                      </button>
-                    ))}
+                    {OUTFIT_ROWS.map((row) => {
+                      const premium = row.premium ?? null;
+                      const locked =
+                        premium !== null &&
+                        !(ownedBoutique?.has(premium.itemId) ?? false);
+                      return (
+                        <button
+                          key={row.outfitId}
+                          type="button"
+                          role="radio"
+                          aria-checked={activeRow?.outfitId === row.outfitId}
+                          disabled={rebuilding || locked}
+                          className={`eko-studio__outfit glass${activeRow?.outfitId === row.outfitId ? " eko-studio__outfit--active" : ""}${locked ? " eko-studio__outfit--locked" : ""}`}
+                          title={
+                            locked && premium
+                              ? `Boutique exclusive · ${naira(premium.price)}`
+                              : undefined
+                          }
+                          onClick={() =>
+                            edit((d) =>
+                              Object.assign(d, applyOutfitRow(d, row))
+                            )
+                          }
+                        >
+                          <span className="eko-studio__outfitname">
+                            {locked ? `🔒 ${row.name}` : row.name}
+                          </span>
+                          <span className="eko-studio__outfitcaption">
+                            {locked && premium
+                              ? `Boutique · ${naira(premium.price)}`
+                              : row.caption}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                   <p className="eko-studio__caption">
                     Shoes are matched to the outfit — Casual, Hoodie, Chill
