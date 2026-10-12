@@ -17,6 +17,8 @@ export const PHONE_APPS: PhoneApp[] = [
   { id: "gist", label: "Gist", icon: "📣" },
   // Phase 4: Èkó Reserve — the bank app (gameplay coins only).
   { id: "bank", label: "Èkó Reserve", icon: "🏦" },
+  // Phase 6: Boutique — premium clothing shop.
+  { id: "boutique", label: "Boutique", icon: "🛍️" },
   { id: "style", label: "Style", icon: "✨" },
   { id: "me", label: "Me", icon: "🧑" },
 ];
