@@ -44,6 +44,7 @@ export const SHORTCUTS: ShortcutDef[] = [
   { key: "n", label: "N", description: "Open notifications" },
   { key: "d", label: "D", description: "Open the Daily app" },
   { key: "j", label: "J", description: "Open the Jobs app" },
+  { key: "t", label: "T", description: "Things to do — venues & activities" },
   { key: "?", label: "?", description: "Show this shortcuts list" },
   { key: "esc", label: "Esc", description: "Close dialog / sheet / panel" },
 ];
