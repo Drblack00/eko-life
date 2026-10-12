@@ -107,6 +107,21 @@ CREATE TABLE IF NOT EXISTS votes (
   created_at INTEGER NOT NULL,
   PRIMARY KEY (election_id, voter_id)
 );
+-- Phase 9: Daily Gem Hunt — one hidden gem per game day.
+CREATE TABLE IF NOT EXISTS gem_days (
+  day INTEGER PRIMARY KEY,
+  location_id TEXT NOT NULL,
+  clue TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS gem_finds (
+  day INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  found_at INTEGER NOT NULL,
+  prize INTEGER NOT NULL,
+  finder_rank INTEGER NOT NULL,
+  PRIMARY KEY (day, user_id)
+);
 -- M5: social graph
 -- W3 (friends page + referrals): updated_ts tracks the last status change;
 -- idx_friendships_unordered_pair enforces one row per unordered user pair
@@ -536,6 +551,21 @@ CREATE TABLE IF NOT EXISTS votes (
   candidate_id INTEGER NOT NULL,
   created_at BIGINT NOT NULL,
   PRIMARY KEY (election_id, voter_id)
+);
+-- Phase 9: Daily Gem Hunt — one hidden gem per game day.
+CREATE TABLE IF NOT EXISTS gem_days (
+  day INTEGER PRIMARY KEY,
+  location_id TEXT NOT NULL,
+  clue TEXT NOT NULL,
+  created_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS gem_finds (
+  day INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  found_at BIGINT NOT NULL,
+  prize INTEGER NOT NULL,
+  finder_rank INTEGER NOT NULL,
+  PRIMARY KEY (day, user_id)
 );
 -- M5: social graph
 -- W3 (friends page + referrals): updated_ts tracks the last status change;
