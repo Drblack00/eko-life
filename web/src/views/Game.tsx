@@ -1257,12 +1257,9 @@ export function Game({
       {tab === "home" && (
         <HomeOverlays
           token={token}
-          shift={you.shift ?? null}
-          fares={config?.travelFares}
           cleanMode={cleanMode}
           onToggleClean={() => setCleanMode((c) => !c)}
           onOpenApp={openPhoneApp}
-          onTab={(t) => (t === "phone" ? setPhoneOpen(true) : setTab(t))}
           onOpenShortcuts={() => setShortcutsOpen(true)}
           onOpenCharacter={openCharacterPanel}
         />
@@ -1312,6 +1309,8 @@ export function Game({
             sock={sock}
             sendAct={sock.sendAct}
             onBuySheetOpen={setBuySheetOpen}
+            onOpenApp={openPhoneApp}
+            onTab={(t) => (t === "phone" ? setPhoneOpen(true) : setTab(t))}
           />
         )}
         {tab === "buy" && config && (
@@ -1460,6 +1459,7 @@ export function Game({
         activeApp={phoneApp}
         onSelectApp={setPhoneApp}
         renderApp={renderPhoneApp}
+        token={token}
       />
 
       <TabBar
