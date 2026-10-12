@@ -4,12 +4,12 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /**
- * Header pills contract (2026-10-12 user request): the single overstuffed
- * top status pill scrolled horizontally on phones and clipped the
- * notification bell. It is now TWO glass pills in a flex row — a status
- * pill (avatar, name, clock, mood, online) and a compact actions pill
- * (sound, wallet + top-up, bell, governor). No horizontal scrolling
- * anywhere; every button keeps its behavior and aria wiring.
+ * Header contract — "Pill + floating orbs" (user-picked 2026-10-12).
+ * The status pill holds the avatar + two stacked text lines (name /
+ * mood · online); every action floats as its own glass circle — wallet
+ * pill, bell orb, governor orb. The sound toggle lives in Settings
+ * (CharacterPanel), not in the header. No horizontal scrolling anywhere;
+ * nothing may clip at 390px.
  * Source-level (node-only vitest); real-browser screenshots are the visual
  * proof.
  */
@@ -29,7 +29,6 @@ function ruleBlock(css: string, selector: string): string {
 function pillsBlock(): string {
   const start = gameTsx.indexOf('className="eko-hud__pills"');
   expect(start).toBeGreaterThan(-1);
-  // Walk forward balancing <div / </div> from the wrapper's opening tag.
   const openTagEnd = gameTsx.indexOf(">", start);
   let depth = 1;
   let i = openTagEnd + 1;
@@ -41,65 +40,78 @@ function pillsBlock(): string {
   return gameTsx.slice(start, i);
 }
 
-describe("two-pill header structure (Game.tsx)", () => {
-  it("renders a pills row with a status pill and an actions pill", () => {
+describe("orbs header structure (Game.tsx)", () => {
+  it("renders a pills row with a status pill and an orbs row", () => {
     expect(gameTsx).toContain('className="eko-hud__pills"');
     expect(gameTsx).toContain("eko-top-pill--status");
-    expect(gameTsx).toContain("eko-top-pill--actions");
+    expect(gameTsx).toContain('className="eko-hud__orbs"');
+    // The old compact actions pill is gone.
+    expect(gameTsx).not.toContain("eko-top-pill--actions");
   });
 
-  it("status pill holds avatar, name, clock, mood, online — and nothing actionable else", () => {
+  it("status pill stacks avatar + name / mood · online — and nothing actionable else", () => {
     const pills = pillsBlock();
     const statusStart = pills.indexOf("eko-top-pill--status");
-    const actionsStart = pills.indexOf("eko-top-pill--actions");
-    const status = pills.slice(statusStart, actionsStart);
+    const orbsStart = pills.indexOf("eko-hud__orbs");
+    const status = pills.slice(statusStart, orbsStart);
     expect(status).toContain("eko-top-pill__avatar");
+    expect(status).toContain("eko-top-pill__stack");
     expect(status).toContain("eko-top-pill__name");
+    expect(status).toContain("eko-top-pill__meta");
     expect(status).toContain("<Clock");
     expect(status).toContain("eko-top-pill__mood");
     expect(status).toContain("eko-top-pill__online");
     expect(status).not.toContain("eko-notifbell");
-    expect(status).not.toContain("eko-hud__gov");
-    expect(status).not.toContain("eko-top-pill__wallet");
+    expect(status).not.toContain("eko-orb--gov");
+    expect(status).not.toContain("eko-orb--wallet");
   });
 
-  it("actions pill holds sound, wallet + top-up, bell, governor", () => {
+  it("orbs row holds wallet pill, bell orb, governor orb", () => {
     const pills = pillsBlock();
-    const actionsStart = pills.indexOf("eko-top-pill--actions");
-    const actions = pills.slice(actionsStart);
-    expect(actions).toContain("eko-top-pill__iconbtn");
-    expect(actions).toContain("eko-top-pill__wallet");
-    expect(actions).toContain("eko-top-pill__topup");
-    expect(actions).toContain("NotificationBell");
-    expect(actions).toContain("eko-hud__gov");
+    const orbsStart = pills.indexOf("eko-hud__orbs");
+    const orbs = pills.slice(orbsStart);
+    expect(orbs).toContain("eko-orb--wallet");
+    expect(orbs).toContain("eko-orb__wallet-text");
+    expect(orbs).toContain("eko-top-pill__topup");
+    expect(orbs).toContain("NotificationBell");
+    expect(orbs).toContain("eko-orb--gov");
   });
 
-  it("every button keeps its behavior and aria wiring", () => {
+  it("the sound toggle is gone from the header (it lives in Settings)", () => {
+    const pills = pillsBlock();
+    expect(pills).not.toMatch(/toggleSound/);
+    expect(pills).not.toMatch(/aria-pressed=\{soundOn\}/);
+    expect(pills).not.toContain("Mute sounds");
+  });
+
+  it("governor orb is icon-only; full text stays in title/aria-label", () => {
+    const pills = pillsBlock();
+    const orbsStart = pills.indexOf("eko-hud__orbs");
+    const orbs = pills.slice(orbsStart);
+    expect(orbs).not.toContain("eko-hud__gov-text");
+    expect(orbs).toMatch(/title=\{governorName \? `State House/);
+    expect(orbs).toMatch(/aria-label=\{governorName \? `State House/);
+    expect(orbs).toContain('aria-haspopup="dialog"');
+    expect(orbs).toMatch(/onClick=\{onGovOpen\}/);
+  });
+
+  it("every remaining button keeps its behavior and aria wiring", () => {
     const pills = pillsBlock();
     // avatar → character panel
     expect(pills).toMatch(/onClick=\{onOpenCharacter\}/);
     expect(pills).toContain('aria-label="Open my character panel"');
-    // sound toggle
-    expect(pills).toMatch(/aria-pressed=\{soundOn\}/);
-    expect(pills).toMatch(/onClick=\{toggleSound\}/);
     // top-up
     expect(pills).toMatch(/onTopUp\(\)/);
     expect(pills).toContain('aria-label="Top up wallet"');
     // bell keeps the unread count wiring
     expect(pills).toMatch(/<NotificationBell unread=\{unreadNotifications\}/);
     expect(pills).toMatch(/onOpen=\{onOpenNotifications\}/);
-    // governor: opens State House, full text preserved in title
-    expect(pills).toMatch(/onClick=\{onGovOpen\}/);
-    expect(pills).toContain('aria-haspopup="dialog"');
-    expect(pills).toMatch(/title=\{governorName \? `State House/);
   });
 });
 
 describe("no-clipping CSS contract (HomeChrome.css)", () => {
-  it("the top pill no longer scrolls horizontally", () => {
-    const pill = ruleBlock(chromeCss, ".eko-top-pill");
-    expect(pill).not.toMatch(/overflow-x:\s*auto/);
-    expect(pill).not.toMatch(/overflow-x:\s*scroll/);
+  it("the header never scrolls horizontally", () => {
+    expect(chromeCss).not.toMatch(/overflow-x:\s*(auto|scroll)/);
   });
 
   it("the pills row is a non-wrapping flex row", () => {
@@ -107,46 +119,50 @@ describe("no-clipping CSS contract (HomeChrome.css)", () => {
     expect(row).toMatch(/display:\s*flex/);
   });
 
-  it("the status pill can shrink and hides overflow instead of scrolling", () => {
+  it("the status pill has generous padding and hides overflow instead of spilling", () => {
     const status = ruleBlock(chromeCss, ".eko-top-pill--status");
     expect(status).toMatch(/min-width:\s*0/);
     expect(status).toMatch(/overflow:\s*hidden/);
+    expect(status).toMatch(/padding:\s*0\.55rem 1\.25rem/);
   });
 
-  it("the governor button is the shrinkable item with ellipsis", () => {
-    const gov = ruleBlock(
-      chromeCss,
-      ".eko-hud .eko-top-pill--actions .eko-hud__gov"
-    );
-    expect(gov).toMatch(/flex:\s*0 1 auto/);
-    expect(gov).toMatch(/min-width:\s*0|2\.4rem/);
+  it("orbs are circles with a fixed size", () => {
+    const orb = ruleBlock(chromeCss, ".eko-orb");
+    expect(orb).toMatch(/border-radius:\s*50%/);
+    expect(orb).toMatch(/width:\s*2\.65rem/);
+    expect(orb).toMatch(/height:\s*2\.65rem/);
   });
 
-  it("phones show the governor button as a clean icon (text hidden, title keeps full text)", () => {
-    const mqStart = chromeCss.indexOf("@media (max-width: 560px)");
-    const mq = chromeCss.slice(mqStart);
-    expect(mq).toMatch(
-      /\.eko-hud \.eko-top-pill--actions \.eko-hud__gov-text\s*\{\s*display:\s*none/
-    );
-    // JSX still renders the full text for wider screens + screen readers
-    expect(gameTsx).toContain("eko-hud__gov-text");
-    expect(gameTsx).toContain("No governor");
+  it("the governor orb overrides the old pill-style gov button", () => {
+    const gov = ruleBlock(chromeCss, ".eko-hud .eko-orb--gov");
+    expect(gov).toMatch(/appearance:\s*none/);
+    expect(gov).toMatch(/max-width:\s*none/);
+    // The circle itself comes from the shared .eko-orb base class.
+    const orb = ruleBlock(chromeCss, ".eko-orb");
+    expect(orb).toMatch(/border-radius:\s*50%/);
   });
 
-  it("small screens compact the pills instead of clipping", () => {
+  it("long wallet balances ellipsize instead of pushing orbs off-screen", () => {
+    const wt = ruleBlock(chromeCss, ".eko-orb__wallet-text");
+    expect(wt).toMatch(/text-overflow:\s*ellipsis/);
+    expect(wt).toMatch(/min-width:\s*0/);
+    expect(gameTsx).toContain("eko-orb__wallet-text");
+  });
+
+  it("phones hide the ambient clock; the meta line compacts instead of clipping", () => {
     const mqStart = chromeCss.indexOf("@media (max-width: 560px)");
     expect(mqStart).toBeGreaterThan(-1);
     const mq = chromeCss.slice(mqStart);
-    expect(mq).toContain(".eko-hud__pills");
-    // The ambient clock hides on phones (status bar already shows the time)
     expect(mq).toMatch(/\.eko-hud \.m7-clock\s*\{\s*display:\s*none/);
-    expect(mq).toContain(".eko-top-pill--actions .eko-hud__gov");
+    expect(mq).toContain(".eko-hud__orbs");
+    expect(mq).toContain(".eko-orb--wallet");
   });
 
-  it("long wallet balances ellipsize instead of pushing the bell off-screen", () => {
-    const wt = ruleBlock(chromeCss, ".eko-top-pill__wallet-text");
-    expect(wt).toMatch(/text-overflow:\s*ellipsis/);
-    expect(wt).toMatch(/min-width:\s*0/);
-    expect(gameTsx).toContain("eko-top-pill__wallet-text");
+  it("the phone media query keeps the wallet pill auto-width (else the fixed orb width crushes the balance text)", () => {
+    const mqStart = chromeCss.indexOf("@media (max-width: 560px)");
+    const mq = chromeCss.slice(mqStart);
+    const m = mq.match(/\.eko-orb--wallet\s*\{([^}]*)\}/s);
+    expect(m).not.toBeNull();
+    expect(m![1]).toMatch(/width:\s*auto/);
   });
 });
