@@ -3,8 +3,16 @@
  * - Same-origin static assets: cache-first with background revalidation.
  * - /api/* : network-only, never cached.
  */
-const CACHE = "eko-life-m1-v1";
-const SHELL = ["/", "/index.html", "/manifest.webmanifest"];
+const CACHE = "eko-life-pwa-v2";
+const SHELL = [
+  "/",
+  "/index.html",
+  "/manifest.webmanifest",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/icon-maskable-512.png",
+  "/icons/apple-touch-icon.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
