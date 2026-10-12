@@ -20,7 +20,13 @@
 //   buildCatalog() -> catalog payload for GET /api/avatar/catalog
 //   AppearanceValidationError / AppearanceConflictError / AppearanceNotFoundError
 // ============================================================
-import { dbGet, dbRun, dbMode } from '../db.js';
+import { dbGet, dbRun, dbMode, ownsBoutiqueItem } from '../db.js';
+import {
+  boutiqueItemForOutfit,
+  BOUTIQUE_DECOMPOSITION,
+  AVATAR_TOP_COLORS,
+  AVATAR_BOTTOM_COLORS,
+} from './data.js';
 
 /* ------------------------------------------------------------------ */
 /* Error types — routes map `code` → HTTP status.                      */
@@ -115,16 +121,8 @@ const LEGACY_OUTFITS = ['casual', 'hoodie', 'office', 'chill', 'sitework'];
 
 const ACCESSORY_SLOTS = ['head', 'face', 'ears', 'neck', 'wrist'];
 
-// Colour palettes — mirror server AVATAR_TOP_COLORS / AVATAR_BOTTOM_COLORS
-// (game/data.js) and web/src/avatar/validation.ts.
-const AVATAR_TOP_COLORS = [
-  '#22d3ee', '#f472b6', '#a3e635', '#fbbf24', '#c084fc',
-  '#fb7185', '#34d399', '#60a5fa', '#ef4444', '#fb923c',
-];
-const AVATAR_BOTTOM_COLORS = [
-  '#334155', '#111827', '#f8fafc', '#1e3a8a', '#64748b',
-  '#78350f', '#14532d', '#7c2d12', '#831843', '#3b0764',
-];
+// Colour palettes — imported from game/data.js (single source of truth);
+// web/src/avatar/validation.ts mirrors them client-side.
 
 // Permitted morphs — mirror web/src/avatar/schema.ts PERMITTED_MORPHS
 // (each 0..1, default 0.5; validated+stored, applied by the M3 builder).
@@ -633,6 +631,28 @@ export async function persistAppearance({ userId, characterId, appearance, expec
     throw new AppearanceValidationError(res.errors);
   }
   const canonical = res.appearance;
+
+  // Phase 6: boutique premium outfits are wearable only when owned.
+  // The clothing ids themselves are all valid manifest assets, so detect
+  // the premium combo by inverting the decomposition (mirrors the
+  // client's assembler.outfitIdForClothing).
+  if (canonical.clothing) {
+    const c = canonical.clothing;
+    const key = `${c.topId}|${c.bottomId}|${c.outerwearId ?? ''}|${c.shoeId}`;
+    for (const [outfitId, decomp] of Object.entries(BOUTIQUE_DECOMPOSITION)) {
+      const dkey = `${decomp.topId}|${decomp.bottomId}|${decomp.outerwearId ?? ''}|${decomp.shoeId}`;
+      if (key === dkey) {
+        const item = boutiqueItemForOutfit(outfitId);
+        if (item && !(await ownsBoutiqueItem(userId, item.id))) {
+          throw new AppearanceValidationError([
+            `Outfit '${item.name}' is a boutique exclusive — buy it in the Boutique app first.`,
+          ]);
+        }
+        break;
+      }
+    }
+  }
+
   const canonicalJson = JSON.stringify(canonical);
 
   const current = Number(row.appearance_rev ?? 0) || 0;

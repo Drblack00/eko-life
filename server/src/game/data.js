@@ -386,6 +386,55 @@ export const AVATAR_OUTFITS = [
   { id: 'sitework', name: 'Site work' },
 ];
 
+/* ------------------------------------------------------------------ */
+/* Phase 6: Boutique — premium outfits bought with gameplay coins.     */
+/* Each item maps to a renderer OutfitId (see                        */
+/* web/src/views/avatar/parts/clothing.ts) with distinct procedural   */
+/* geometry. The decomposition mirrors the client's OUTFIT_ROWS so    */
+/* the server can invert a saved v1 clothing block to its outfit and  */
+/* enforce wardrobe ownership on avatar saves.                        */
+/* ------------------------------------------------------------------ */
+
+export const BOUTIQUE_ITEMS = [
+  { id: 'bq_senator',    outfitId: 'senator',    name: 'Senator Set',         price: 85000,   occasion: 'traditional', blurb: 'Knee-length embroidered tunic with gold chest embroidery. Boardroom to owambe, no changing room needed.' },
+  { id: 'bq_dashiki',    outfitId: 'dashiki',    name: 'Dashiki Royale',      price: 45000,   occasion: 'traditional', blurb: 'Relaxed dashiki with a bold embroidered V. Heritage you can feel.' },
+  { id: 'bq_kaftan',     outfitId: 'kaftan',     name: 'Kaftan Luxe',         price: 120000,  occasion: 'traditional', blurb: 'Ankle-length flowing kaftan with a hand-finished neckline. Effortless grace.' },
+  { id: 'bq_adire_gown', outfitId: 'adire_gown', name: 'Adire Gown',          price: 150000,  occasion: 'owambe',      blurb: 'Floor-length adire gown on a fitted bodice. The entrance makes itself.' },
+  { id: 'bq_ankara_set', outfitId: 'ankara_set', name: 'Ankara Two-Piece',    price: 95000,   occasion: 'owambe',      blurb: 'Fitted ankara top over a wrapper skirt. Print game: undefeated.' },
+  { id: 'bq_asoebi',     outfitId: 'asoebi',     name: 'Aso-Ebi Glam',        price: 250000,  occasion: 'owambe',      blurb: 'Peplum party dress with a flared ruffle. For when the gele has to sit right.' },
+  { id: 'bq_tuxedo',     outfitId: 'tuxedo',     name: 'Black Tie Tuxedo',    price: 550000,  occasion: 'office',      blurb: 'Sharp tuxedo, bow tie, peaked lapels. The deal closes itself.' },
+  { id: 'bq_suit',       outfitId: 'suit',       name: 'Executive Suit',      price: 350000,  occasion: 'office',      blurb: 'Tailored two-piece with notch lapels. Corner-office energy.' },
+  { id: 'bq_streetwear', outfitId: 'streetwear', name: 'Streetwear Drop',     price: 60000,   occasion: 'street',      blurb: 'Oversized hoodie, cargo, and a chain. Limited-drop attitude, everyday price.' },
+  { id: 'bq_denim',      outfitId: 'denim',      name: 'Denim Culture',       price: 75000,   occasion: 'street',      blurb: 'Denim trucker jacket over clean jeans. Never out of season.' },
+  { id: 'bq_sport_luxe', outfitId: 'sport_luxe', name: 'Sport Luxe Tracksuit', price: 55000,  occasion: 'street',      blurb: 'Zip-up track jacket and track pants. Athleisure, but make it luxury.' },
+  { id: 'bq_royalty',    outfitId: 'royalty',    name: 'Royalty Agbada',      price: 1800000, occasion: 'traditional', blurb: 'Grand royal boubou with heavy gold embroidery and a sternum medallion. For thrones, not queues.' },
+];
+
+/** Decompositions mirror web/src/views/avatar/editor/catalog.ts OUTFIT_ROWS. */
+export const BOUTIQUE_DECOMPOSITION = {
+  senator:    { topId: 'top_agbada_01',       bottomId: 'bottom_trouser_01', outerwearId: null,               shoeId: 'shoe_oxford_01' },
+  dashiki:    { topId: 'top_tee_01',          bottomId: 'bottom_trouser_01', outerwearId: null,               shoeId: 'shoe_sandal_01' },
+  kaftan:     { topId: 'top_agbada_01',       bottomId: 'bottom_skirt_01',   outerwearId: null,               shoeId: 'shoe_sandal_01' },
+  adire_gown: { topId: 'top_dress_01',        bottomId: 'bottom_skirt_01',   outerwearId: null,               shoeId: 'shoe_sneaker_01' },
+  ankara_set: { topId: 'top_dress_01',        bottomId: 'bottom_skirt_01',   outerwearId: null,               shoeId: 'shoe_sandal_01' },
+  asoebi:     { topId: 'top_dress_01',        bottomId: 'bottom_short_01',   outerwearId: null,               shoeId: 'shoe_heel_01' },
+  tuxedo:     { topId: 'top_shirt_office_01', bottomId: 'bottom_cargo_01',   outerwearId: null,               shoeId: 'shoe_oxford_01' },
+  suit:       { topId: 'top_tee_01',          bottomId: 'bottom_trouser_01', outerwearId: null,               shoeId: 'shoe_oxford_01' },
+  streetwear: { topId: 'top_tee_01',          bottomId: 'bottom_cargo_01',   outerwearId: null,               shoeId: 'shoe_sneaker_01' },
+  denim:      { topId: 'top_tank_01',         bottomId: 'bottom_trouser_01', outerwearId: null,               shoeId: 'shoe_sneaker_01' },
+  sport_luxe: { topId: 'top_tank_01',         bottomId: 'bottom_trouser_01', outerwearId: 'outer_hoodie_01',  shoeId: 'shoe_sneaker_01' },
+  royalty:    { topId: 'top_agbada_01',       bottomId: 'bottom_cargo_01',   outerwearId: null,               shoeId: 'shoe_sandal_01' },
+};
+
+export function boutiqueItemById(id) {
+  return BOUTIQUE_ITEMS.find(i => i.id === id) || null;
+}
+
+/** outfitId → boutique item (only premium outfits are listed). */
+export function boutiqueItemForOutfit(outfitId) {
+  return BOUTIQUE_ITEMS.find(i => i.outfitId === outfitId) || null;
+}
+
 export const AVATAR_FABRICS = [
   { id: 'plain',  name: 'Plain' },
   { id: 'ankara', name: 'Ankara' },
@@ -396,11 +445,18 @@ export const AVATAR_FABRICS = [
 export const AVATAR_TOP_COLORS = [
   '#22d3ee', '#f472b6', '#a3e635', '#fbbf24', '#c084fc',
   '#fb7185', '#34d399', '#60a5fa', '#ef4444', '#fb923c',
+  // Phase 6 (boutique): signature garment colors for premium outfits.
+  '#f8fafc', '#c2703d', '#0f766e', '#1e3a8a', '#e11d48',
+  '#f5d76e', '#111418', '#374151', '#7c3aed', '#3b82c4',
+  '#18181b',
 ];
 
 export const AVATAR_BOTTOM_COLORS = [
   '#334155', '#111827', '#f8fafc', '#1e3a8a', '#64748b',
   '#78350f', '#14532d', '#7c2d12', '#831843', '#3b0764',
+  // Phase 6 (boutique): signature garment colors for premium outfits.
+  '#1f2430', '#3b2f2f', '#134e4a', '#172554', '#b45309',
+  '#92400e', '#111418', '#1f2937', '#18181b', '#1e40af',
 ];
 
 export const DEFAULT_AVATAR = {
