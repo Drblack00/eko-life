@@ -46,6 +46,8 @@ import { Phone } from "./phone/Phone";
 import { BuyView } from "./buy/BuyView";
 import { Walkthrough, WALKTHROUGH_KEY } from "./Walkthrough";
 import { ThemePicker } from "../theme/theme";
+import { CharacterPanel, type CharacterTabId } from "./CharacterPanel";
+import "./CharacterPanel.css";
 // M21: notifications (bell, panel, live toasts).
 import {
   NotificationBell,
@@ -96,7 +98,8 @@ function Hud({
   governorName,
   online,
   unreadNotifications,
-  onOpenMe,
+  onOpenCharacter,
+  onOpenNeeds,
   onOpenNotifications,
   onGovOpen,
   onRetry,
@@ -109,7 +112,8 @@ function Hud({
   governorName: string | null;
   online: number;
   unreadNotifications: number;
-  onOpenMe: () => void;
+  onOpenCharacter: () => void;
+  onOpenNeeds: () => void;
   onOpenNotifications: () => void;
   onGovOpen: () => void;
   onRetry: () => void;
@@ -138,9 +142,9 @@ function Hud({
           type="button"
           className="eko-top-pill__avatar"
           style={{ backgroundColor: you.color }}
-          onClick={onOpenMe}
-          title="My profile"
-          aria-label="Open my profile"
+          onClick={onOpenCharacter}
+          title="My character"
+          aria-label="Open my character panel"
         >
           {you.avatar}
         </button>
@@ -203,7 +207,17 @@ function Hud({
           {governorName ? `👑 @${governorName}` : "🏛️ No governor"}
         </button>
       </div>
-      <div className="eko-hud__stats">
+      <div
+        className="eko-hud__stats eko-hud__stats--clickable"
+        onClick={onOpenNeeds}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") onOpenNeeds();
+        }}
+        aria-label="Open needs"
+        title="Open needs"
+      >
         <StatBar label="Energy" value={you.energy} icon="⚡" />
         <StatBar label="Health" value={you.health} icon="❤️" />
         <StatBar label="Happiness" value={you.happiness} icon="😊" />
@@ -739,6 +753,15 @@ export function Game({
     setPhoneApp(app);
     setPhoneOpen(true);
   }, []);
+  // Character panel (Phase 2 of the reference audit): tabbed dialog opened
+  // from the avatar button in the top status pill.
+  const [charPanel, setCharPanel] = useState<{
+    open: boolean;
+    tab: CharacterTabId;
+  }>({ open: false, tab: "profile" });
+  const openCharacterPanel = useCallback((tab: CharacterTabId) => {
+    setCharPanel({ open: true, tab });
+  }, []);
   // First-launch walkthrough (skippable, replayable from Me → Settings).
   const [walkthroughOpen, setWalkthroughOpen] = useState(false);
   const replayWalkthrough = useCallback(() => {
@@ -1091,7 +1114,8 @@ export function Game({
         governorName={sock.governor?.name ?? null}
         online={sock.online}
         unreadNotifications={sock.unreadNotifications}
-        onOpenMe={() => openPhoneApp("me")}
+        onOpenCharacter={() => openCharacterPanel("profile")}
+        onOpenNeeds={() => openCharacterPanel("needs")}
         onOpenNotifications={() => {
           setNotifOpen(true);
           sock.openNotifications(); // loads the list + clears the badge
@@ -1133,6 +1157,7 @@ export function Game({
           onOpenApp={openPhoneApp}
           onTab={(t) => (t === "phone" ? setPhoneOpen(true) : setTab(t))}
           onOpenShortcuts={() => setShortcutsOpen(true)}
+          onOpenCharacter={openCharacterPanel}
         />
       )}
 
@@ -1283,6 +1308,23 @@ export function Game({
         onTap={onNotificationTap}
         onDismiss={sock.dismissNotifToast}
       />
+
+      {/* Phase 2: tabbed character panel (avatar button in the top pill). */}
+      {you && (
+        <CharacterPanel
+          open={charPanel.open}
+          initialTab={charPanel.tab}
+          token={token}
+          you={you}
+          onClose={() => setCharPanel((p) => ({ ...p, open: false }))}
+          onOpenApp={openPhoneApp}
+          onReplayWalkthrough={replayWalkthrough}
+          onSignOut={onSignOut}
+          notifPrefs={sock.notifPrefs}
+          onNotifPrefs={sock.updateNotifPrefs}
+          onProfileChanged={(patch) => sock.patchYou(patch)}
+        />
+      )}
 
       <Phone
         open={phoneOpen}

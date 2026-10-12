@@ -1,0 +1,448 @@
+/* Character panel — tabbed character dialog (Phase 2 of the reference audit). */
+
+.eko-char {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: min(78vh, 640px);
+}
+
+.eko-char__tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  flex: 0 0 auto;
+}
+
+.eko-char__tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.65;
+  cursor: pointer;
+  font-size: 18px;
+  min-width: 56px;
+}
+
+.eko-char__tab-label {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.eko-char__tab--active {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.eko-char__body {
+  overflow-y: auto;
+  padding: 12px 4px 4px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.eko-char__h {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.eko-char__sub {
+  margin: 0 0 8px;
+  opacity: 0.75;
+  font-size: 13px;
+}
+
+.eko-char__tip {
+  margin: 4px 2px 0;
+  opacity: 0.6;
+  font-size: 12px;
+}
+
+.eko-char__error {
+  color: #f87171;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* Profile */
+.eko-char__preview {
+  position: relative;
+  height: 280px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 30%, rgba(120, 160, 220, 0.25), rgba(10, 15, 30, 0.55));
+}
+
+.eko-char__preview > div:first-child {
+  position: absolute;
+  inset: 0;
+}
+
+.eko-char__preview-hint {
+  position: absolute;
+  bottom: 6px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+  opacity: 0.6;
+  margin: 0;
+  pointer-events: none;
+}
+
+.eko-char__profile {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.eko-char__rows {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eko-char__rows > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.eko-char__rows dt {
+  opacity: 0.65;
+  font-weight: 600;
+}
+
+.eko-char__rows dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.eko-char__linkbtn {
+  background: none;
+  border: 0;
+  color: #7dd3fc;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 2px 4px;
+}
+
+.eko-char__linktext {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.eko-char__editrow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.eko-char__editrow input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  font-size: 14px;
+}
+
+/* Needs */
+.eko-char__needs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eko-char__need,
+.eko-char__skill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.eko-char__need-icon,
+.eko-char__skill-icon {
+  font-size: 18px;
+  width: 26px;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+.eko-char__need-label {
+  width: 64px;
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
+.eko-char__need-bar {
+  flex: 1;
+  height: 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.eko-char__need-fill {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #34d399, #a3e635);
+  transition: width 0.4s ease;
+}
+
+.eko-char__need-fill--low {
+  background: linear-gradient(90deg, #f87171, #fb923c);
+}
+
+.eko-char__need-pct {
+  width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+  flex: 0 0 auto;
+}
+
+.eko-char__feelings p {
+  margin: 6px 0;
+  font-size: 14px;
+}
+
+/* Goals */
+.eko-char__missions,
+.eko-char__perks,
+.eko-char__certs,
+.eko-char__friends,
+.eko-char__tracks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eko-char__missions li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.eko-char__mission--done {
+  opacity: 0.6;
+}
+
+.eko-char__reward {
+  margin-left: auto;
+  font-weight: 700;
+  color: #fbbf24;
+  white-space: nowrap;
+}
+
+.eko-char__perks li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 14px;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.eko-char__perks li > span:nth-child(2) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.eko-char__perks small {
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+.eko-char__perk--owned {
+  outline: 1px solid rgba(52, 211, 153, 0.5);
+}
+
+.eko-char__perk-cost {
+  white-space: nowrap;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+/* Skills */
+.eko-char__skills {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.eko-char__skill-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eko-char__skill-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.eko-char__certs li {
+  font-size: 14px;
+}
+
+/* People */
+.eko-char__friends li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.eko-char__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #6b7280;
+  flex: 0 0 auto;
+}
+
+.eko-char__dot--on {
+  background: #34d399;
+  box-shadow: 0 0 6px #34d399;
+}
+
+.eko-char__friend-status {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* Career */
+.eko-char__ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eko-char__ladder li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 14px;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.eko-char__ladder--current {
+  outline: 1px solid rgba(125, 211, 252, 0.6);
+}
+
+.eko-char__ladder em {
+  font-style: normal;
+  color: #7dd3fc;
+  font-size: 12px;
+}
+
+.eko-char__tracks li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 14px;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.eko-char__tracks li > span:nth-child(2) {
+  display: flex;
+  flex-direction: column;
+}
+
+.eko-char__tracks small {
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+/* Settings */
+.eko-char__switchrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.eko-char__switchrow > span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.eko-char__switchrow small {
+  opacity: 0.65;
+  font-size: 12px;
+}
+
+.eko-char__signout {
+  align-self: center;
+  margin-top: 4px;
+}
+
+/* Make HUD stat bars open the Needs tab */
+.eko-hud__stats--clickable {
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .eko-char__tab-label {
+    display: none;
+  }
+  .eko-char__tab {
+    min-width: 44px;
+    font-size: 20px;
+  }
+  .eko-char__preview {
+    height: 230px;
+  }
+}
