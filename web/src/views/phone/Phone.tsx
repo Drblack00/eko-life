@@ -7,13 +7,14 @@ export interface PhoneApp {
   icon: string;
 }
 
-/** The six apps inside the Phone slide-over. Order is the grid order. */
+/** The seven apps inside the Phone slide-over. Order is the grid order. */
 export const PHONE_APPS: PhoneApp[] = [
   { id: "jobs", label: "Jobs", icon: "💼" },
   { id: "daily", label: "Daily", icon: "🎯" },
   { id: "market", label: "Market", icon: "💰" },
   { id: "chat", label: "Chat", icon: "💬" },
   { id: "friends", label: "Friends", icon: "🤝" },
+  { id: "style", label: "Style", icon: "✨" },
   { id: "me", label: "Me", icon: "🧑" },
 ];
 
@@ -65,7 +66,7 @@ export function Phone({ open, onClose, activeApp, onSelectApp, renderApp }: Phon
   return (
     <div className="eko-phone__scrim" onClick={onClose}>
       <section
-        className="eko-phone__panel"
+        className={`eko-phone__panel${activeApp === "style" ? " eko-phone__panel--wide" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={isAppOpen ? `${appLabel} — Phone` : "Phone"}
