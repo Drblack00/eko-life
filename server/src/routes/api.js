@@ -15,6 +15,7 @@ import { createNotificationsRouter } from './notifications.js';
 import { createGistsRouter, createNewsRouter } from './gists.js';
 import { createBankRouter } from './bank.js';
 import { createBoutiqueRouter } from './boutique.js';
+import { createGovRouter } from './gov.js';
 import { createCashWalletRouter } from './cashWallet.js';
 import { createCashFlowsRouter } from './cashFlows.js';
 import { createCashAdminRouter } from './cashAdmin.js';
@@ -216,7 +217,12 @@ export function createApiRouter({ hub, getDay }) {
     const limit = Math.max(1, Math.min(50, Math.floor(Number(req.query.limit) || 25)));
     const leaders = await listTopByNetWorth(limit);
     const { rank, totalPlayers } = await getNetWorthRank(req.userId);
-    res.json({ leaders, yourRank: rank, totalPlayers });
+    // Phase 8: mark the sitting governor (👑 badge on their row).
+    const govId = Number(await getMeta('governor_id')) || 0;
+    res.json({
+      leaders: leaders.map((l) => ({ ...l, isGovernor: govId !== 0 && Number(l.id) === govId })),
+      yourRank: rank, totalPlayers,
+    });
   });
 
   // ---- public game data (server is the source of truth) ----
@@ -319,6 +325,9 @@ export function createApiRouter({ hub, getDay }) {
 
   // ---- Phase 6: Boutique clothing shop (gameplay coins only) ----
   router.use('/boutique', createBoutiqueRouter());
+
+  // ---- Phase 8: Èkó Gov — governor election + governance REST ----
+  router.use('/gov', createGovRouter({ hub, getDay }));
 
   // ---- Phase 3: News tab headlines (standard in-game session auth).
   // Mounted at /api/headlines — /api/news is the older M5 ticker feed.
