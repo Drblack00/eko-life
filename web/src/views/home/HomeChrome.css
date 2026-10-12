@@ -28,6 +28,8 @@
 .eko-top-pill__avatar {
   width: 2.1rem;
   height: 2.1rem;
+  min-width: 2.1rem;
+  min-height: 2.1rem;
   border-radius: 50%;
   border: 2px solid var(--surface-2);
   font-size: 1.15rem;
@@ -85,6 +87,15 @@
   flex: none;
   position: relative;
   padding: 0;
+  /* Hard floor: no engine may squeeze a circle into an oval, even when the
+     row is under width pressure (iOS Safari quirk with shrunken buttons). */
+  min-width: 2.65rem;
+  min-height: 2.65rem;
+}
+.eko-orb--wallet {
+  /* The wallet is a pill, not a circle — it keeps width:auto. */
+  min-width: 0;
+  min-height: 0;
 }
 /* Wallet floats as a small pill: balance text + green top-up button. */
 .eko-orb--wallet {
@@ -135,6 +146,8 @@
 .eko-top-pill__topup {
   width: 1.6rem;
   height: 1.6rem;
+  min-width: 1.6rem;
+  min-height: 1.6rem;
   border-radius: 50%;
   border: none;
   background: #22c55e;
@@ -421,6 +434,8 @@
   .eko-top-pill__avatar {
     width: 1.8rem;
     height: 1.8rem;
+    min-width: 1.8rem;
+    min-height: 1.8rem;
     font-size: 1rem;
   }
   .eko-top-pill__name {
@@ -449,6 +464,8 @@
   .eko-orb {
     width: 2.45rem;
     height: 2.45rem;
+    min-width: 2.45rem;
+    min-height: 2.45rem;
   }
   .eko-orb--wallet {
     /* width:auto must be re-stated here: this block comes after the base
@@ -466,6 +483,8 @@
   .eko-top-pill__topup {
     width: 1.45rem;
     height: 1.45rem;
+    min-width: 1.45rem;
+    min-height: 1.45rem;
     font-size: 0.95rem;
   }
   .eko-hud__orbs .eko-notifbell {
