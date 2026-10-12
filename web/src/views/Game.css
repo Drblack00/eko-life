@@ -1016,22 +1016,26 @@
   background: rgba(120, 120, 128, 0.32);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.22);
   cursor: pointer;
-  position: relative;
-  padding: 0;
+  /* Flex layout (not absolute positioning) for the knob: iOS Safari has
+     flaky containing-block behavior for absolutely positioned children of
+     <button>, which left the knob riding outside the track. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 4px;
   transition: background 0.25s cubic-bezier(0.32, 1.2, 0.4, 1);
 }
 .eko-switch--on {
   background: var(--palm-500);
 }
 .eko-switch__knob {
-  position: absolute;
-  top: 4px;
-  left: 4px;
+  flex: none;
   width: 18px;
   height: 18px;
   border-radius: 999px;
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transform: translateX(0);
   transition: transform 0.3s cubic-bezier(0.32, 1.45, 0.4, 1);
 }
 .eko-switch--on .eko-switch__knob {
