@@ -7,13 +7,14 @@ export interface PhoneApp {
   icon: string;
 }
 
-/** The seven apps inside the Phone slide-over. Order is the grid order. */
+/** The eight apps inside the Phone slide-over. Order is the grid order. */
 export const PHONE_APPS: PhoneApp[] = [
   { id: "jobs", label: "Jobs", icon: "💼" },
   { id: "daily", label: "Daily", icon: "🎯" },
   { id: "market", label: "Market", icon: "💰" },
   { id: "chat", label: "Chat", icon: "💬" },
   { id: "friends", label: "Friends", icon: "🤝" },
+  { id: "gist", label: "Gist", icon: "📣" },
   { id: "style", label: "Style", icon: "✨" },
   { id: "me", label: "Me", icon: "🧑" },
 ];
