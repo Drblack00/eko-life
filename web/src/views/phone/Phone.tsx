@@ -7,7 +7,7 @@ export interface PhoneApp {
   icon: string;
 }
 
-/** The nine apps inside the Phone slide-over. Order is the grid order. */
+/** The eleven apps inside the Phone slide-over. Order is the grid order. */
 export const PHONE_APPS: PhoneApp[] = [
   { id: "jobs", label: "Jobs", icon: "💼" },
   { id: "daily", label: "Daily", icon: "🎯" },
@@ -19,6 +19,8 @@ export const PHONE_APPS: PhoneApp[] = [
   { id: "bank", label: "Èkó Reserve", icon: "🏦" },
   // Phase 6: Boutique — premium clothing shop.
   { id: "boutique", label: "Boutique", icon: "🛍️" },
+  // Phase 7: Èkó Rich List — top players by net worth.
+  { id: "richlist", label: "Rich List", icon: "🏆" },
   { id: "style", label: "Style", icon: "✨" },
   { id: "me", label: "Me", icon: "🧑" },
 ];
