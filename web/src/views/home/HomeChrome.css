@@ -1,109 +1,136 @@
 /* Home screen chrome — Phase 1 of the reference audit rebuild.
    Original styling; liquid-glass treatment matches the app theme. */
 
-/* ---- Top status pills: status (left) + quick actions (right).
-   Two glass pills in a flex row — no horizontal scrolling; everything must
-   fit a 390px phone. The gov button is the only shrinkable item and
-   ellipsizes gracefully (full text stays in its title attr). ---- */
+/* ---- Top header: status pill (left) + floating orbs (right).
+   "Pill + floating orbs" (user-picked 2026-10-12): the status pill holds the
+   avatar and two stacked text lines (name / mood · online), and every action
+   floats as its own glass circle — wallet pill, bell orb, governor orb.
+   No horizontal scrolling anywhere; everything must fit a 390px phone. ---- */
 .eko-hud__pills {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 .eko-top-pill {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.4rem 0.6rem;
-  border-radius: 999px;
   min-width: 0;
 }
 .eko-top-pill--status {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-}
-.eko-top-pill--status > * {
-  flex: none;
-}
-.eko-top-pill--actions {
-  flex: none;
-}
-/* The gov button may shrink inside the actions pill (overrides the
-   flex:none pin in Game.css, which existed for the old scrollable row). */
-.eko-hud .eko-top-pill--actions .eko-hud__gov {
-  flex: 0 1 auto;
-  min-width: 2.4rem;
-}
-/* Compact the bell inside the actions pill. */
-.eko-top-pill--actions .eko-notifbell {
-  width: 34px;
-  height: 34px;
-  font-size: 17px;
-  flex: none;
+  border-radius: 999px;
+  /* Generous padding so the name and online count never touch the pill edge. */
+  padding: 0.55rem 1.25rem 0.55rem 0.65rem;
+  gap: 0.65rem;
 }
 .eko-top-pill__avatar {
-  width: 2rem;
-  height: 2rem;
+  width: 2.1rem;
+  height: 2.1rem;
   border-radius: 50%;
   border: 2px solid var(--surface-2);
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
+  flex: none;
+}
+/* Two stacked status lines: bold name on top, mood · online below. */
+.eko-top-pill__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.25;
+  min-width: 0;
 }
 .eko-top-pill__name {
   font-weight: 700;
-  font-size: 0.85rem;
-  max-width: 7rem;
+  font-size: 0.88rem;
+  max-width: 8rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.eko-top-pill__sep {
-  width: 1px;
-  align-self: stretch;
-  background: var(--surface-2);
-  opacity: 0.6;
-}
-.eko-top-pill__mood,
-.eko-top-pill__online {
-  font-size: 0.8rem;
+.eko-top-pill__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
   font-weight: 600;
+  color: var(--text-2, inherit);
   white-space: nowrap;
 }
-.eko-top-pill__online {
-  color: var(--text-2, inherit);
+.eko-top-pill__mood {
+  white-space: nowrap;
 }
-.eko-top-pill__iconbtn {
-  border: none;
-  background: transparent;
-  font-size: 1.05rem;
-  line-height: 1;
-  padding: 0.25rem;
+/* ---- Floating orbs: each action is its own glass circle. ---- */
+.eko-hud__orbs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  flex: none;
+}
+.eko-orb {
+  width: 2.65rem;
+  height: 2.65rem;
   border-radius: 50%;
-  cursor: pointer;
-}
-.eko-top-pill__iconbtn:active {
-  transform: scale(0.92);
-}
-.eko-top-pill__wallet {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  font-weight: 700;
+  justify-content: center;
+  flex: none;
+  position: relative;
+  padding: 0;
+}
+/* Wallet floats as a small pill: balance text + green top-up button. */
+.eko-orb--wallet {
+  width: auto;
+  border-radius: 999px;
+  padding: 0.35rem 0.35rem 0.35rem 0.8rem;
+  gap: 0.45rem;
+  font-weight: 800;
   font-size: 0.85rem;
   white-space: nowrap;
-  min-width: 0;
 }
-.eko-top-pill__wallet-text {
+.eko-orb__wallet-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
+  max-width: 7rem;
+}
+/* Governor orb: icon-only (full title stays in its title/aria-label).
+   Resets the old pill-style gov button from Game.css (native button reset +
+   higher specificity keep iOS Safari from painting it over neighbours). */
+.eko-hud .eko-orb--gov {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  max-width: none;
+  min-height: 0;
+  min-width: 0;
+}
+.eko-hud .eko-orb--gov:active {
+  transform: scale(0.92);
+}
+/* Bell orb: let the notification bell fill its glass circle. */
+.eko-hud__orbs .eko-notifbell {
+  width: 100%;
+  height: 100%;
+  font-size: 1.1rem;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  flex: none;
 }
 .eko-top-pill__topup {
   width: 1.6rem;
@@ -119,6 +146,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: none;
 }
 .eko-top-pill__topup:active {
   transform: scale(0.9);
@@ -381,63 +409,70 @@
   font-size: 0.8rem;
 }
 
-/* ---- Small screens: the two pills share one row with zero clipping ---- */
+/* ---- Small screens: status pill + orbs share one row with zero clipping ---- */
 @media (max-width: 560px) {
-  .eko-top-pill__name {
-    display: none;
-  }
-  .eko-top-pill__mood-text {
-    display: none;
-  }
   .eko-hud__pills {
-    gap: 0.4rem;
+    gap: 0.45rem;
   }
-  .eko-top-pill {
-    padding: 0.32rem 0.5rem;
-    gap: 0.35rem;
+  .eko-top-pill--status {
+    padding: 0.45rem 1rem 0.45rem 0.55rem;
+    gap: 0.55rem;
   }
   .eko-top-pill__avatar {
-    width: 1.7rem;
-    height: 1.7rem;
+    width: 1.8rem;
+    height: 1.8rem;
     font-size: 1rem;
+  }
+  .eko-top-pill__name {
+    font-size: 0.8rem;
+    max-width: 6.5rem;
   }
   /* Phone status bar already shows Lagos time — the ambient game clock
      hides on small phones so the status pill never clips. */
   .eko-hud .m7-clock {
     display: none;
   }
-  .eko-top-pill__mood,
-  .eko-top-pill__online {
-    font-size: 0.72rem;
-  }
-  .eko-top-pill__iconbtn {
-    font-size: 0.95rem;
-    padding: 0.2rem;
-  }
-  .eko-top-pill__wallet {
-    font-size: 0.78rem;
+  .eko-top-pill__meta {
+    font-size: 0.7rem;
     gap: 0.25rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Phones show "😊 1 online" (mood word hidden) — matches the approved
+     mockup and guarantees the meta line fits inside the pill. */
+  .eko-top-pill__mood-text {
+    display: none;
+  }
+  .eko-hud__orbs {
+    gap: 0.4rem;
+  }
+  .eko-orb {
+    width: 2.45rem;
+    height: 2.45rem;
+  }
+  .eko-orb--wallet {
+    /* width:auto must be re-stated here: this block comes after the base
+       .eko-orb--wallet rule with equal specificity, and without it the
+       .eko-orb fixed width above would crush the balance text to zero. */
+    width: auto;
+    height: auto;
+    padding: 0.3rem 0.3rem 0.3rem 0.7rem;
+    font-size: 0.78rem;
+    gap: 0.35rem;
+  }
+  .eko-orb__wallet-text {
+    max-width: 5rem;
   }
   .eko-top-pill__topup {
     width: 1.45rem;
     height: 1.45rem;
     font-size: 0.95rem;
   }
-  .eko-top-pill--actions .eko-notifbell {
-    width: 32px;
-    height: 32px;
-    font-size: 16px;
+  .eko-hud__orbs .eko-notifbell {
+    font-size: 1rem;
   }
-  /* Governor pill: icon-only on phones (full text stays in title);
-     the text span keeps its ellipsis behavior on wider screens. */
-  .eko-hud .eko-top-pill--actions .eko-hud__gov {
-    max-width: none;
-    font-size: 0.95rem;
-    padding: 6px 10px;
-    min-height: 32px;
-  }
-  .eko-hud .eko-top-pill--actions .eko-hud__gov-text {
-    display: none;
+  .eko-hud .eko-orb--gov {
+    font-size: 1.05rem;
   }
   .eko-quickfab {
     bottom: calc(var(--sab, 0px) + 5.25rem);
