@@ -133,6 +133,26 @@ describe("no-clipping CSS contract (HomeChrome.css)", () => {
     expect(orb).toMatch(/height:\s*2\.65rem/);
   });
 
+  it("circles can never be squeezed into ovals: min-width/min-height match the fixed size", () => {
+    // iOS Safari quirk: buttons inside an overflowing flex row can shrink
+    // despite flex:none. A hard min-size floor keeps every circle round.
+    const orb = ruleBlock(chromeCss, ".eko-orb");
+    expect(orb).toMatch(/min-width:\s*2\.65rem/);
+    expect(orb).toMatch(/min-height:\s*2\.65rem/);
+    const avatar = ruleBlock(chromeCss, ".eko-top-pill__avatar");
+    expect(avatar).toMatch(/min-width:\s*2\.1rem/);
+    expect(avatar).toMatch(/min-height:\s*2\.1rem/);
+    const topup = ruleBlock(chromeCss, ".eko-top-pill__topup");
+    expect(topup).toMatch(/min-width:\s*1\.6rem/);
+    expect(topup).toMatch(/min-height:\s*1\.6rem/);
+    // …and the phone media query re-states the floors at the smaller sizes.
+    const mqStart = chromeCss.indexOf("@media (max-width: 560px)");
+    const mq = chromeCss.slice(mqStart);
+    expect(mq).toMatch(/\.eko-orb\s*\{[^}]*min-width:\s*2\.45rem/s);
+    expect(mq).toMatch(/\.eko-top-pill__avatar\s*\{[^}]*min-width:\s*1\.8rem/s);
+    expect(mq).toMatch(/\.eko-top-pill__topup\s*\{[^}]*min-width:\s*1\.45rem/s);
+  });
+
   it("the governor orb overrides the old pill-style gov button", () => {
     const gov = ruleBlock(chromeCss, ".eko-hud .eko-orb--gov");
     expect(gov).toMatch(/appearance:\s*none/);
