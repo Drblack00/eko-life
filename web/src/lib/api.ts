@@ -868,6 +868,7 @@ export interface RichListEntry {
   avatar: string;
   color: string;
   netWorth: number;
+  isGovernor?: boolean;
 }
 
 export const richListApi = {
@@ -1012,5 +1013,100 @@ export const boutiqueApi = {
       "/api/boutique/buy",
       token,
       { itemId }
+    ),
+};
+
+/* ------------------------------------------------------------------ */
+/* Phase 8 — Èkó Gov: governor election + governance.                  */
+/* ------------------------------------------------------------------ */
+
+export interface GovCandidate {
+  playerId: number;
+  username: string;
+  votes: number;
+}
+
+export interface GovPolicyInfo {
+  id: string | null;
+  name: string | null;
+  icon: string;
+  desc: string | null;
+  picked: boolean;
+  defaulted: boolean;
+  pickDeadline: number;
+  canPick: boolean;
+  effects: string;
+}
+
+export interface GovCommissioner {
+  title: string;
+  user_id: number;
+  username: string | null;
+  appointed_at: number;
+}
+
+export interface GovPolicyOption {
+  id: string;
+  name: string;
+  icon: string;
+  desc: string;
+  effects: string;
+}
+
+export interface GovCommissionerTitle {
+  title: string;
+  icon: string;
+}
+
+export interface GovState {
+  election: {
+    id: number;
+    status: string;
+    startDay: number;
+    endDay: number;
+    daysLeft: number;
+  } | null;
+  candidates: GovCandidate[];
+  myVote: number | null;
+  isCandidate: boolean;
+  governor: { id: number; username: string | null } | null;
+  lastWinner: { username: string | null; electionId: number } | null;
+  policy: GovPolicyInfo;
+  commissioners: GovCommissioner[];
+  commissionerTitles: GovCommissionerTitle[];
+  policies: GovPolicyOption[];
+  runFee: number;
+  canRun: boolean;
+}
+
+export const govApi = {
+  /** Full governance state (election, candidates, governor, policy, cabinet). */
+  state: (token: string) => authGet<GovState>("/api/gov", token),
+  /** Enter the governor race — server charges the candidacy fee. */
+  run: (token: string) =>
+    authPost<{ ok: boolean; state: GovState }>("/api/gov/run", token, {}),
+  /** Cast one vote for a candidate. */
+  vote: (token: string, candidateId: number) =>
+    authPost<{ ok: boolean; state: GovState }>("/api/gov/vote", token, {
+      candidateId,
+    }),
+  /** Governor signs a city policy (within the pick window). */
+  pickPolicy: (token: string, policyId: string) =>
+    authPost<{ ok: boolean; state: GovState }>("/api/gov/policy", token, {
+      policyId,
+    }),
+  /** Governor appoints a commissioner. */
+  appoint: (token: string, title: string, username: string) =>
+    authPost<{ ok: boolean; state: GovState }>(
+      "/api/gov/commissioners/appoint",
+      token,
+      { title, username }
+    ),
+  /** Governor dismisses a commissioner. */
+  dismiss: (token: string, title: string) =>
+    authPost<{ ok: boolean; state: GovState }>(
+      "/api/gov/commissioners/dismiss",
+      token,
+      { title }
     ),
 };
