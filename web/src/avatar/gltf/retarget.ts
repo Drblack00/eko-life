@@ -123,17 +123,25 @@ export function retargetClip(
  * Call after retargeting or as a pose overlay.
  */
 export function clenchFists(root: THREE.Object3D, amount = 1.0): void {
-  const curl = (95 * Math.PI) / 180 * amount;
-  const thumbCurl = (70 * Math.PI) / 180 * amount;
-  root.traverse((o) => {
-    if (!(o instanceof THREE.Bone)) return;
-    const n = o.name;
-    if (/^(index|middle|ring|pinky)_0[123]_/.test(n)) {
-      o.rotateX(curl * 0.85);
-    } else if (/^thumb_0[123]_/.test(n)) {
-      o.rotateX(thumbCurl * 0.7);
-    }
-  });
+  try {
+    const curl = (95 * Math.PI) / 180 * amount;
+    const thumbCurl = (70 * Math.PI) / 180 * amount;
+    root.traverse((o) => {
+      try {
+        if (!(o instanceof THREE.Bone)) return;
+        const n = o.name;
+        if (/^(index|middle|ring|pinky)_0[123]_/.test(n)) {
+          o.rotateX(curl * 0.85);
+        } else if (/^thumb_0[123]_/.test(n)) {
+          o.rotateX(thumbCurl * 0.7);
+        }
+      } catch {
+        /* ignore */
+      }
+    });
+  } catch {
+    /* never breaks loading */
+  }
 }
 
 /** Collects rest-pose quaternions for all bones in a model. */
