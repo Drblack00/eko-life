@@ -204,14 +204,6 @@ export const FURN = {
   fan:          { id: 'fan',          name: 'Standing Fan',    price: 2200,  icon: '🌀', effect: 'sleep_happy',  desc: 'Sleep restores +5 extra happiness', category: 'comfort', size: [1, 1] },
   beanbag:      { id: 'beanbag',      name: 'Bean Bag',        price: 12000, icon: '🟠', effect: 'fun_happy',    desc: 'Fun gives +6 extra happiness', category: 'comfort', size: [1, 1] },
   bookshelf:    { id: 'bookshelf',    name: 'Bookshelf',       price: 9000,  icon: '📚', effect: 'fun_happy',    desc: 'Fun gives +4 extra happiness', category: 'comfort', size: [1, 1] },
-  // Shop tab storefront products (cartoon shop screen) — same buy_furniture
-  // flow as furniture; bought into inventory, placeable at home.
-  jollof_rice: { id: 'jollof_rice', name: 'Jollof Rice', price: 1500,  icon: '🍚', effect: 'eat_hunger', desc: 'Eating restores +5 extra hunger', category: 'kitchen', size: [1, 1] },
-  zobo:        { id: 'zobo',        name: 'Zobo',        price: 500,   icon: '🥤', effect: 'eat_hunger', desc: 'Eating restores +2 extra hunger', category: 'kitchen', size: [1, 1] },
-  keke_ride:   { id: 'keke_ride',   name: 'Keke Ride',   price: 800,   icon: '🛺', effect: 'fun_happy',  desc: 'Fun gives +1 extra happiness', category: 'comfort', size: [1, 1] },
-  armchair:    { id: 'armchair',    name: 'Armchair',    price: 5000,  icon: '🪑', effect: 'fun_happy',  desc: 'Fun gives +3 extra happiness', category: 'comfort', size: [1, 1] },
-  sneakers:    { id: 'sneakers',    name: 'Sneakers',    price: 8000,  icon: '👟', effect: 'fun_happy',  desc: 'Fun gives +4 extra happiness', category: 'comfort', size: [1, 1] },
-  headphones:  { id: 'headphones',  name: 'Headphones',  price: 12000, icon: '🎧', effect: 'fun_happy',  desc: 'Fun gives +6 extra happiness', category: 'comfort', size: [1, 1] },
 };
 export const HOME_SLOTS = 6;
 
