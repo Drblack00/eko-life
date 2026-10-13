@@ -208,7 +208,28 @@ export function applyProportions(root: THREE.Object3D, height: number, build: nu
 export function relaxArms(root: THREE.Object3D): void {
   try {
     const D = Math.PI / 180;
+    // Ensure world matrices are current before we compute anything
+    root.updateMatrixWorld(true);
     const updatedSkeletons = new Set<THREE.Skeleton>();
+    const relaxBone = (bone: THREE.Bone) => {
+      try {
+        if (!bone || !bone.quaternion) return;
+        const n = (bone.name || "").toLowerCase();
+        if (!n.includes("upperarm") && !n.includes("upper_arm")) return;
+        if ((bone as any).__relaxed) return;
+        const isLeft = /[_.]l($|[^a-z])/.test(n);
+        // T-pose arms point out along ±X. Rotate in WORLD space around world Z
+        // to swing them down to the sides: left arm (-76°), right arm (+76°).
+        // rotateOnWorldAxis handles the parent-space conversion for us.
+        bone.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), (isLeft ? -76 : 76) * D);
+        // Slight inward tuck around world Y for a natural stance
+        bone.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), (isLeft ? -8 : 8) * D);
+        bone.updateMatrixWorld(true);
+        (bone as any).__relaxed = true;
+      } catch {
+        /* ignore */
+      }
+    };
     // Strategy 1: via SkinnedMesh skeletons (most reliable)
     root.traverse((o) => {
       try {
@@ -216,20 +237,9 @@ export function relaxArms(root: THREE.Object3D): void {
         if (!skinned.isSkinnedMesh || !skinned.skeleton || !skinned.skeleton.bones) return;
         let modified = false;
         for (const bone of skinned.skeleton.bones) {
-          if (!bone || !bone.quaternion) continue;
-          const n = (bone.name || "").toLowerCase();
-          if (!n.includes("upperarm") && !n.includes("upper_arm")) continue;
-          const isLeft = /[_.]l($|[^a-z])/.test(n);
-          const d = isLeft ? 1 : -1;
-          bone.quaternion.premultiply(
-            new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, d), 76 * D)
-          );
-          bone.quaternion.premultiply(
-            new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), d * 8 * D)
-          );
-          bone.updateMatrixWorld(true);
-          (bone as any).__relaxed = true;
-          modified = true;
+          const before = (bone as any).__relaxed;
+          relaxBone(bone);
+          if ((bone as any).__relaxed && !before) modified = true;
         }
         if (modified) updatedSkeletons.add(skinned.skeleton);
       } catch {
@@ -246,21 +256,7 @@ export function relaxArms(root: THREE.Object3D): void {
     }
     // Strategy 2: traverse fallback for non-skinned setups
     root.traverse((o) => {
-      try {
-        if ((o as any).__relaxed) return;
-        const n = (o.name || "").toLowerCase();
-        if (!n.includes("upperarm") && !n.includes("upper_arm")) return;
-        const q = (o as THREE.Bone).quaternion;
-        if (!q) return;
-        const isLeft = /[_.]l($|[^a-z])/.test(n);
-        const d = isLeft ? 1 : -1;
-        q.premultiply(
-          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, d), 76 * D)
-        );
-        (o as THREE.Bone).updateMatrixWorld(true);
-      } catch {
-        /* ignore */
-      }
+      if ((o as THREE.Bone).isBone) relaxBone(o as THREE.Bone);
     });
   } catch {
     /* relaxArms never breaks avatar loading */
