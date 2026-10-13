@@ -62,7 +62,7 @@
 /* Emerald accents: #34d399 fails on light surfaces (1.9:1) — use the dark
    emerald in the day theme, the light one at night. */
 .m12-eff { color: #047857; font-weight: 600; }
-[data-theme="night"] .m12-eff { color: #34d399; }
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .m12-eff { color: #34d399; }
 .m12-cert { font-size: 0.9rem; }
 
 .m12-xpbar { margin: 2px 0; }
@@ -78,7 +78,7 @@
   border-radius: 8px;
   padding: 4px 6px;
 }
-[data-theme="night"] .m12-rust { color: #fbbf24; }
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .m12-rust { color: #fbbf24; }
 
 .m12-train-hint { font-size: 0.72rem; opacity: 0.65; line-height: 1.4; }
 
@@ -114,7 +114,7 @@
   padding: 3px 8px;
   white-space: nowrap;
 }
-[data-theme="night"] .m12-cert-badge { color: #34d399; }
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .m12-cert-badge { color: #34d399; }
 
 .m12-course-desc { margin: 0; font-size: 0.85rem; line-height: 1.45; opacity: 0.85; }
 
