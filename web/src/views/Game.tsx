@@ -10,7 +10,7 @@ import {
   type ApiLocation,
   type GameConfig,
 } from "../lib/api";
-import { CityMap } from "../game/CityMap";
+import { LagosMap } from "../game/LagosMap";
 import { mapXYToWorld, toPin } from "../game/mapPins";
 import type { PinLocation } from "../game/stubLocations";
 import {
@@ -43,6 +43,7 @@ import { StyleApp } from "./StyleApp";
 import { ElectionSheet } from "./election/ElectionSheet";
 import { HomeTab, type HomeFocus } from "./home/HomeTab";
 import { HomeView } from "./home/HomeView";
+import { HomeRoomSection } from "./home/HomeRoom";
 import { LedgerSheet } from "./home/LedgerSheet";
 import { AdminView } from "./Admin";
 import { TabBar, TABS, type Tab } from "./TabBar";
@@ -341,7 +342,7 @@ function CityTab({
         </button>
       </div>
       <div className="eko-city__mapwrap">
-        <CityMap pins={pins} onPinSelect={onPinSelect} />
+        <LagosMap pins={pins} onPinSelect={onPinSelect} />
       </div>
       <p className="eko-city__tip">
         Tap a pin to see what's there — travelling costs 5 energy, so choose
@@ -1133,6 +1134,18 @@ export function Game({
               Your character is still loading — reopen Style in a moment.
             </p>
           );
+        case "room":
+          if (!config) return null;
+          return (
+            <div className="eko-tabpad">
+              <HomeRoomSection
+                you={you}
+                config={config}
+                sendAct={send}
+                onBuySheetOpen={setBuySheetOpen}
+              />
+            </div>
+          );
         case "me":
         default:
           return (
@@ -1213,6 +1226,7 @@ export function Game({
 
   return (
     <div className={cleanMode ? "eko-game eko-game--clean" : "eko-game"}>
+      {tab !== "home" && (
       <Hud
         you={you}
         status={sock.status}
@@ -1231,6 +1245,7 @@ export function Game({
         onRetry={sock.retryNow}
         onTopUp={() => setTopUpOpen(true)}
       />
+      )}
 
       {!announceDismissed && (
         <AnnouncementPill onDismiss={() => setAnnounceDismissed(true)} />
@@ -1308,9 +1323,25 @@ export function Game({
             token={token}
             sock={sock}
             sendAct={sock.sendAct}
-            onBuySheetOpen={setBuySheetOpen}
             onOpenApp={openPhoneApp}
             onTab={(t) => (t === "phone" ? setPhoneOpen(true) : setTab(t))}
+            onOpenNotifications={() => {
+              setNotifOpen(true);
+              sock.openNotifications();
+            }}
+            onGovOpen={() => setElectionOpen(true)}
+            onTopUp={() => setTopUpOpen(true)}
+            tip={
+              you.hunger < 30
+                ? "You're hungry — grab food in Needs."
+                : you.energy < 30
+                  ? "You're tired — rest or sleep it off."
+                  : you.money < 1000
+                    ? "Wallet's light — clock in for a shift in Jobs."
+                    : you.happiness < 30
+                      ? "Low spirits — have some fun."
+                      : null
+            }
           />
         )}
         {tab === "buy" && config && (
