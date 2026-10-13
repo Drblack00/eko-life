@@ -30,18 +30,18 @@
   --neutral-800: #2b2620;
   --neutral-900: #1c1814;
 
-  /* Semantic */
-  --bg: var(--neutral-50);
-  --surface: var(--neutral-0);
-  --surface-2: var(--neutral-100);
-  --text: var(--neutral-900);
-  --text-muted: var(--neutral-600);
-  --primary: var(--lagoon-600);
-  --primary-strong: var(--lagoon-700);
-  --accent: var(--danfo-500);
-  --success: var(--palm-600);
-  --danger: #dc2626;
-  --ring: var(--lagoon-500);
+  /* Semantic — lagoslife.app bright cozy game palette */
+  --bg: #e8f4fd;
+  --surface: #ffffff;
+  --surface-2: #f0f7ff;
+  --text: #1a2b3c;
+  --text-muted: #5b7a94;
+  --primary: #00c853;
+  --primary-strong: #00a344;
+  --accent: #f59e0b;
+  --success: #00c853;
+  --danger: #ef4444;
+  --ring: #00c853;
 
   /* Shape */
   --radius-sm: 10px;
