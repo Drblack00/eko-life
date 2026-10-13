@@ -55,7 +55,7 @@
 
 .m9-found { font-weight: 700; color: #15803d; }
 /* Dark green fails on the dark panel — lighten at night (8.6:1). */
-[data-theme="night"] .m9-found { color: var(--palm-400); }
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .m9-found { color: var(--palm-400); }
 
 .m9-cta { width: 100%; min-height: 48px; margin: 8px 0; }
 
@@ -77,7 +77,7 @@
   font-size: 0.92rem;
 }
 .m9-place { font-weight: 800; min-width: 34px; color: #b45309; }
-[data-theme="night"] .m9-place { color: #fbbf24; }
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .m9-place { color: #fbbf24; }
 .m9-who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .m9-missions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -107,17 +107,17 @@
 .m9-perk.is-owned { border-color: #fbbf24; background: #fffbeb; }
 /* The owned card is a light amber card in both themes — keep the light
    text legible at night with a dark amber wash instead. */
-[data-theme="night"] .m9-perk.is-owned { background: rgb(251 191 36 / 0.14); }
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .m9-perk.is-owned { background: rgb(251 191 36 / 0.14); }
 .m9-perk-icon { font-size: 1.6rem; line-height: 1; }
 .m9-perk-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .m9-perk-name { margin: 0; font-weight: 700; font-size: 0.92rem; }
 .m9-perk-desc { margin: 0; font-size: 0.8rem; color: var(--text-muted); line-height: 1.35; }
 .m9-perk-foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 6px; }
 .m9-perk-cost { font-weight: 800; color: #b45309; }
-[data-theme="night"] .m9-perk-cost { color: #fbbf24; }
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .m9-perk-cost { color: #fbbf24; }
 .m9-perk-foot .eko-btn { min-height: 44px; }
 .m9-owned { font-weight: 700; color: #15803d; font-size: 0.85rem; }
-[data-theme="night"] .m9-owned { color: var(--palm-400); }
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .m9-owned { color: var(--palm-400); }
 
 @media (prefers-reduced-motion: reduce) {
   .m9-daily * { animation: none !important; transition: none !important; }
