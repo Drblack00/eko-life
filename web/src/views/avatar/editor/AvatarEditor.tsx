@@ -154,7 +154,22 @@ export function AvatarEditor({
         const hh = handleRef.current;
         const ll = loaderRef.current;
         try {
-          if (hh && !hh.discarded && ll) ll.diffUpdate(hh, hh.appearance, next);
+          if (hh && !hh.discarded && ll) {
+            const result = ll.diffUpdate(hh, hh.appearance, next);
+            // GLTF loader returns rebuilt:true — need to swap (rebuild) the handle
+            if (result.rebuilt) {
+              ll.swap(hh, next).then((newHandle) => {
+                if (newHandle.discarded) return;
+                handleRef.current = newHandle;
+                // Update the preview with the new handle
+                apiRef.current?.setFigure({
+                  group: newHandle.group,
+                  update: newHandle.update,
+                  dispose: newHandle.dispose,
+                });
+              });
+            }
+          }
         } finally {
           renderBusyRef.current = false;
           if (mountedRef.current) setRebuilding(false);
