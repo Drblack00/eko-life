@@ -162,21 +162,40 @@ export function applyCustomization(
  */
 export function relaxArms(root: THREE.Object3D): void {
   const D = Math.PI / 180;
+  // Strategy 1: via SkinnedMesh skeletons (most reliable)
   root.traverse((o) => {
-    if (!(o instanceof THREE.Bone)) return;
-    const n = o.name;
-    if (n === "upperarm_l" || n === "upperarm_r") {
-      const dir = n === "upperarm_l" ? 1 : -1;
-      const q = new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(0, 0, dir),
-        76 * D
+    if ((o as THREE.SkinnedMesh).isSkinnedMesh) {
+      const skinned = o as THREE.SkinnedMesh;
+      for (const bone of skinned.skeleton.bones) {
+        const n = (bone.name || "").toLowerCase();
+        if (n.includes("upperarm") || n.includes("upper_arm")) {
+          // More precise: check if it's left (contains _l or .l, not _r or .r)
+          const isLeft = /[_.]l($|[^a-z])/.test(n);
+          const d = isLeft ? 1 : -1;
+          bone.quaternion.premultiply(
+            new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, d), 76 * D)
+          );
+          bone.quaternion.premultiply(
+            new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), d * 8 * D)
+          );
+          // Mark as modified
+          (bone as any).__relaxed = true;
+        }
+      }
+    }
+  });
+  // Strategy 2: traverse fallback for non-skinned setups
+  root.traverse((o) => {
+    if ((o as any).__relaxed) return;
+    const n = (o.name || "").toLowerCase();
+    if (n.includes("upperarm") || n.includes("upper_arm")) {
+      const q = (o as THREE.Bone).quaternion;
+      if (!q) return;
+      const isLeft = /[_.]l($|[^a-z])/.test(n);
+      const d = isLeft ? 1 : -1;
+      q.premultiply(
+        new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, d), 76 * D)
       );
-      o.quaternion.premultiply(q);
-      const qy = new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(0, 1, 0),
-        dir * 8 * D
-      );
-      o.quaternion.premultiply(qy);
     }
   });
 }
