@@ -230,9 +230,9 @@
 }
 
 .eko-room__card.glass {
-  --glass-tint: rgb(255 255 255 / 0.55);
-  --glass-radius: var(--radius-md);
-  --glass-blur: 0px;
+  --glass-tint: rgb(255 255 255 / 0.08);
+  --glass-radius: var(--radius-lg);
+  --glass-blur: 12px;
 }
 
 .eko-room__card-top {
