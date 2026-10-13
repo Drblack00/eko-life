@@ -340,14 +340,12 @@ export function HomeOverlays({
   cleanMode,
   onToggleClean,
   onOpenApp,
-  onOpenShortcuts,
   onOpenCharacter,
 }: {
   token: string;
   cleanMode: boolean;
   onToggleClean: () => void;
   onOpenApp: (app: string) => void;
-  onOpenShortcuts: () => void;
   onOpenCharacter: (tab: "goals") => void;
 }) {
   return (
@@ -359,20 +357,6 @@ export function HomeOverlays({
         cleanMode={cleanMode}
         onToggleClean={onToggleClean}
       />
-      <div className="eko-workpills" aria-label="Shortcuts">
-        <button
-          type="button"
-          className="eko-workpill eko-workpill--round glass"
-          onClick={() => {
-            blip("tap");
-            onOpenShortcuts();
-          }}
-          aria-label="Keyboard shortcuts"
-          title="Keyboard shortcuts"
-        >
-          ⌨️
-        </button>
-      </div>
     </>
   );
 }
