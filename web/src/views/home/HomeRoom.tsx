@@ -12,7 +12,7 @@ import {
   type FurnitureEntry,
   type You,
 } from "../../game/types";
-import { buildAvatarLook } from "../avatar/avatarModel";
+/* buildCapsuleAvatar defined below — lightweight, no GLTF. */
 import {
   footprintCells,
   fitsInGrid,
@@ -721,39 +721,56 @@ function buildCapsuleAvatar(T: typeof THREE, look: AvatarLook): THREE.Group {
   const mat = (color: string) =>
     new T.MeshStandardMaterial({
       color: new T.Color(validHex(color) ?? "#888888"),
-      roughness: 0.85,
+      roughness: 0.7,
       metalness: 0.02,
     });
   const skin = mat(capsuleSkinHex(look));
   const top = mat(look.topColor);
   const bottom = mat(look.bottomColor);
   const dark = mat("#2b2118");
+  const white = mat("#ffffff");
+  const black = mat("#1a1a1a");
   const add = (m: THREE.Mesh, x: number, y: number, z: number) => {
     m.position.set(x, y, z);
     m.castShadow = true;
     g.add(m);
     return m;
   };
-  // Legs + shoes.
-  for (const sx of [-0.11, 0.11]) {
-    add(new T.Mesh(new T.BoxGeometry(0.16, 0.42, 0.18), bottom), sx, 0.21, 0);
-    add(new T.Mesh(new T.BoxGeometry(0.17, 0.08, 0.26), dark), sx, 0.04, 0.03);
+  // Legs + shoes (chunky cartoon).
+  for (const sx of [-0.13, 0.13]) {
+    add(new T.Mesh(new T.BoxGeometry(0.18, 0.4, 0.2), bottom), sx, 0.2, 0);
+    add(new T.Mesh(new T.BoxGeometry(0.2, 0.1, 0.3), dark), sx, 0.05, 0.04);
   }
-  // Torso capsule + arms.
-  add(new T.Mesh(new T.CapsuleGeometry(0.21, 0.34, 6, 14), top), 0, 0.78, 0);
-  for (const sx of [-0.3, 0.3])
-    add(new T.Mesh(new T.CapsuleGeometry(0.07, 0.3, 4, 10), top), sx, 0.78, 0);
-  // Head + hair cap.
-  add(new T.Mesh(new T.SphereGeometry(0.17, 18, 14), skin), 0, 1.32, 0);
+  // Torso (rounded).
+  add(new T.Mesh(new T.CapsuleGeometry(0.24, 0.32, 6, 14), top), 0, 0.78, 0);
+  // Arms (chunky).
+  for (const sx of [-0.34, 0.34]) {
+    add(new T.Mesh(new T.CapsuleGeometry(0.08, 0.28, 4, 10), top), sx, 0.78, 0);
+    add(new T.Mesh(new T.SphereGeometry(0.08, 12, 10), skin), sx, 0.55, 0);
+  }
+  // BIG cartoon head.
+  add(new T.Mesh(new T.SphereGeometry(0.24, 20, 16), skin), 0, 1.35, 0);
+  // Hair cap.
   add(
     new T.Mesh(
-      new T.SphereGeometry(0.175, 18, 14, 0, Math.PI * 2, 0, Math.PI / 2.2),
+      new T.SphereGeometry(0.245, 20, 16, 0, Math.PI * 2, 0, Math.PI / 2.1),
       dark
     ),
     0,
-    1.34,
+    1.37,
     0
   );
+  // Cartoon eyes (white + pupils).
+  for (const sx of [-0.09, 0.09]) {
+    add(new T.Mesh(new T.SphereGeometry(0.045, 12, 10), white), sx, 1.38, 0.2);
+    add(new T.Mesh(new T.SphereGeometry(0.02, 10, 8), black), sx, 1.38, 0.24);
+  }
+  // Smile (torus arc).
+  const smile = new T.Mesh(new T.TorusGeometry(0.07, 0.015, 8, 16, Math.PI), black);
+  smile.position.set(0, 1.28, 0.21);
+  smile.rotation.x = Math.PI;
+  smile.rotation.z = Math.PI;
+  g.add(smile);
   return g;
 }
 
@@ -1118,12 +1135,8 @@ function RoomCanvas({
           return;
         }
         let g: THREE.Group;
-        try {
-          g = buildAvatarLook(THREE, look);
-        } catch {
-          // Bad look data must never blank the room — capsule fallback.
-          g = buildCapsuleAvatar(THREE, look);
-        }
+        // GLTF avatar disabled (too heavy, causes glitches) — using lightweight capsule.
+        g = buildCapsuleAvatar(THREE, look);
         g.position.set(cell[0] - HALF + 0.5, 0, cell[1] - HALF + 0.5);
         g.rotation.y = Math.PI / 4;
         walk.heading = Math.PI / 4;
