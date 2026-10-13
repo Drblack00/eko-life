@@ -163,9 +163,13 @@
 
 /* Floating bottom tab bar: frosted dock. */
 .eko-game .eko-tabs {
-  background: #1a1a2e;
-  border: 1px solid #1a1a2e;
-  box-shadow: 0 8px 24px rgba(26, 26, 46, 0.35);
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 40%),
+    var(--glass-tint-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
 }
 
 /* Magnifying active-tab bubble: a CLEAR liquid-glass lens that FLIP-morphs
