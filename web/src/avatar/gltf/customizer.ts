@@ -6,7 +6,6 @@
 import * as THREE from "three";
 import { getCachedAssets, type BodyType, type HairStyle } from "./loader";
 import { clenchFists } from "./retarget";
-import { clone as skeletonClone } from "three/addons/utils/SkeletonUtils.js";
 
 export interface AvatarCustomization {
   body: BodyType;
@@ -130,23 +129,86 @@ export function attachHeadgear(
   const container = new THREE.Group();
   container.name = "__headgear";
 
+  // Helper: extract hair/beard meshes from their GLTF scenes as rigid meshes.
+  // These GLTFs contain a full skeleton; we bake the current skinned position
+  // into the geometry and attach rigidly to the head bone.
+  const extractMeshes = (src: THREE.Object3D): THREE.Object3D[] => {
+    const meshes: THREE.Object3D[] = [];
+    src.updateMatrixWorld(true);
+    src.traverse((o) => {
+      const skinned = o as THREE.SkinnedMesh;
+      if (!skinned.isSkinnedMesh && !(o as THREE.Mesh).isMesh) return;
+      // Skip non-mesh nodes
+      if (!((o as THREE.Mesh).isMesh || skinned.isSkinnedMesh)) return;
+
+      let geometry = (o as THREE.Mesh).geometry;
+      const material = (o as THREE.Mesh).material;
+
+      // If skinned, bake the skinning into the geometry
+      if (skinned.isSkinnedMesh && skinned.skeleton) {
+        try {
+          skinned.skeleton.update();
+          const baked = geometry.clone();
+          const pos = baked.getAttribute("position");
+          const skinIndex = baked.getAttribute("skinIndex");
+          const skinWeight = baked.getAttribute("skinWeight");
+          if (pos && skinIndex && skinWeight) {
+            const v = new THREE.Vector3();
+            const temp = new THREE.Vector3();
+            const boneMatrices = skinned.skeleton.boneMatrices;
+            // boneInverses are already applied in boneMatrices
+            for (let i = 0; i < pos.count; i++) {
+              v.fromBufferAttribute(pos, i);
+              temp.set(0, 0, 0);
+              for (let j = 0; j < 4; j++) {
+                const boneIdx = skinIndex.getX(i * 4 + j);
+                const weight = skinWeight.getX(i * 4 + j);
+                if (weight === 0) continue;
+                const m = new THREE.Matrix4().fromArray(boneMatrices, boneIdx * 16);
+                temp.add(v.clone().applyMatrix4(m).multiplyScalar(weight));
+              }
+              pos.setXYZ(i, temp.x, temp.y, temp.z);
+            }
+            // Transform from hair-scene space to head-bone space:
+            // the hair scene root is at origin; we want it relative to head.
+            // For now, keep as-is (hair authored near origin, head bone will position it)
+            geometry = baked;
+          }
+        } catch {
+          /* fall back to original geometry */
+        }
+      }
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = o.name;
+      // Copy world transform (hair scene is at origin, so this is the bind pose position)
+      o.updateWorldMatrix(true, false);
+      mesh.applyMatrix4(o.matrixWorld);
+      meshes.push(mesh);
+    });
+    return meshes;
+  };
+
   if (opts.hair !== "none") {
     const hairSrc = assets.hair[opts.hair];
     if (hairSrc) {
-      // Use SkeletonUtils.clone for skinned hair meshes (plain clone breaks binding)
-      const hair = skeletonClone(hairSrc) as THREE.Object3D;
-      tintHair(hair, opts.hairColor);
-      container.add(hair);
+      for (const m of extractMeshes(hairSrc)) {
+        tintHair(m, opts.hairColor);
+        container.add(m);
+      }
     }
   }
   if (opts.beard && assets.beard) {
-    const beard = skeletonClone(assets.beard) as THREE.Object3D;
-    tintHair(beard, opts.hairColor);
-    container.add(beard);
+    for (const m of extractMeshes(assets.beard)) {
+      tintHair(m, opts.hairColor);
+      container.add(m);
+    }
   }
   const browSrc = opts.body === "female" ? assets.eyebrowsFemale : assets.eyebrows;
   if (opts.eyebrows && browSrc) {
-    container.add(skeletonClone(browSrc) as THREE.Object3D);
+    for (const m of extractMeshes(browSrc)) {
+      container.add(m);
+    }
   }
 
   head.add(container);
