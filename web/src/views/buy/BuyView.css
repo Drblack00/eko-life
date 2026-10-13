@@ -1,7 +1,8 @@
-/* Workstream C — BUY tab header treatment. The catalogue sheet itself
- * carries the "Buy mode" handle affordance; this header gives the tab a
- * clear, premium title above the room stage. */
+/* Èkó Life SHOP tab — cartoon storefront (approved design).
+ * Light blue sky with soft clouds, white 24px product cards,
+ * chunky green BUY buttons. */
 
+/* Legacy header block (kept for compatibility, unused by the new shop). */
 .eko-buy {
   display: flex;
   flex-direction: column;
@@ -16,50 +17,193 @@
   border-radius: 18px;
 }
 
-.eko-buy__head-icon {
-  font-size: 1.6rem;
-  line-height: 1;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+/* ============ New standalone shop ============ */
+
+.eko-shop {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 100%;
+  margin: calc(var(--space-4) * -1);
+  padding: calc(var(--space-4) + 20px) calc(var(--space-4) + 18px) calc(var(--space-4) + 28px);
+  background:
+    radial-gradient(ellipse 240px 74px at 10% 6%, rgba(255, 255, 255, 0.6), transparent 70%),
+    radial-gradient(ellipse 280px 84px at 90% 20%, rgba(255, 255, 255, 0.55), transparent 70%),
+    radial-gradient(ellipse 220px 66px at 68% 52%, rgba(255, 255, 255, 0.42), transparent 70%),
+    radial-gradient(ellipse 260px 76px at 18% 84%, rgba(255, 255, 255, 0.5), transparent 70%),
+    radial-gradient(ellipse 180px 56px at 85% 78%, rgba(255, 255, 255, 0.4), transparent 70%),
+    linear-gradient(180deg, #b5ddf5 0%, #c6e7fa 45%, #d7f0fd 100%);
 }
 
-.eko-buy__head-text {
-  min-width: 0;
+/* Brand header */
+.eko-shop__brand {
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  color: #182344;
 }
 
-.eko-buy__head-title {
-  margin: 0;
-  font-size: 1.05rem;
+/* Top status pill */
+.eko-shop__pill {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 11px 11px 11px 18px;
+  box-shadow: 0 5px 16px rgba(25, 55, 110, 0.14);
+  color: #182344;
+  font-size: 17px;
+}
+
+.eko-shop__pill-sun {
+  font-size: 22px;
+}
+
+.eko-shop__pill-day {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+}
+
+.eko-shop__pill-mood-label {
   font-weight: 800;
-  /* The glass card adapts to the theme — use the theme ink token so the
-   * title stays legible in both light and dark themes. */
-  color: var(--text);
-  letter-spacing: 0.01em;
+  color: #3b4a6b;
 }
 
-.eko-buy__head-sub {
-  margin: 2px 0 0;
-  font-size: 0.78rem;
-  font-weight: 600;
-  /* Theme ink: the old hardcoded dark slate went unreadable in the night
-     theme. */
-  color: var(--text-muted);
-  line-height: 1.35;
+.eko-shop__pill-money {
+  font-weight: 900;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.eko-shop__pill-plus {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border: none;
+  border-radius: 50%;
+  background: #0aa84f;
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(10, 168, 79, 0.4);
+}
+
+/* Big title */
+.eko-shop__title {
+  margin: 8px 0 0;
+  font-size: 68px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -2.5px;
+  color: #0e1526;
+}
+
+/* Category chips */
+.eko-shop__cats {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.eko-shop__cats::-webkit-scrollbar {
+  display: none;
+}
+
+.eko-shop__cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  background: #ffffff;
+  border: none;
+  border-radius: 18px;
+  padding: 13px 20px;
+  font-size: 17px;
+  font-weight: 800;
+  color: #182344;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(25, 55, 110, 0.12);
+}
+
+.eko-shop__cat--active {
+  outline: 3px solid #0aa84f;
+  outline-offset: -1px;
+}
+
+/* Product grid */
+.eko-shop__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.eko-shop__card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 22px 14px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 7px 20px rgba(25, 55, 110, 0.12);
+}
+
+.eko-shop__img {
+  font-size: 78px;
+  line-height: 1.25;
+  filter: drop-shadow(0 6px 10px rgba(25, 55, 110, 0.16));
+}
+
+.eko-shop__name {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: #101a33;
+  text-align: center;
+}
+
+.eko-shop__price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #3b4a6b;
+}
+
+.eko-shop__buy {
+  margin-top: 8px;
+  border: none;
+  border-radius: 999px;
+  background: #0aa84f;
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  padding: 11px 36px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(10, 168, 79, 0.35);
+}
+
+.eko-shop__buy:disabled {
+  background: #a3adbd;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.eko-shop__buy:not(:disabled):active {
+  transform: scale(0.96);
 }
 
 @media (min-width: 720px) {
-  .eko-buy__head {
-    padding: var(--space-3) var(--space-4);
+  .eko-shop__grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 
-  .eko-buy__head-icon {
-    font-size: 2rem;
-  }
-
-  .eko-buy__head-title {
-    font-size: 1.25rem;
-  }
-
-  .eko-buy__head-sub {
-    font-size: 0.85rem;
+  .eko-shop__title {
+    font-size: 84px;
   }
 }
