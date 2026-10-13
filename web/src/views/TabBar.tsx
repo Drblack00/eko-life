@@ -16,7 +16,7 @@ export type Tab = "home" | "buy" | "map" | "phone";
 
 export const TABS: Array<{ id: Tab; label: string }> = [
   { id: "home", label: "Home" },
-  { id: "buy", label: "Buy" },
+  { id: "buy", label: "Shop" },
   { id: "map", label: "Map" },
   { id: "phone", label: "Phone" },
 ];

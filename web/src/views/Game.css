@@ -536,8 +536,8 @@
   margin: 0 var(--space-2) calc(var(--sab) + 2px);
   padding: 8px;
   border-radius: 28px;
-  background: #1a2b3c;
-  box-shadow: 0 8px 24px rgba(26, 43, 60, 0.3);
+  background: #1a1a2e;
+  box-shadow: 0 8px 24px rgba(26, 26, 46, 0.35);
   z-index: 10;
   position: relative;
 }

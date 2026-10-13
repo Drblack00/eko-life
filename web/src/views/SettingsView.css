@@ -1,0 +1,190 @@
+/* Èkó Life Settings — matches the approved cartoon reference exactly.
+ * Light blue background, huge black title, white rounded cards,
+ * green toggles, red logout. */
+
+.eko-settings {
+  min-height: 100%;
+  padding: 24px 16px 32px;
+  background: #bfe3f5;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.eko-settings__brand {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 900;
+  color: #22c55e;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.eko-settings__title {
+  text-align: center;
+  font-size: 64px;
+  font-weight: 900;
+  color: #000;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin: 0 0 8px;
+}
+
+.eko-settings__card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 8px 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.eko-settings__profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+}
+
+.eko-settings__avatar {
+  width: 72px;
+  height: 72px;
+  min-width: 72px;
+  min-height: 72px;
+  border-radius: 50%;
+  background: #f0f4f8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+}
+
+.eko-settings__profile-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.eko-settings__name {
+  font-size: 32px;
+  font-weight: 900;
+  color: #000;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.eko-settings__handle {
+  font-size: 20px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.eko-settings__edit {
+  background: #22c55e;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 32px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.eko-settings__edit:active {
+  transform: scale(0.96);
+}
+
+.eko-settings__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid #f0f0f0;
+  width: 100%;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  text-align: left;
+  font: inherit;
+}
+
+.eko-settings__row--last {
+  border-bottom: none;
+}
+
+.eko-settings__menurow {
+  cursor: pointer;
+}
+
+.eko-settings__icon {
+  font-size: 32px;
+  width: 40px;
+  text-align: center;
+  flex-shrink: 0;
+  color: #000;
+}
+
+.eko-settings__label {
+  flex: 1;
+  font-size: 28px;
+  font-weight: 800;
+  color: #000;
+  letter-spacing: -0.01em;
+}
+
+.eko-settings__chevron {
+  font-size: 32px;
+  color: #9ca3af;
+  font-weight: 300;
+  flex-shrink: 0;
+}
+
+/* Toggle switch — green when on, gray when off. */
+.eko-settings-toggle {
+  position: relative;
+  width: 72px;
+  height: 44px;
+  min-width: 72px;
+  min-height: 44px;
+  border-radius: 999px;
+  background: #9ca3af;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.eko-settings-toggle--on {
+  background: #22c55e;
+}
+
+.eko-settings-toggle__knob {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: left 0.2s;
+}
+
+.eko-settings-toggle--on .eko-settings-toggle__knob {
+  left: 32px;
+}
+
+.eko-settings__logout {
+  display: block;
+  width: 100%;
+  padding: 20px 0 12px;
+  background: none;
+  border: none;
+  font-size: 28px;
+  font-weight: 800;
+  color: #ef4444;
+  cursor: pointer;
+  text-align: center;
+}

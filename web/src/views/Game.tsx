@@ -19,13 +19,11 @@ import {
   spawnLabel,
   spawnMapXY,
   type ActName,
-  type LeaderEntry,
   type StreetSpawn,
   type You,
 } from "../game/types";
 import {
   Button,
-  Card,
   Loading,
   Sheet,
   Skeleton,
@@ -44,15 +42,18 @@ import { ElectionSheet } from "./election/ElectionSheet";
 import { HomeTab, type HomeFocus } from "./home/HomeTab";
 import { HomeView } from "./home/HomeView";
 import { HomeRoomSection } from "./home/HomeRoom";
-import { LedgerSheet } from "./home/LedgerSheet";
 import { AdminView } from "./Admin";
 import { TabBar, TABS, type Tab } from "./TabBar";
+import {
+  SettingsView,
+  useMusicToggle,
+  useNightModeToggle,
+} from "./SettingsView";
 export { TABS };
 export type { Tab };
 import { Phone } from "./phone/Phone";
 import { BuyView } from "./buy/BuyView";
 import { Walkthrough, WALKTHROUGH_KEY } from "./Walkthrough";
-import { ThemePicker } from "../theme/theme";
 import { CharacterPanel, type CharacterTabId } from "./CharacterPanel";
 import "./CharacterPanel.css";
 // M21: notifications (bell, panel, live toasts).
@@ -62,7 +63,7 @@ import {
   NotificationToasts,
 } from "./Notifications";
 import "./Notifications.css";
-import { NOTIFICATION_PREF_LABELS, type NotificationEntry, type NotificationPrefs } from "../game/types";
+import { type NotificationEntry, type NotificationPrefs } from "../game/types";
 import "./Walkthrough.css";
 import "./Admin.css";
 import "./Game.css";
@@ -470,68 +471,14 @@ function LocationActions({
 }
 
 /** City leaderboard — top 10 by money. Hides itself until GET /api/leaderboard lands. */
-function LeaderboardCard({ token, you }: { token: string; you: You }) {
-  const [leaders, setLeaders] = useState<LeaderEntry[] | null | undefined>(undefined);
-  useEffect(() => {
-    let live = true;
-    api
-      .leaderboard(token)
-      .then((rows) => {
-        if (live) setLeaders(rows);
-      })
-      .catch(() => {
-        if (live) setLeaders(null);
-      });
-    return () => {
-      live = false;
-    };
-  }, [token]);
-  if (leaders === null || leaders === undefined) return null;
-  if (leaders.length === 0) return null;
-  const medals = ["🥇", "🥈", "🥉"];
-  return (
-    <Card className="eko-me__card">
-      <h2 className="eko-tabh" style={{ marginTop: 0 }}>
-        🏆 City rankings
-      </h2>
-      <ol className="eko-leaders">
-        {leaders.map((l, i) => {
-          const isMe =
-            (typeof l.id === "number" && l.id === you.id) ||
-            l.username === you.username;
-          return (
-            <li
-              key={`${l.username}-${i}`}
-              className={`eko-leaders__row ${isMe ? "eko-leaders__row--me" : ""}`}
-            >
-              <span className="eko-leaders__rank" aria-hidden="true">
-                {medals[i] ?? `${i + 1}.`}
-              </span>
-              <strong className="eko-leaders__name">
-                @{l.username}
-                {isMe && " (you)"}
-              </strong>
-              <span className="eko-leaders__money">{naira(l.money)}</span>
-            </li>
-          );
-        })}
-      </ol>
-    </Card>
-  );
-}
 
 function MeTab({
   you,
-  config,
-  token,
-  onSleep,
-  onRest,
   onSignOut,
-  onUpgrade,
-  onOpenAdmin,
   onReplayWalkthrough,
   notifPrefs,
   onNotifPrefs,
+  onEditProfile,
 }: {
   you: You;
   config: GameConfig | null;
@@ -545,8 +492,8 @@ function MeTab({
   notifPrefs: NotificationPrefs | null;
   onNotifPrefs: (p: Partial<NotificationPrefs>) => void;
   sendAct: (a: ActName, params?: Record<string, unknown>) => void;
+  onEditProfile: () => void;
 }) {
-  const [ledgerOpen, setLedgerOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(isSoundEnabled());
   const toggleSound = () => {
     const next = !soundOn;
@@ -554,215 +501,42 @@ function MeTab({
     setSoundOn(next);
     if (next) blip("tap");
   };
-  const className =
-    config?.classes?.[you.class]?.name ?? you.class ?? "Wanderer";
-  const housingName =
-    config?.housing?.[you.housing]?.name ?? you.housing ?? "—";
+  const [musicOn, toggleMusic] = useMusicToggle();
+  const [nightModeOn, toggleNightMode] = useNightModeToggle();
+
+  const handleShare = () => {
+    const url = window.location.origin;
+    if (navigator.share) {
+      navigator.share({ title: "Èkó Life", url }).catch(() => {});
+    } else {
+      try {
+        navigator.clipboard.writeText(url);
+      } catch {
+        /* clipboard unavailable */
+      }
+    }
+  };
+
   return (
-    <div className="eko-tabpad eko-me">
-      <Card className="eko-me__card">
-        <div className="eko-me__head">
-          <span
-            className="eko-me__avatar"
-            style={{ backgroundColor: you.color }}
-            aria-hidden="true"
-          >
-            {you.avatar}
-          </span>
-          <div>
-            <strong className="eko-me__name">{you.name}</strong>
-            <div className="eko-me__sub">
-              {className} · {housingName}
-              {you.cert > 0 && " · 🎓 Certified"}
-            </div>
-          </div>
-        </div>
-        <dl className="eko-me__rows">
-          <div>
-            <dt>Wallet</dt>
-            {/* M21: admins see unlimited (private view); the coins column
-                itself stays small so the leaderboard shows the decoy. */}
-            <dd>{you.is_admin ? "∞ Unlimited" : naira(you.money)}</dd>
-          </div>
-          <div>
-            <dt>Savings</dt>
-            <dd>{naira(you.savings)}</dd>
-          </div>
-          <div>
-            <dt>Loan</dt>
-            <dd>{naira(you.loan)}</dd>
-          </div>
-          <div>
-            <dt>Home</dt>
-            <dd>{housingName}</dd>
-          </div>
-        </dl>
-        <Button
-          size="md"
-          variant="accent"
-          onClick={() => setLedgerOpen(true)}
-          className="eko-me__ledger"
-        >
-          💰 Money history
-        </Button>
-      </Card>
-
-      <Card className="eko-me__card">
-        <dl className="eko-me__rows">
-          <div>
-            <dt>Account type</dt>
-            <dd>{you.guest ? "🧭 Guest" : "🧑 Full account"}</dd>
-          </div>
-          {you.is_admin && (
-            <div>
-              <dt>Role</dt>
-              <dd>🛡️ Admin</dd>
-            </div>
-          )}
-        </dl>
-        {you.guest && (
-          <>
-            <p className="eko-me__tip">
-              Guest progress lives on this device. Create a full account to
-              keep your character, money, and home on any device.
-            </p>
-            <Button
-              size="md"
-              variant="accent"
-              onClick={onUpgrade}
-              className="eko-me__ledger"
-            >
-              🎒 Create full account — keep my progress
-            </Button>
-          </>
-        )}
-        {you.is_admin && (
-          <Button
-            size="md"
-            variant="accent"
-            onClick={onOpenAdmin}
-            className="eko-me__ledger"
-          >
-            🛡️ Open admin dashboard
-          </Button>
-        )}
-        <details className="eko-howto">
-          <summary>Delete my data</summary>
-          <p className="eko-me__tip">
-            In-game account deletion isn't built yet — it's on the roadmap. To
-            request deletion today, email the support team:{" "}
-            <a href="mailto:support@eko-life.example">support@eko-life.example</a>{" "}
-            <em>(placeholder address — the account API is still being built, so
-            this link doesn't reach anyone real yet).</em>
-          </p>
-        </details>
-      </Card>
-
-      <div className="eko-me__actions">
-        <Button size="lg" onClick={onSleep} className="eko-me__btn">
-          😴 Sleep
-        </Button>
-        <Button size="lg" variant="accent" onClick={onRest} className="eko-me__btn">
-          🛋️ Rest
-        </Button>
-      </div>
-      <p className="eko-me__tip">
-        Sleep restores the most energy — but the day keeps moving while you do.
-      </p>
-
-      <LeaderboardCard token={token} you={you} />
-
-      <details className="eko-howto">
-        <summary>How to play</summary>
-        <ul>
-          <li>
-            <strong>Work</strong> at the right location to earn naira. Each
-            shift costs energy and needs a breather before the next one.
-          </li>
-          <li>
-            <strong>Eat</strong> to keep hunger up — an empty stomach drains
-            your health.
-          </li>
-          <li>
-            <strong>Travel</strong> around the city by tapping location pins.
-          </li>
-          <li>
-            <strong>Rest or sleep</strong> when your energy runs low.
-          </li>
-          <li>One game day lasts 5 real minutes. Survive and thrive.</li>
-        </ul>
-      </details>
-
-      <Button variant="ghost" onClick={onSignOut} className="eko-me__signout">
-        Sign out
-      </Button>
-
-      <Card className="eko-me__card">
-        <h2 className="eko-tabh" style={{ marginTop: 0 }}>
-          ⚙️ Settings
-        </h2>
-        <Button
-          size="md"
-          variant="ghost"
-          onClick={onReplayWalkthrough}
-          className="eko-me__ledger"
-        >
-          🎬 Replay walkthrough
-        </Button>
-        <ThemePicker />
-        {/* Sound effects — lives here in the Me panel (it was removed from
-            the top header in v3.6; the CharacterPanel copy stays too). */}
-        <div className="eko-me__notifprefs">
-          <h3 className="eko-me__notifprefs-title">🔊 Sound</h3>
-          <label className="eko-me__notifpref">
-            <span className="eko-me__notifpref-text">
-              <strong>Sound effects</strong>
-              <small>Tap and success sounds</small>
-            </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={soundOn}
-              aria-label="Sound effects"
-              className={`eko-switch${soundOn ? " eko-switch--on" : ""}`}
-              onClick={toggleSound}
-            >
-              <span className="eko-switch__knob" aria-hidden="true" />
-            </button>
-          </label>
-        </div>
-        {/* M21: notification preferences */}
-        <div className="eko-me__notifprefs">
-          <h3 className="eko-me__notifprefs-title">🔔 Notifications</h3>
-          {(Object.keys(NOTIFICATION_PREF_LABELS) as Array<keyof NotificationPrefs>).map(
-            (key) => {
-              const label = NOTIFICATION_PREF_LABELS[key];
-              const on = notifPrefs ? notifPrefs[key] !== false : true;
-              return (
-                <label key={key} className="eko-me__notifpref">
-                  <span className="eko-me__notifpref-text">
-                    <strong>{label.title}</strong>
-                    <small>{label.hint}</small>
-                  </span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={on}
-                    aria-label={label.title}
-                    className={`eko-switch${on ? " eko-switch--on" : ""}`}
-                    onClick={() => onNotifPrefs({ [key]: !on })}
-                  >
-                    <span className="eko-switch__knob" aria-hidden="true" />
-                  </button>
-                </label>
-              );
-            }
-          )}
-        </div>
-      </Card>
-
-      <LedgerSheet token={token} open={ledgerOpen} onClose={() => setLedgerOpen(false)} />
-    </div>
+    <SettingsView
+      displayName={you.name}
+      username={you.username}
+      notifPrefs={notifPrefs}
+      onNotifPrefs={onNotifPrefs}
+      soundOn={soundOn}
+      onToggleSound={toggleSound}
+      musicOn={musicOn}
+      onToggleMusic={toggleMusic}
+      nightModeOn={nightModeOn}
+      onToggleNightMode={toggleNightMode}
+      onEdit={onEditProfile}
+      onTheme={() => {}}
+      onLanguage={() => {}}
+      onHelp={onReplayWalkthrough}
+      onRate={() => {}}
+      onShare={handleShare}
+      onLogout={onSignOut}
+    />
   );
 }
 
@@ -1163,6 +937,7 @@ export function Game({
                 notifPrefs={sock.notifPrefs}
                 onNotifPrefs={sock.updateNotifPrefs}
                 sendAct={sock.sendAct}
+                onEditProfile={() => openCharacterPanel("profile")}
               />
               {config && (
                 <HomeTab
@@ -1346,8 +1121,9 @@ export function Game({
         {tab === "buy" && config && (
           <BuyView
             you={you}
-            config={config}
             sendAct={sock.sendAct}
+            day={sock.day}
+            onTopUp={() => setTopUpOpen(true)}
             onBuySheetOpen={setBuySheetOpen}
           />
         )}
@@ -1490,11 +1266,19 @@ export function Game({
         onSelectApp={setPhoneApp}
         renderApp={renderPhoneApp}
         token={token}
+        day={dayBanner}
+        coins={you.money}
       />
 
       <TabBar
-        tab={tab}
-        onTab={(t) => (t === "phone" ? setPhoneOpen(true) : setTab(t))}
+        tab={phoneOpen ? "phone" : tab}
+        onTab={(t) => {
+          if (t === "phone") setPhoneOpen(true);
+          else {
+            setTab(t);
+            setPhoneOpen(false);
+          }
+        }}
         hasUnread={sock.unreadNotifications > 0}
       />
         </>
