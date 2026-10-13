@@ -291,8 +291,15 @@
   border-radius: 54px;
   /* Bezel: outer edge + inner black ring around the screen. */
   border: 2px solid #3a3f4b;
+  /* Fully opaque device — never glass. The base .eko-phone__panel brings
+     backdrop-filter: blur(26px); cancel it here so map/HUD content behind
+     the sheet can never bleed through (iPhone layer-stack bug, 2026-10-13).
+     Solid background-color sits under the gradient as a paint fallback. */
+  background-color: #0d1526;
   background:
     linear-gradient(165deg, #1a2542 0%, #0e1730 48%, #090e1c 100%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow:
     0 30px 80px rgb(0 0 0 / 0.6),
     0 8px 24px rgb(0 0 0 / 0.45),
