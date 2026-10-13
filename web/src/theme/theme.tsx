@@ -31,9 +31,6 @@ export type ResolvedTheme = "day" | "night";
 export const THEME_STORAGE_KEY = "eko-life:theme";
 export const THEME_ATTRIBUTE = "data-theme";
 
-/** In-game day window, Africa/Lagos wall time: 06:00 (inclusive) – 18:00 (exclusive). */
-const DAY_START_HOUR = 6;
-const DAY_END_HOUR = 18;
 const REEVALUATE_MS = 60_000;
 
 const PREFERENCES: ThemePreference[] = ["light", "dark", "automatic"];
@@ -75,26 +72,17 @@ export function lagosHour(now = new Date()): number | null {
   }
 }
 
-function systemPrefersDark(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches
-  );
-}
+/* Unused — dark theme disabled. */
+void 0;
 
 /** Resolve a preference to a concrete theme (pure — safe in tests). */
 export function resolveTheme(
-  preference: ThemePreference,
-  now = new Date(),
+  _preference: ThemePreference,
+  _now = new Date(),
 ): ResolvedTheme {
-  if (preference === "light") return "day";
-  if (preference === "dark") return "night";
-  const hour = lagosHour(now);
-  if (hour != null) {
-    return hour >= DAY_START_HOUR && hour < DAY_END_HOUR ? "day" : "night";
-  }
-  return systemPrefersDark() ? "night" : "day";
+  // Bright cartoon theme forced always — the dark theme is disabled.
+  // The user wants the lagoslife.app bright design everywhere.
+  return "day";
 }
 
 export function readPreference(): ThemePreference {
