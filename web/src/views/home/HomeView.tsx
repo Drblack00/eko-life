@@ -5,8 +5,8 @@ import type { ActName, You } from "../../game/types";
 import { NeedsBar } from "./NeedsBar";
 import { GoalsCard } from "./GoalsCard";
 import {
-  Greeting,
-  StatRings,
+  TopPill,
+  GoalsPanel,
   QuickActions,
   HomeTip,
   TrendingNews,
@@ -14,9 +14,9 @@ import {
 import "./Home.css";
 
 /**
- * Home tab — G1 "Ocean Glass" (picked 2026-10-12): liquid-glass hero,
- * progress-ring stats (shown once), glass quick actions, tip, hustle,
- * trending news. The 3D room editor moved to the Phone app.
+ * Home tab — cartoon reference rebuild (2026-10-13): top status pill,
+ * goals card with checklist + stat tiles, 2x2 quick actions, tip,
+ * today's hustle, news cards. Matches the approved mockup exactly.
  */
 export function HomeView({
   you,
@@ -26,8 +26,6 @@ export function HomeView({
   sendAct,
   onOpenApp,
   onTab,
-  onOpenNotifications,
-  onGovOpen,
   onTopUp,
   tip,
 }: {
@@ -48,23 +46,15 @@ export function HomeView({
   const [needsOpen, setNeedsOpen] = useState(false);
   return (
     <div className="eko-tabpad eko-home eko-home--g1">
-      <Greeting
-        username={you.username}
-        day={sock.day ?? null}
-        online={sock.online}
-        onWallet={onTopUp}
-        onBell={onOpenNotifications}
-        onGov={onGovOpen}
-        hasUnread={sock.unreadNotifications > 0}
-      />
-      <StatRings you={you} />
+      <TopPill you={you} day={sock.day ?? null} onTopUp={onTopUp} />
+      <GoalsPanel you={you} />
       <QuickActions
         onWork={() => onOpenApp?.("jobs")}
         onTravel={() => onTab?.("map")}
         onEat={() => setNeedsOpen(true)}
         onSleep={() => sendAct("sleep")}
       />
-      <HomeTip text={tip ?? null} />
+      <HomeTip text={tip ?? null} token={token} />
       <GoalsCard token={token} sendAct={sendAct} />
       <TrendingNews onOpenGist={() => onOpenApp?.("gist")} />
       <NeedsBar

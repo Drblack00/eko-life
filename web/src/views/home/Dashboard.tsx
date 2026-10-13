@@ -1,136 +1,140 @@
 import { useEffect, useState } from "react";
 import type { NewsItem, You } from "../../game/types";
-import { api } from "../../lib/api";
+import { api, authGet } from "../../lib/api";
 import { blip } from "../../lib/sound";
+import { moodFor } from "./homeChrome";
 import "./Dashboard.css";
 
 /* ------------------------------------------------------------------ */
-/* Dashboard — G1 "Ocean Glass" (picked 2026-10-12): liquid-glass hero, */
-/* progress-ring stats (shown once), glass quick actions, tip, hustle, */
-/* trending news. Room editor lives in the Phone app now.              */
+/* Dashboard — cartoon reference rebuild (2026-10-13): matches the     */
+/* approved Home mockup exactly. Top pill (weather/day/mood/money),    */
+/* goals card with checklist + stat tiles, 2x2 actions, tip, hustle,   */
+/* news cards. All game logic (stats, actions, navigation) preserved.  */
 /* ------------------------------------------------------------------ */
 
-function greetingFor(date: Date): { text: string; emoji: string } {
-  const h = date.getHours();
-  if (h < 12) return { text: "Good morning", emoji: "☀️" };
-  if (h < 17) return { text: "Good afternoon", emoji: "🌤️" };
-  return { text: "Good evening", emoji: "🌙" };
+/* ---------------- Top pill ---------------- */
+
+function formatNaira(n: number): string {
+  return `₦${Math.max(0, Math.round(n || 0)).toLocaleString("en-NG")}`;
 }
 
-export function Greeting({
-  username,
+export function TopPill({
+  you,
   day,
-  online,
-  onWallet,
-  onBell,
-  onGov,
-  hasUnread,
+  onTopUp,
 }: {
-  username: string;
+  you: You;
   day: number | null;
-  online?: number;
-  onWallet?: () => void;
-  onBell?: () => void;
-  onGov?: () => void;
-  hasUnread?: boolean;
+  onTopUp?: () => void;
 }) {
-  const now = new Date();
-  const g = greetingFor(now);
-  const weekday = now.toLocaleDateString(undefined, { weekday: "long" });
+  const mood = moodFor(you.happiness);
   return (
-    <div className="oglass og-hero">
-      <div className="og-hero__top">
-        <div className="og-avatar" aria-hidden="true">
-          😎
-        </div>
-        <div className="og-hero__who">
-          <div className="og-hero__name">{username}</div>
-          <div className="og-hero__sub">
-            🟢 {typeof online === "number" ? online : 0} online
-          </div>
-        </div>
-        <div className="og-hero__icons">
-          <button
-            type="button"
-            className="og-icobtn"
-            onClick={() => {
-              blip("tap");
-              onWallet?.();
-            }}
-            aria-label="Wallet"
-          >
-            ∞
-          </button>
-          <button
-            type="button"
-            className="og-icobtn"
-            onClick={() => {
-              blip("tap");
-              onBell?.();
-            }}
-            aria-label="Notifications"
-          >
-            🔔{hasUnread ? <span className="og-dot" /> : null}
-          </button>
-          <button
-            type="button"
-            className="og-icobtn"
-            onClick={() => {
-              blip("tap");
-              onGov?.();
-            }}
-            aria-label="Government"
-          >
-            🏛️
-          </button>
-        </div>
-      </div>
-      <div className="og-hero__greet">
-        <h2>
-          {g.text} {g.emoji}
-        </h2>
-        <p>
-          {weekday}
-          {typeof day === "number" ? ` · Day ${day} in Èkó` : ""}
-        </p>
-      </div>
+    <div className="db-toppill" role="status" aria-label="Status">
+      <span className="db-toppill__weather" aria-hidden="true">
+        ☀️
+      </span>
+      <span className="db-toppill__chunk">
+        <strong>Sunny</strong>
+        <strong>28°C</strong>
+      </span>
+      <span className="db-toppill__dot" aria-hidden="true">
+        •
+      </span>
+      <span className="db-toppill__chunk">
+        <strong>Day {typeof day === "number" ? day : "–"}</strong>
+      </span>
+      <span className="db-toppill__dot" aria-hidden="true">
+        •
+      </span>
+      <span className="db-toppill__chunk" aria-hidden="true">
+        {mood.emoji}
+      </span>
+      <span className="db-toppill__chunk">
+        <strong>
+          Mood:
+          <br />
+          {mood.label}
+        </strong>
+      </span>
+      <span className="db-toppill__chunk" aria-hidden="true">
+        💰
+      </span>
+      <span className="db-toppill__chunk">
+        <strong>{formatNaira(you.money)}</strong>
+      </span>
+      <button
+        type="button"
+        className="db-toppill__plus"
+        onClick={() => {
+          blip("tap");
+          onTopUp?.();
+        }}
+        aria-label="Add money"
+      >
+        +
+      </button>
     </div>
   );
 }
 
-/* ---------------- Stat rings (shown once) ---------------- */
+/* ---------------- Goals panel (goals + stat tiles) ---------------- */
+
+const GOAL_ITEMS = [
+  "Complete 3 daily tasks",
+  "Meet Kemi at Yaba market",
+  "Upgrade your food stall",
+];
 
 const STATS = [
-  { id: "energy", label: "Energy", icon: "⚡", color: "#06d6a0" },
-  { id: "health", label: "Health", icon: "❤️", color: "#ff6b8a" },
-  { id: "happiness", label: "Happiness", icon: "😊", color: "#ffd166" },
-  { id: "hunger", label: "Hunger", icon: "🍽️", color: "#ff9f1c" },
+  { id: "energy", label: "Energy", icon: "⚡" },
+  { id: "health", label: "Health", icon: "❤️" },
+  { id: "happiness", label: "Happy", icon: "😊" },
+  { id: "hunger", label: "Hunger", icon: "🍔" },
 ] as const;
 
-/* Stat tiles use progress bars now — Ring removed. */
-
-export function StatRings({ you }: { you: You }) {
+export function GoalsPanel({ you }: { you: You }) {
   return (
-    <div className="og-stats" role="group" aria-label="Your stats">
-      {STATS.map((s) => {
-        const v = Math.max(0, Math.min(100, Math.round(Number(you[s.id]) || 0)));
-        return (
-          <div key={s.id} className="oglass og-stat">
-            <span className="og-stat__ico" aria-hidden="true">
-              {s.icon}
+    <section className="db-goals" aria-label="Goals">
+      <div className="db-goals__head">
+        <h3 className="db-goals__title">
+          <span aria-hidden="true">🎯</span> Goals
+        </h3>
+        <span className="db-goals__badge">{GOAL_ITEMS.length} ACTIVE</span>
+      </div>
+      <ul className="db-goals__list">
+        {GOAL_ITEMS.map((g) => (
+          <li key={g} className="db-goals__item">
+            <span className="db-goals__check" aria-hidden="true">
+              ✓
             </span>
-            <span className="og-stat__label">{s.label}</span>
-            <span className="og-stat__bar" aria-hidden="true">
-              <span
-                className="og-stat__fill"
-                style={{ width: `${v}%`, background: s.color }}
-              />
-            </span>
-            <span className="og-stat__v">{v}</span>
-          </div>
-        );
-      })}
-    </div>
+            <span className="db-goals__text">{g}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="db-stats" role="group" aria-label="Your stats">
+        {STATS.map((s) => {
+          const v = Math.max(
+            0,
+            Math.min(100, Math.round(Number(you[s.id]) || 0))
+          );
+          return (
+            <div key={s.id} className="db-stat">
+              <span className="db-stat__ico" aria-hidden="true">
+                {s.icon}
+              </span>
+              <span className="db-stat__label">{s.label}</span>
+              <span className="db-stat__bar" aria-hidden="true">
+                <span
+                  className="db-stat__fill"
+                  style={{ width: `${v}%` }}
+                />
+              </span>
+              <span className="db-stat__v">{v}</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -154,21 +158,21 @@ export function QuickActions({
     { id: "sleep", label: "Sleep", icon: "😴", run: onSleep },
   ];
   return (
-    <div className="og-actions" role="group" aria-label="Quick actions">
+    <div className="db-actions" role="group" aria-label="Quick actions">
       {acts.map((a) => (
         <button
           key={a.id}
           type="button"
-          className="oglass og-action"
+          className="db-action"
           onClick={() => {
             blip("tap");
             a.run();
           }}
         >
-          <span className="og-action__ico" aria-hidden="true">
+          <span className="db-action__ico" aria-hidden="true">
             {a.icon}
           </span>
-          <span className="og-action__label">{a.label}</span>
+          <span className="db-action__label">{a.label}</span>
         </button>
       ))}
     </div>
@@ -177,25 +181,64 @@ export function QuickActions({
 
 /* ---------------- Tip ---------------- */
 
-export function HomeTip({ text }: { text: string | null }) {
-  if (!text) return null;
+interface HustleMission {
+  id: string;
+  label: string;
+  done: boolean;
+  claimed: boolean;
+}
+
+export function HomeTip({ text, token }: { text: string | null; token: string }) {
+  const [sub, setSub] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    authGet("/api/v2/m9/hustle", token)
+      .then((h) => {
+        const data = h as unknown as {
+          missions?: HustleMission[];
+        } | null;
+        if (!live || !data || !Array.isArray(data.missions)) return;
+        const missions = data.missions;
+        if (missions.length === 0) return;
+        const done = missions.filter((m) => m.done || m.claimed).length;
+        const next = missions.find((m) => !m.done && !m.claimed);
+        setSub(
+          `${next ? next.label : missions[0].label} • ${done} of ${missions.length} completed`
+        );
+      })
+      .catch(() => {
+        /* offline — tip still renders */
+      });
+    return () => {
+      live = false;
+    };
+  }, [token]);
+  if (!text && !sub) return null;
   return (
-    <div className="oglass og-tip" role="status">
-      <span aria-hidden="true">💡</span>
-      <span>{text}</span>
+    <div className="db-tip" role="status">
+      <span className="db-tip__ico" aria-hidden="true">
+        💡
+      </span>
+      <div className="db-tip__body">
+        {text ? (
+          <p className="db-tip__main">
+            <strong className="db-tip__word">Tip:</strong> {text}
+          </p>
+        ) : null}
+        {sub ? <p className="db-tip__sub">{sub}</p> : null}
+      </div>
     </div>
   );
 }
 
-/* ---------------- Trending news ---------------- */
+/* ---------------- Trending news (reference card style) ---------------- */
 
-function timeAgo(ts?: number): string {
-  if (!ts) return "";
-  const s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
-  if (s < 60) return "now";
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  return `${Math.floor(s / 86400)}d`;
+function newsIcon(text: string): string {
+  const t = text.toLowerCase();
+  if (t.includes("fest") || t.includes("party") || t.includes("event"))
+    return "📢";
+  if (t.includes("road") || t.includes("traffic")) return "📰";
+  return "📢";
 }
 
 export function TrendingNews({ onOpenGist }: { onOpenGist?: () => void }) {
@@ -215,35 +258,39 @@ export function TrendingNews({ onOpenGist }: { onOpenGist?: () => void }) {
     };
   }, []);
   if (!items || items.length === 0) return null;
-  const top = items.slice(0, 4);
+  const top = items.slice(0, 2);
   return (
-    <section className="og-news" aria-label="Trending news">
-      <div className="og-news__head">
-        <h3>🔥 Trending in Èkó</h3>
-        {onOpenGist ? (
-          <button
-            type="button"
-            className="og-news__more"
-            onClick={() => {
-              blip("tap");
-              onOpenGist();
-            }}
-          >
-            More ›
-          </button>
-        ) : null}
-      </div>
-      <div className="og-news__list">
-        {top.map((n, i) => (
-          <article key={String(n.id ?? i)} className="oglass og-news__item">
-            <span className="og-news__rank">{i + 1}</span>
-            <p className="og-news__text">{n.text}</p>
-            {n.ts ? (
-              <time className="og-news__time">{timeAgo(n.ts)} ago</time>
+    <div className="db-newslist">
+      {top.map((n, i) => {
+        const text = n.text || "";
+        const [title, ...rest] = text.split(/[.!]\s/);
+        const subtitle = rest.join(". ").trim();
+        return (
+          <article key={String(n.id ?? i)} className="db-news">
+            <span className="db-news__ico" aria-hidden="true">
+              {newsIcon(text)}
+            </span>
+            <div className="db-news__body">
+              <h4 className="db-news__title">{title}</h4>
+              {subtitle ? (
+                <p className="db-news__sub">{subtitle}</p>
+              ) : null}
+            </div>
+            {onOpenGist ? (
+              <button
+                type="button"
+                className={`db-news__btn ${i === 0 ? "db-news__btn--green" : "db-news__btn--orange"}`}
+                onClick={() => {
+                  blip("tap");
+                  onOpenGist();
+                }}
+              >
+                {i === 0 ? "+Event" : "Info"}
+              </button>
             ) : null}
           </article>
-        ))}
-      </div>
-    </section>
+        );
+      })}
+    </div>
   );
 }

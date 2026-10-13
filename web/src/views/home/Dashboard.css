@@ -1,228 +1,387 @@
-/* Bright cozy game cards — white with soft shadows like the reference. */
+/* Cartoon home dashboard — matches the approved reference exactly.
+ * Light sky-blue page, chunky white cards, bold rounded type. */
 
-.oglass {
+:root {
+  --db-green: #00c853;
+  --db-green-dark: #00a344;
+  --db-ink: #14213d;
+  --db-ink-soft: #3d4a63;
+  --db-muted: #8a94a8;
+}
+
+/* ---- Top pill ---- */
+.db-toppill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.04);
-  border-radius: 22px;
-  box-shadow: 0 4px 16px rgba(26, 43, 60, 0.08);
+  border-radius: 999px;
+  padding: 10px 10px 10px 14px;
+  box-shadow: 0 4px 14px rgba(20, 33, 61, 0.12);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-
-/* Hero */
-.og-hero {
-  padding: 18px;
-  position: relative;
-  overflow: hidden;
+.db-toppill::-webkit-scrollbar {
+  display: none;
 }
-.og-hero__top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.og-avatar {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #ffd166, #ef476f);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+.db-toppill__weather {
+  font-size: 30px;
+  line-height: 1;
   flex: none;
 }
-.og-hero__name {
+.db-toppill__chunk {
+  font-size: 14px;
+  color: var(--db-ink);
+  white-space: nowrap;
+  line-height: 1.25;
+}
+.db-toppill__chunk strong {
   font-weight: 800;
-  font-size: 16px;
-  color: #1a2b3c;
 }
-.og-hero__sub {
-  font-size: 12px;
-  color: #5b7a94;
+.db-toppill__dot {
+  color: var(--db-ink);
+  font-weight: 800;
+  flex: none;
 }
-.og-hero__icons {
+.db-toppill__plus {
   margin-left: auto;
-  display: flex;
-  gap: 8px;
-}
-.og-icobtn {
-  width: 38px;
-  height: 38px;
+  flex: none;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: #f0f7ff;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
-  color: #1a2b3c;
-  position: relative;
+  border: none;
+  background: var(--db-green);
+  color: #fff;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
   cursor: pointer;
-}
-.og-dot {
-  position: absolute;
-  top: 7px;
-  right: 9px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ef476f;
-}
-.og-hero__greet {
-  margin-top: 14px;
-}
-.og-hero__greet h2 {
-  font-size: 25px;
-  font-weight: 800;
-  color: #1a2b3c;
-  margin: 0;
-}
-.og-hero__greet p {
-  font-size: 13px;
-  color: #5b7a94;
-  margin: 4px 0 0;
-}
-
-/* Stat tiles — cartoon style with progress bars */
-.og-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  gap: 10px;
-  margin-top: 14px;
-}
-.og-stat {
-  padding: 14px 8px;
-  text-align: center;
-  border-radius: 20px;
-}
-.og-stat__ico {
-  font-size: 28px;
-  display: block;
-  margin-bottom: 4px;
-}
-.og-stat__label {
-  font-size: 13px;
-  font-weight: 700;
-  color: #1a2b3c;
-  display: block;
-  margin-bottom: 6px;
-}
-.og-stat__bar {
-  display: block;
-  height: 8px;
-  border-radius: 99px;
-  background: #e8f0f5;
-  overflow: hidden;
-  margin-bottom: 6px;
-}
-.og-stat__fill {
-  display: block;
-  height: 100%;
-  border-radius: 99px;
-  background: #00c853;
-}
-.og-stat__v {
-  font-size: 15px;
-  font-weight: 800;
-  color: #1a2b3c;
-}
-
-/* Quick actions — 2x2 cartoon grid */
-.og-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 14px;
-}
-.og-action {
-  padding: 20px 16px;
-  text-align: center;
-  font-weight: 800;
-  font-size: 17px;
-  color: #1a2b3c;
-  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0, 200, 83, 0.4);
   font-family: inherit;
+}
+.db-toppill__plus:active {
+  transform: scale(0.94);
+}
+
+/* ---- Goals card ---- */
+.db-goals {
+  background: #ffffff;
   border-radius: 24px;
+  padding: 18px 16px 16px;
+  box-shadow: 0 6px 18px rgba(20, 33, 61, 0.1);
 }
-.og-action__ico {
-  font-size: 44px;
-  display: block;
-  margin-bottom: 8px;
-}
-.og-action__label {
-  color: #1a2b3c;
-}
-
-/* Tip */
-.og-tip {
-  margin-top: 14px;
-  padding: 12px 16px;
-  font-size: 13px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  color: #8a6d1b;
-  background: #fffbeb;
-}
-
-/* Trending news */
-.og-news {
-  margin-top: 18px;
-}
-.og-news__head {
+.db-goals__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 0 4px 10px;
+  margin-bottom: 12px;
 }
-.og-news__head h3 {
-  font-size: 16px;
+.db-goals__title {
+  font-size: 24px;
   font-weight: 800;
-  color: #1a2b3c;
+  color: var(--db-ink);
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.og-news__more {
-  background: none;
-  border: none;
-  color: #00a344;
+.db-goals__badge {
+  background: var(--db-green);
+  color: #fff;
   font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: inherit;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
 }
-.og-news__list {
+.db-goals__list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.og-news__item {
+.db-goals__item {
   display: flex;
+  align-items: center;
   gap: 12px;
-  align-items: flex-start;
-  padding: 14px 16px;
-  border-radius: 20px;
 }
-.og-news__rank {
+.db-goals__check {
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ff9f1c, #ef476f);
+  background: var(--db-green);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+}
+.db-goals__text {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--db-ink);
+}
+
+/* ---- Stat tiles (inside goals card) ---- */
+.db-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.db-stat {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 12px 6px 10px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(20, 33, 61, 0.1);
+  border: 1px solid rgba(20, 33, 61, 0.05);
+}
+.db-stat__ico {
+  font-size: 30px;
+  display: block;
+  margin-bottom: 2px;
+}
+.db-stat__label {
+  font-size: 14px;
   font-weight: 800;
+  color: var(--db-ink);
+  display: block;
+  margin-bottom: 6px;
+}
+.db-stat__bar {
+  display: block;
+  height: 9px;
+  border-radius: 99px;
+  background: #e3ecf3;
+  overflow: hidden;
+  margin: 0 8px 6px;
+}
+.db-stat__fill {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--db-green);
+}
+.db-stat__v {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--db-ink);
+}
+
+/* ---- 2x2 action grid ---- */
+.db-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.db-action {
+  background: #ffffff;
+  border: none;
+  border-radius: 24px;
+  padding: 22px 16px 18px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(20, 33, 61, 0.1);
+  font-family: inherit;
+}
+.db-action:active {
+  transform: scale(0.97);
+}
+.db-action__ico {
+  font-size: 52px;
+  display: block;
+  margin-bottom: 6px;
+}
+.db-action__label {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--db-ink);
+}
+
+/* ---- Tip card ---- */
+.db-tip {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 14px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  box-shadow: 0 4px 14px rgba(20, 33, 61, 0.1);
+}
+.db-tip__ico {
+  font-size: 34px;
+  line-height: 1;
+  flex: none;
+}
+.db-tip__body {
+  min-width: 0;
+}
+.db-tip__main {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--db-ink);
+  line-height: 1.35;
+}
+.db-tip__word {
+  color: var(--db-green);
+  font-weight: 800;
+  font-size: 20px;
+}
+.db-tip__sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--db-muted);
+  font-weight: 600;
+}
+
+/* ---- Hustle card (restyled GoalsCard) ---- */
+.db-hustle {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 14px 16px;
+  box-shadow: 0 4px 14px rgba(20, 33, 61, 0.1);
+}
+.db-hustle__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.db-hustle__title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--db-ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.db-hustle__count {
+  background: var(--db-green);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: 999px;
+}
+.db-hustle__bar {
+  height: 10px;
+  border-radius: 99px;
+  background: #e3ecf3;
+  overflow: hidden;
+  margin-top: 10px;
+}
+.db-hustle__fill {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--db-green);
+}
+.db-hustle__list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.db-hustle__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--db-ink);
+}
+.db-hustle__item .db-goals__check {
+  width: 26px;
+  height: 26px;
+  font-size: 14px;
+}
+.db-hustle__item.is-done {
+  opacity: 0.6;
+}
+.db-hustle__label {
+  flex: 1;
+  min-width: 0;
+}
+.db-hustle__claim {
+  flex: none;
+  border: none;
+  border-radius: 999px;
+  background: var(--db-green);
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.db-hustle__claim:disabled {
+  background: #cfd8e3;
+}
+
+/* ---- News cards ---- */
+.db-newslist {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.db-news {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 14px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  box-shadow: 0 4px 14px rgba(20, 33, 61, 0.1);
+}
+.db-news__ico {
+  font-size: 40px;
+  line-height: 1;
+  flex: none;
+}
+.db-news__body {
+  flex: 1;
+  min-width: 0;
+}
+.db-news__title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--db-ink);
+  line-height: 1.25;
+}
+.db-news__sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--db-ink-soft);
+  line-height: 1.35;
+}
+.db-news__btn {
+  flex: none;
+  border: none;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-family: inherit;
   color: #fff;
 }
-.og-news__text {
-  flex: 1;
-  font-size: 13.5px;
-  line-height: 1.45;
-  color: #1a2b3c;
-  margin: 0;
+.db-news__btn--green {
+  background: var(--db-green);
 }
-.og-news__time {
-  flex: none;
-  font-size: 11px;
-  color: #5b7a94;
+.db-news__btn--orange {
+  background: #ffb020;
 }
