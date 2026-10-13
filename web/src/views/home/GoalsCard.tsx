@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { authGet } from "../../lib/api";
 import type { ActName } from "../../game/types";
+import { Button } from "../../components";
 
 /* ------------------------------------------------------------------ */
 /* GoalsCard — compact "Today's Hustle" card for the Home tab. Reuses   */
@@ -62,47 +63,54 @@ export function GoalsCard({
   const doneCount = missions.filter((m) => m.done || m.claimed).length;
   const preview = missions.slice(0, 3);
   const list = expanded ? missions : preview;
-  const pct = missions.length ? Math.round((doneCount / missions.length) * 100) : 0;
 
   return (
-    <section className="db-hustle" aria-label="Today's hustle">
+    <section className="eko-goals glass" aria-label="Today's goals">
       <button
         type="button"
-        className="db-hustle__head"
+        className="eko-goals__head"
         onClick={() => setExpanded((e) => !e)}
         aria-expanded={expanded}
       >
-        <span className="db-hustle__title">
-          <span aria-hidden="true">✨</span> Today&apos;s hustle
+        <span className="eko-goals__title">
+          <span aria-hidden="true">🎯</span> Today&apos;s hustle
         </span>
-        <span className="db-hustle__count">
-          {missions.length === 0 ? "…" : `${doneCount}/${missions.length}`}
+        <span className="eko-goals__meta">
+          <span className="eko-goals__stars" title="Perk stars">
+            ✨ {hustle?.stars ?? 0}
+          </span>
+          <span className="eko-goals__count">
+            {missions.length === 0 ? "…" : `${doneCount}/${missions.length}`}
+          </span>
+          <span className="eko-goals__chev" aria-hidden="true">
+            {expanded ? "▴" : "▾"}
+          </span>
         </span>
       </button>
-      <div className="db-hustle__bar" aria-hidden="true">
-        <span className="db-hustle__fill" style={{ width: `${pct}%` }} />
-      </div>
 
-      {missions.length > 0 && (
-        <ul className="db-hustle__list">
+      {missions.length === 0 ? (
+        <p className="eko-goals__empty">Loading today&apos;s missions…</p>
+      ) : (
+        <ul className="eko-goals__list">
           {list.map((m) => (
             <li
               key={m.id}
-              className={`db-hustle__item ${m.done || m.claimed ? "is-done" : ""}`}
+              className={`eko-goals__item ${m.claimed ? "is-claimed" : ""}`}
             >
-              <span className="db-goals__check" aria-hidden="true">
-                {m.done || m.claimed ? "✓" : "•"}
+              <span className="eko-goals__check" aria-hidden="true">
+                {m.claimed ? "✅" : m.done ? "☑️" : "⬜"}
               </span>
-              <span className="db-hustle__label">{m.label}</span>
+              <span className="eko-goals__label">{m.label}</span>
+              <span className="eko-goals__reward">+{m.reward} ✨</span>
               {expanded && !m.claimed && (
-                <button
-                  type="button"
-                  className="db-hustle__claim"
+                <Button
+                  size="md"
+                  variant={m.done ? "primary" : "ghost"}
                   disabled={!m.done || busy === m.id}
                   onClick={() => claim(m)}
                 >
                   {busy === m.id ? "…" : m.done ? "Claim" : "Locked"}
-                </button>
+                </Button>
               )}
             </li>
           ))}
