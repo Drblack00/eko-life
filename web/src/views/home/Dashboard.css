@@ -13,13 +13,15 @@
 .db-toppill {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: #ffffff;
   border-radius: 999px;
-  padding: 10px 10px 10px 14px;
+  padding: 8px 8px 8px 12px;
   box-shadow: 0 4px 14px rgba(20, 33, 61, 0.12);
   overflow-x: auto;
   scrollbar-width: none;
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 .db-toppill::-webkit-scrollbar {
   display: none;
