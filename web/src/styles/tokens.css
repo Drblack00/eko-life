@@ -1,7 +1,7 @@
 /* Èkó Life design tokens — day theme + night theme (data-theme="night") */
 
 :root,
-[data-theme="day"] {
+[data-theme="warm-light"], [data-theme="sage-calm"] {
   --font-display: "Baloo 2", "Comic Sans MS", system-ui, sans-serif;
   --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 
@@ -70,7 +70,7 @@
   --sar: env(safe-area-inset-right, 0px);
 }
 
-[data-theme="night"] {
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] {
   --bg: #0b1b2a;
   --surface: #12293d;
   --surface-2: #0e2233;
