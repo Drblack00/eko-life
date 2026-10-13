@@ -1,22 +1,13 @@
-import { useState } from "react";
 import type { GameSocket } from "../../hooks/useGameSocket";
 import type { GameConfig } from "../../lib/api";
 import type { ActName, You } from "../../game/types";
-import { NeedsBar } from "./NeedsBar";
-import { GoalsCard } from "./GoalsCard";
-import {
-  Greeting,
-  StatRings,
-  QuickActions,
-  HomeTip,
-  TrendingNews,
-} from "./Dashboard";
+import { Dashboard } from "./Dashboard";
 import "./Home.css";
 
 /**
- * Home tab — G1 "Ocean Glass" (picked 2026-10-12): liquid-glass hero,
- * progress-ring stats (shown once), glass quick actions, tip, hustle,
- * trending news. The 3D room editor moved to the Phone app.
+ * Home tab — liquid-glass redesign (2026-10-13): hero, profile strip,
+ * quick-action grid, needs, discover, goals, community pulse. Thin
+ * wrapper over Dashboard so Game.tsx keeps its existing props.
  */
 export function HomeView({
   you,
@@ -45,34 +36,20 @@ export function HomeView({
   onTopUp?: () => void;
   tip?: string | null;
 }) {
-  const [needsOpen, setNeedsOpen] = useState(false);
+  void onGovOpen; // reserved for the government shortcut row (roadmap)
   return (
-    <div className="eko-tabpad eko-home eko-home--g1">
-      <Greeting
-        username={you.username}
-        day={sock.day ?? null}
-        online={sock.online}
-        onWallet={onTopUp}
-        onBell={onOpenNotifications}
-        onGov={onGovOpen}
-        hasUnread={sock.unreadNotifications > 0}
-      />
-      <StatRings you={you} />
-      <QuickActions
-        onWork={() => onOpenApp?.("jobs")}
-        onTravel={() => onTab?.("map")}
-        onEat={() => setNeedsOpen(true)}
-        onSleep={() => sendAct("sleep")}
-      />
-      <HomeTip text={tip ?? null} />
-      <GoalsCard token={token} sendAct={sendAct} />
-      <TrendingNews onOpenGist={() => onOpenApp?.("gist")} />
-      <NeedsBar
+    <div className="eko-tabpad eko-home eko-home--liquid">
+      <Dashboard
         you={you}
-        sock={sock}
         config={config}
-        open={needsOpen}
-        onOpenChange={setNeedsOpen}
+        token={token}
+        sock={sock}
+        sendAct={sendAct}
+        onOpenApp={onOpenApp}
+        onTab={onTab}
+        onOpenNotifications={onOpenNotifications}
+        onTopUp={onTopUp}
+        tip={tip}
       />
     </div>
   );

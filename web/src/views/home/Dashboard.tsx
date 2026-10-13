@@ -1,273 +1,297 @@
-import { useEffect, useState } from "react";
-import type { NewsItem, You } from "../../game/types";
-import { api } from "../../lib/api";
-import { blip } from "../../lib/sound";
+import type { GameSocket } from "../../hooks/useGameSocket";
+import type { GameConfig } from "../../lib/api";
+import { asList } from "../../lib/api";
+import { naira, type ActName, type You } from "../../game/types";
+import { Icon, type IconName } from "../../components";
+import { GoalsCard } from "./GoalsCard";
 import "./Dashboard.css";
 
 /* ------------------------------------------------------------------ */
-/* Dashboard — G1 "Ocean Glass" (picked 2026-10-12): liquid-glass hero, */
-/* progress-ring stats (shown once), glass quick actions, tip, hustle, */
-/* trending news. Room editor lives in the Phone app now.              */
-/* ------------------------------------------------------------------ */
+/* Dashboard — liquid-glass redesign (2026-10-13).
+ *
+ * Prototype home layout wired to REAL game state only:
+ * hero → profile strip → quick-action grid → needs → discover →
+ * today's goals → community pulse. No invented numbers: every value
+ * comes from the `you` snapshot, the game config, or the socket.
+ * ------------------------------------------------------------------ */
 
-function greetingFor(date: Date): { text: string; emoji: string } {
+function greetingFor(date: Date): string {
   const h = date.getHours();
-  if (h < 12) return { text: "Good morning", emoji: "☀️" };
-  if (h < 17) return { text: "Good afternoon", emoji: "🌤️" };
-  return { text: "Good evening", emoji: "🌙" };
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
 }
 
-export function Greeting({
-  username,
-  day,
-  online,
-  onWallet,
-  onBell,
-  onGov,
-  hasUnread,
-}: {
-  username: string;
-  day: number | null;
-  online?: number;
-  onWallet?: () => void;
-  onBell?: () => void;
-  onGov?: () => void;
-  hasUnread?: boolean;
-}) {
-  const now = new Date();
-  const g = greetingFor(now);
-  const weekday = now.toLocaleDateString(undefined, { weekday: "long" });
+function clampPct(v: unknown): number {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+interface NeedDef {
+  id: string;
+  label: string;
+  icon: IconName;
+  value: number;
+}
+
+function needsFor(you: You): NeedDef[] {
+  const needs: NeedDef[] = [
+    { id: "health", label: "Health", icon: "heart-pulse", value: clampPct(you.health) },
+    { id: "energy", label: "Energy", icon: "zap", value: clampPct(you.energy) },
+    { id: "mood", label: "Mood", icon: "smile", value: clampPct(you.happiness) },
+    { id: "hunger", label: "Hunger", icon: "utensils", value: clampPct(you.hunger) },
+  ];
+  // M8 extended needs — shown only when the server actually tracks them.
+  if (typeof you.fun === "number")
+    needs.push({ id: "fun", label: "Fun", icon: "sparkles", value: clampPct(you.fun) });
+  if (typeof you.social === "number")
+    needs.push({ id: "social", label: "Social", icon: "users", value: clampPct(you.social) });
+  if (typeof you.hygiene === "number")
+    needs.push({ id: "hygiene", label: "Hygiene", icon: "droplet", value: clampPct(you.hygiene) });
+  return needs;
+}
+
+export interface DashboardProps {
+  you: You;
+  config: GameConfig;
+  token: string;
+  sock: GameSocket;
+  sendAct: (a: ActName, params?: Record<string, unknown>) => void;
+  /** Opens a phone app (jobs, style...). */
+  onOpenApp?: (app: string) => void;
+  /** Switches the bottom-dock tab. */
+  onTab?: (t: "home" | "buy" | "map" | "phone") => void;
+  onOpenNotifications?: () => void;
+  onTopUp?: () => void;
+  tip?: string | null;
+}
+
+export function Dashboard({
+  you,
+  config,
+  token,
+  sock,
+  sendAct,
+  onOpenApp,
+  onTab,
+  onOpenNotifications,
+  onTopUp,
+  tip,
+}: DashboardProps) {
+  const greet = greetingFor(new Date());
+  const online = sock.status === "open";
+  const className = config.classes?.[you.class]?.name ?? you.class ?? "Newcomer";
+  const housingName = config.housing?.[you.housing]?.name ?? you.housing ?? "—";
+  const district =
+    asList(config.locations).find((l) => l.id === you.locationId)?.name ??
+    "Somewhere in Lagos";
+  const wallet = you.is_admin ? "∞" : naira(you.money);
+  const needs = needsFor(you);
+  const districts = asList(config.locations).slice(0, 4);
+  const goCity = () => onTab?.("map");
+
+  const quick: Array<{
+    id: string;
+    label: string;
+    hint: string;
+    icon: IconName;
+    run: () => void;
+  }> = [
+    { id: "explore", label: "Explore", hint: "Find your next stop", icon: "map", run: goCity },
+    { id: "style", label: "My style", hint: "Make it yours", icon: "shirt", run: () => onOpenApp?.("style") },
+    { id: "jobs", label: "Jobs", hint: "Build your career", icon: "briefcase", run: () => onOpenApp?.("jobs") },
+    { id: "phone", label: "My phone", hint: "Your life, connected", icon: "smartphone", run: () => onTab?.("phone") },
+  ];
+
   return (
-    <div className="oglass og-hero">
-      <div className="og-hero__top">
-        <div className="og-avatar" aria-hidden="true">
-          😎
-        </div>
-        <div className="og-hero__who">
-          <div className="og-hero__name">{username}</div>
-          <div className="og-hero__sub">
-            🟢 {typeof online === "number" ? online : 0} online
+    <div className="lg-scope">
+      {/* Hero */}
+      <div className="hero glass">
+        <div className="hero-art" role="img" aria-label="Stylised Lagos skyline at dusk" />
+        <div>
+          <div className="eyebrow">A new day in Lagos</div>
+          <h1>
+            Your city.
+            <br />
+            Your story.
+          </h1>
+          <p>Build your life, meet your people, and find your place in Èkó.</p>
+          <div className="hero-actions">
+            <button type="button" className="primary" onClick={goCity}>
+              <Icon name="play" size={18} />
+              Continue playing
+            </button>
+            <button type="button" className="secondary" onClick={goCity}>
+              <Icon name="map" size={18} />
+              Explore city
+            </button>
           </div>
         </div>
-        <div className="og-hero__icons">
-          <button
-            type="button"
-            className="og-icobtn"
-            onClick={() => {
-              blip("tap");
-              onWallet?.();
-            }}
-            aria-label="Wallet"
-          >
-            ∞
-          </button>
-          <button
-            type="button"
-            className="og-icobtn"
-            onClick={() => {
-              blip("tap");
-              onBell?.();
-            }}
-            aria-label="Notifications"
-          >
-            🔔{hasUnread ? <span className="og-dot" /> : null}
-          </button>
-          <button
-            type="button"
-            className="og-icobtn"
-            onClick={() => {
-              blip("tap");
-              onGov?.();
-            }}
-            aria-label="Government"
-          >
-            🏛️
-          </button>
+      </div>
+
+      {/* Profile strip — real snapshot data only */}
+      <div className="profile-strip glass">
+        <div
+          className="avatar"
+          style={you.color ? { background: you.color } : undefined}
+          aria-hidden="true"
+        >
+          {you.avatar || you.name.slice(0, 1).toUpperCase()}
         </div>
-      </div>
-      <div className="og-hero__greet">
-        <h2>
-          {g.text} {g.emoji}
-        </h2>
-        <p>
-          {weekday}
-          {typeof day === "number" ? ` · Day ${day} in Èkó` : ""}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-/* ---------------- Stat rings (shown once) ---------------- */
-
-const STATS = [
-  { id: "energy", label: "Energy", icon: "⚡", color: "#06d6a0" },
-  { id: "health", label: "Health", icon: "❤️", color: "#ff6b8a" },
-  { id: "happiness", label: "Happiness", icon: "😊", color: "#ffd166" },
-  { id: "hunger", label: "Hunger", icon: "🍽️", color: "#ff9f1c" },
-] as const;
-
-function Ring({ value, color }: { value: number; color: string }) {
-  const r = 21;
-  const c = 2 * Math.PI * r;
-  const off = c * (1 - Math.max(0, Math.min(100, value)) / 100);
-  return (
-    <span className="og-ring" aria-hidden="true">
-      <svg width="50" height="50" viewBox="0 0 50 50">
-        <circle
-          cx="25"
-          cy="25"
-          r={r}
-          fill="none"
-          stroke="rgba(255,255,255,0.18)"
-          strokeWidth="6"
-        />
-        <circle
-          cx="25"
-          cy="25"
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth="6"
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={off}
-          transform="rotate(-90 25 25)"
-        />
-      </svg>
-      <span className="og-ring__v">{value}</span>
-    </span>
-  );
-}
-
-export function StatRings({ you }: { you: You }) {
-  return (
-    <div className="og-stats" role="group" aria-label="Your stats">
-      {STATS.map((s) => {
-        const v = Math.max(0, Math.min(100, Math.round(Number(you[s.id]) || 0)));
-        return (
-          <div key={s.id} className="oglass og-stat">
-            <Ring value={v} color={s.color} />
-            <span className="og-stat__label">
-              {s.icon} {s.label}
+        <div className="profile-main">
+          <div className="profile-line">
+            <span className="profile-name">
+              {greet}, {you.name}
+            </span>
+            <span className={`pill${online ? "" : " pill--dim"}`}>
+              <span aria-hidden="true">●</span> {online ? "Online" : "Offline"}
             </span>
           </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ---------------- Quick actions ---------------- */
-
-export function QuickActions({
-  onWork,
-  onTravel,
-  onEat,
-  onSleep,
-}: {
-  onWork: () => void;
-  onTravel: () => void;
-  onEat: () => void;
-  onSleep: () => void;
-}) {
-  const acts = [
-    { id: "work", label: "Work", icon: "💼", run: onWork },
-    { id: "travel", label: "Travel", icon: "🚕", run: onTravel },
-    { id: "eat", label: "Eat", icon: "🍔", run: onEat },
-    { id: "sleep", label: "Sleep", icon: "😴", run: onSleep },
-  ];
-  return (
-    <div className="og-actions" role="group" aria-label="Quick actions">
-      {acts.map((a) => (
-        <button
-          key={a.id}
-          type="button"
-          className="oglass og-action"
-          onClick={() => {
-            blip("tap");
-            a.run();
-          }}
-        >
-          <span className="og-action__ico" aria-hidden="true">
-            {a.icon}
-          </span>
-          <span className="og-action__label">{a.label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/* ---------------- Tip ---------------- */
-
-export function HomeTip({ text }: { text: string | null }) {
-  if (!text) return null;
-  return (
-    <div className="oglass og-tip" role="status">
-      <span aria-hidden="true">💡</span>
-      <span>{text}</span>
-    </div>
-  );
-}
-
-/* ---------------- Trending news ---------------- */
-
-function timeAgo(ts?: number): string {
-  if (!ts) return "";
-  const s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
-  if (s < 60) return "now";
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  return `${Math.floor(s / 86400)}d`;
-}
-
-export function TrendingNews({ onOpenGist }: { onOpenGist?: () => void }) {
-  const [items, setItems] = useState<NewsItem[] | null>(null);
-  useEffect(() => {
-    let live = true;
-    api
-      .news()
-      .then((n) => {
-        if (live) setItems(n ?? []);
-      })
-      .catch(() => {
-        if (live) setItems([]);
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
-  if (!items || items.length === 0) return null;
-  const top = items.slice(0, 4);
-  return (
-    <section className="og-news" aria-label="Trending news">
-      <div className="og-news__head">
-        <h3>🔥 Trending in Èkó</h3>
-        {onOpenGist ? (
-          <button
-            type="button"
-            className="og-news__more"
-            onClick={() => {
-              blip("tap");
-              onOpenGist();
-            }}
-          >
-            More ›
-          </button>
-        ) : null}
+          <div className="profile-sub">
+            {className} · {housingName}
+          </div>
+        </div>
+        <div className="profile-metrics">
+          <div>
+            <div className="metric-label">Wallet</div>
+            <div className="metric-value">
+              {wallet} <small>NGN</small>
+            </div>
+          </div>
+          <div>
+            <div className="metric-label">District</div>
+            <div className="metric-value" style={{ fontSize: 15 }}>
+              {district}
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="og-news__list">
-        {top.map((n, i) => (
-          <article key={String(n.id ?? i)} className="oglass og-news__item">
-            <span className="og-news__rank">{i + 1}</span>
-            <p className="og-news__text">{n.text}</p>
-            {n.ts ? (
-              <time className="og-news__time">{timeAgo(n.ts)} ago</time>
-            ) : null}
-          </article>
-        ))}
+
+      {/* Quick actions */}
+      <div className="section">
+        <div className="section-head">
+          <h2>Jump back in</h2>
+          <span className="muted">Quick access</span>
+        </div>
+        <div className="quick-grid">
+          {quick.map((q) => (
+            <button key={q.id} type="button" className="quick" onClick={q.run}>
+              <span className="action-icon" aria-hidden="true">
+                <Icon name={q.icon} />
+              </span>
+              <strong>{q.label}</strong>
+              <small>{q.hint}</small>
+            </button>
+          ))}
+        </div>
       </div>
-    </section>
+
+      <div className="desktop-dashboard">
+        <div>
+          {/* Needs — real values from the you snapshot */}
+          <div className="section">
+            <div className="section-head">
+              <h2>Your daily life</h2>
+              <button
+                type="button"
+                className="section-link"
+                onClick={() => onOpenApp?.("needs")}
+              >
+                Manage needs ↗
+              </button>
+            </div>
+            <div className="needs glass">
+              {needs.map((n) => (
+                <div className="need" key={n.id}>
+                  <span className="need-icon" aria-hidden="true">
+                    <Icon name={n.icon} />
+                  </span>
+                  <div>
+                    <div className="need-label">{n.label}</div>
+                    <div className="bar" role="progressbar" aria-valuenow={n.value} aria-valuemin={0} aria-valuemax={100} aria-label={n.label}>
+                      <span style={{ width: `${n.value}%` }} />
+                    </div>
+                  </div>
+                  <span className="need-value">{n.value}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Discover — real districts from the game config */}
+          {districts.length > 0 && (
+            <div className="section">
+              <div className="section-head">
+                <h2>Discover Èkó</h2>
+                <button type="button" className="section-link" onClick={goCity}>
+                  View all ↗
+                </button>
+              </div>
+              <div className="cards">
+                {districts.map((d) => (
+                  <button key={d.id} type="button" className="discover-card" onClick={goCity}>
+                    <div className="discover-art" aria-hidden="true">
+                      <Icon name="map-pin" />
+                    </div>
+                    <div className="discover-copy">
+                      <strong>{d.name}</strong>
+                      <small>{d.blurb ?? d.zone ?? d.region ?? "Lagos"}</small>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div>
+          {/* Today's goals — live hustle data */}
+          <div className="section">
+            <div className="section-head">
+              <h2>Today&apos;s goals</h2>
+            </div>
+            <GoalsCard token={token} sendAct={sendAct} />
+          </div>
+
+          {/* Community pulse — real presence data only */}
+          <div className="section">
+            <div className="section-head">
+              <h2>Community pulse</h2>
+            </div>
+            <div className="glass feed-item">
+              <div className="feed-avatar" aria-hidden="true">
+                {String(sock.online).length > 2 ? "◆" : sock.online}
+              </div>
+              <div>
+                <strong style={{ fontSize: 13 }}>The city is awake</strong>
+                <div className="muted">
+                  Day {sock.day} · {sock.online} player{sock.online === 1 ? "" : "s"} online
+                </div>
+                <p>
+                  {tip ??
+                    "Tap a quick action above to get moving — the city rewards the bold."}
+                </p>
+                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                  <button type="button" className="secondary" onClick={() => onOpenApp?.("chat")}>
+                    <Icon name="messages" size={18} />
+                    City chat
+                  </button>
+                  <button type="button" className="secondary" onClick={onOpenNotifications}>
+                    <Icon name="bell" size={18} />
+                    Notifications
+                    {sock.unreadNotifications > 0 ? ` (${sock.unreadNotifications})` : ""}
+                  </button>
+                  <button type="button" className="secondary" onClick={onTopUp}>
+                    <Icon name="wallet" size={18} />
+                    Wallet
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
