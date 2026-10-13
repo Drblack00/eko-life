@@ -27,7 +27,6 @@ export const PHONE_APPS: PhoneApp[] = [
   // Phase 8: Èkó Gov — governor election + governance.
   { id: "gov", label: "Èkó Gov", icon: "🏛️" },
   { id: "style", label: "Style", icon: "✨" },
-  { id: "room", label: "My Room", icon: "🏠" },
   { id: "me", label: "Me", icon: "🧑" },
 ];
 
