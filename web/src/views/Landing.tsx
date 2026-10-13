@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LagosMap } from "../game/LagosMap";
+import { CityMap } from "../game/CityMap";
 import { STUB_PINS, type PinLocation } from "../game/stubLocations";
 import { mapXYToWorld, toPin } from "../game/mapPins";
 import { api, type PublicStats } from "../lib/api";
@@ -159,7 +159,7 @@ export function Landing({ onAuth }: { onAuth: (tab: AuthEntry) => void }) {
   return (
     <div className="eko-landing">
       <div className="eko-landing__map" key={pinsReady ? "ready" : "stub"}>
-        <LagosMap pins={allPins} onPinSelect={handlePinSelect} />
+        <CityMap pins={allPins} onPinSelect={handlePinSelect} />
       </div>
 
       <header className="eko-landing__topbar">
