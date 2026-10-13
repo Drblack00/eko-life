@@ -1,15 +1,10 @@
-/* G1 "Ocean Glass" dashboard — liquid glass over deep ocean gradient. */
+/* Bright cozy game cards — white with soft shadows like the reference. */
 
 .oglass {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-top: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: 26px;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-radius: 22px;
+  box-shadow: 0 4px 16px rgba(26, 43, 60, 0.08);
 }
 
 /* Hero */
@@ -38,11 +33,11 @@
 .og-hero__name {
   font-weight: 800;
   font-size: 16px;
-  color: #fff;
+  color: #1a2b3c;
 }
 .og-hero__sub {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
+  color: #5b7a94;
 }
 .og-hero__icons {
   margin-left: auto;
@@ -53,16 +48,13 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-top-color: rgba(255, 255, 255, 0.45);
+  background: #f0f7ff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 17px;
-  color: #fff;
+  color: #1a2b3c;
   position: relative;
   cursor: pointer;
 }
@@ -81,13 +73,12 @@
 .og-hero__greet h2 {
   font-size: 25px;
   font-weight: 800;
-  color: #fff;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  color: #1a2b3c;
   margin: 0;
 }
 .og-hero__greet p {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.75);
+  color: #5b7a94;
   margin: 4px 0 0;
 }
 
@@ -117,11 +108,11 @@
   justify-content: center;
   font-weight: 800;
   font-size: 14px;
-  color: #fff;
+  color: #1a2b3c;
 }
 .og-stat__label {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.8);
+  color: #5b7a94;
 }
 
 /* Quick actions */
@@ -136,7 +127,7 @@
   text-align: center;
   font-weight: 700;
   font-size: 13px;
-  color: #fff;
+  color: #1a2b3c;
   cursor: pointer;
   font-family: inherit;
 }
@@ -144,10 +135,9 @@
   font-size: 26px;
   display: block;
   margin-bottom: 6px;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
 }
 .og-action__label {
-  color: #fff;
+  color: #1a2b3c;
 }
 
 /* Tip */
@@ -158,7 +148,8 @@
   display: flex;
   gap: 10px;
   align-items: center;
-  color: #ffe9a8;
+  color: #8a6d1b;
+  background: #fffbeb;
 }
 
 /* Trending news */
@@ -174,13 +165,13 @@
 .og-news__head h3 {
   font-size: 16px;
   font-weight: 800;
-  color: #fff;
+  color: #1a2b3c;
   margin: 0;
 }
 .og-news__more {
   background: none;
   border: none;
-  color: #7dd3fc;
+  color: #00a344;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -215,11 +206,11 @@
   flex: 1;
   font-size: 13.5px;
   line-height: 1.45;
-  color: #fff;
+  color: #1a2b3c;
   margin: 0;
 }
 .og-news__time {
   flex: none;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
+  color: #5b7a94;
 }

@@ -26,8 +26,8 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   touch-action: none;
-  background: radial-gradient(120% 90% at 50% 20%, #16233d 0%, #0f1a2e 70%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, #dff0fd 0%, #f4fafd 100%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .eko-room__nogl {
