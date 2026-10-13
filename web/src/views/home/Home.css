@@ -4,6 +4,15 @@
   gap: var(--space-6);
 }
 
+/* G1 "Ocean Glass" — deep ocean gradient backdrop for the new dashboard. */
+.eko-home--g1 {
+  background: linear-gradient(180deg, #0d2242 0%, #0e3a5c 50%, #0a4a44 100%);
+  background-attachment: fixed;
+  margin: calc(var(--space-6) * -1);
+  padding: var(--space-6);
+  border-radius: 0;
+}
+
 .eko-home__section {
   display: flex;
   flex-direction: column;
