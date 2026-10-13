@@ -1,36 +1,44 @@
 import * as THREE from "three";
 import type { AvatarLook } from "../../game/types";
-import { getCachedAssets, cloneBody, loadAvatarAssets } from "../../avatar/gltf/loader";
-import { applyCustomization } from "../../avatar/gltf/customizer";
-import { AvatarAnimator } from "../../avatar/gltf/animator";
-import { SKIN_TONES } from "../../avatar/gltf/customizer";
+import { migrateAvatarLookToV1 } from "../../avatar/migrate";
+import {
+  assembleAppearance,
+  type AssembledAvatar,
+} from "../../avatar/assembler";
 
 /**
- * GLTF-based avatar (CC0 Universal Base Characters + Animation Library).
- * Replaces the procedural avatar engine.
+ * Realistic procedural avatar (~1.6 units tall, root at y=0, faces +Z).
+ * All geometry is original, generated at build time — no external assets.
  *
- * - Male/female base bodies from the CC0 pack
- * - 46 retargeted animations (Idle_Loop by default, fists clenched)
- * - Skin tone, hair style/color, beard, eyebrows customization
+ * Milestone 4: this module is now a thin compatibility layer over the
+ * canonical avatar engine in `../../avatar/`:
+ *   - legacy AvatarLook → v1 via `migrateAvatarLookToV1` (M2)
+ *   - assembly (body → clothing → head → hair → facial hair, rig, idle
+ *     update, disposal) via `assembleAppearance` (M4, `avatar/assembler.ts`)
  *
- * Assets preload during boot; buildAvatarLook clones from cache synchronously.
- * If assets aren't ready yet, triggers load and returns a placeholder group
- * that populates when loading completes.
+ * The public contract is unchanged:
+ *   buildAvatarLook(look)        → { group, update? }   (new contract)
+ *   buildAvatarLook(THREE, look) → THREE.Group          (legacy)
+ * The legacy shape returns the bare group (updater stashed on
+ * `group.userData.update` when animation is enabled).
  *
- * Public contract (unchanged):
- *   buildAvatarLook(look)        → { group, update? }
- *   buildAvatarLook(THREE, look) → THREE.Group (legacy)
+ * Conventions (preserved): trousers use look.bottomColor, shirts use
+ * look.topColor (canvas fabric pattern unless fabric === "plain"), skin
+ * parts use the skin tone, hair is dark. group.userData.dispose()
+ * releases everything.
+ *
+ * Geometry contract (unchanged — studio.ts camera anchors depend on it):
+ * figure ~1.6 units, faces +Z, chin anchor at y=1.4, feet ~0.09.
  */
 
 /** Result of the new single-argument buildAvatarLook(look) call. */
 export interface AvatarBuild {
   group: THREE.Group;
   /**
-   * Advances animation. Safe to call every frame.
+   * Advances blink timers and idle animation. Safe to call every frame.
+   * Omitted when the user prefers reduced motion (static neutral pose).
    */
   update?: (t: number, dt: number) => void;
-  /** Plays a named animation (e.g. "Walk_Loop", "Dance_Loop"). */
-  playAnim?: (name: string) => void;
 }
 
 export function buildAvatarLook(look: AvatarLook): AvatarBuild;
@@ -43,130 +51,26 @@ export function buildAvatarLook(
   b?: AvatarLook
 ): AvatarBuild | THREE.Group {
   const legacy = b !== undefined;
+  const T = (legacy ? a : THREE) as typeof import("three");
   const look = (legacy ? b : a) as AvatarLook;
-  const built = buildInternal(look);
+  const built = buildInternal(T, look);
   if (!legacy) return built;
   if (built.update) built.group.userData.update = built.update;
-  if (built.playAnim) built.group.userData.playAnim = built.playAnim;
   return built.group;
 }
 
-/** Maps legacy skin ids/names to hex. Falls back to mid-brown. */
-function resolveSkinHex(skin: string | undefined): string {
-  if (!skin) return "#8d5524";
-  if (/^#[0-9a-f]{6}$/i.test(skin)) return skin;
-  // Legacy named tones — map to closest hex
-  const lower = skin.toLowerCase();
-  if (lower.includes("light") || lower.includes("fair")) return SKIN_TONES[0];
-  if (lower.includes("medium")) return SKIN_TONES[3];
-  if (lower.includes("dark") || lower.includes("deep")) return SKIN_TONES[5];
-  return "#8d5524";
-}
-
-/** Maps legacy hair ids to new hair styles. */
-function resolveHairStyle(hair: string | undefined, body: "male" | "female"): string {
-  if (!hair) return body === "female" ? "long" : "buzzed";
-  const lower = hair.toLowerCase();
-  if (lower.includes("bun")) return "buns";
-  if (lower.includes("long")) return "long";
-  if (lower.includes("buzz")) return body === "female" ? "buzzedFemale" : "buzzed";
-  if (lower.includes("part")) return "parted";
-  if (lower.includes("bald") || lower.includes("none")) return "none";
-  return body === "female" ? "long" : "buzzed";
-}
-
-function buildInternal(look: AvatarLook): AvatarBuild {
-  const group = new THREE.Group();
-  group.name = "GltfAvatar";
-
-  const body: "male" | "female" = look?.body === "woman" ? "female" : "male";
-  const skinTone = resolveSkinHex(look?.skin);
-  const hair = resolveHairStyle(look?.hair, body) as "buns" | "long" | "buzzed" | "parted" | "buzzedFemale" | "none";
-
-  const assets = getCachedAssets();
-
-  if (!assets) {
-    // Assets not loaded yet — trigger load and populate async.
-    // Return a placeholder group that fills in when ready.
-    loadAvatarAssets()
-      .then(() => {
-        const built = buildInternal(look);
-        group.add(built.group);
-        if (built.update) group.userData.update = built.update;
-        if (built.playAnim) group.userData.playAnim = built.playAnim;
-        group.userData.dispose = () => {
-          built.group.traverse((o) => {
-            if (o instanceof THREE.Mesh) {
-              o.geometry.dispose();
-            }
-          });
-        };
-      })
-      .catch(() => {
-        /* placeholder stays empty rather than breaking the scene */
-      });
-
-    const placeholder: AvatarBuild = {
-      group,
-      update: () => {
-        const u = group.userData.update as ((t: number, dt: number) => void) | undefined;
-        if (u) u(performance.now() / 1000, 0.016);
-      },
-    };
-    return placeholder;
+function buildInternal(T: typeof import("three"), look: AvatarLook): AvatarBuild {
+  // Legacy flat look → canonical v1 (never throws, never invalid).
+  const appearance = migrateAvatarLookToV1(look ?? {});
+  let assembled: AssembledAvatar;
+  try {
+    assembled = assembleAppearance(T, appearance);
+  } catch {
+    // Should not happen (the assembler degrades to defaults internally),
+    // but the room must never go blank: retry once with clean defaults,
+    // then let HomeRoom's capsule fallback take over if that also fails.
+    assembled = assembleAppearance(T, migrateAvatarLookToV1(null));
   }
-
-  // Clone body from cache
-  const bodyModel = cloneBody(body);
-  if (!bodyModel) {
-    return { group };
-  }
-
-  // Normalize scale/position: base characters are ~1.7 units, root at y=0
-  const box = new THREE.Box3().setFromObject(bodyModel);
-  const height = box.max.y - box.min.y;
-  const targetHeight = 1.7;
-  const scale = targetHeight / height;
-  bodyModel.scale.setScalar(scale);
-  // Recompute after scale and ground it
-  const box2 = new THREE.Box3().setFromObject(bodyModel);
-  bodyModel.position.y -= box2.min.y;
-
-  // Apply customization
-  applyCustomization(bodyModel, {
-    body,
-    skinTone,
-    hair,
-    hairColor: "#1a1a1a",
-    beard: false,
-    eyebrows: true,
-    fistsClenched: true,
-  });
-
-  // Set up animator with idle
-  const animator = new AvatarAnimator(bodyModel);
-  animator.play("Idle_Loop");
-
-  group.add(bodyModel);
-
-  let lastT = performance.now() / 1000;
-  const update = (t: number, dt: number) => {
-    const now = t || performance.now() / 1000;
-    const delta = dt || Math.min(0.05, now - lastT);
-    lastT = now;
-    animator.update(delta);
-  };
-
-  const playAnim = (name: string) => {
-    animator.play(name);
-  };
-
-  group.userData.dispose = () => {
-    animator.dispose();
-    bodyModel.traverse((o) => {
-      if (o instanceof THREE.Mesh) o.geometry.dispose();
-    });
-  };
-
-  return { group, update, playAnim };
+  const { group } = assembled;
+  return assembled.update ? { group, update: assembled.update } : { group };
 }
