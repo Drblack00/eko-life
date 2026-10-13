@@ -204,3 +204,107 @@
   font-size: 20px;
   padding: 12px 0 8px;
 }
+
+/* ---------------- Appearance / theme cards ---------------- */
+
+.eko-settings__section-title {
+  font-size: 20px;
+  font-weight: 900;
+  color: #000;
+  margin: 0 0 12px;
+  letter-spacing: -0.01em;
+}
+
+.eko-settings__appearance {
+  padding: 20px;
+}
+
+.eko-theme-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.eko-theme-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 2px solid #ececec;
+  background: #fafafa;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  min-height: 44px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.eko-theme-card--active {
+  border-color: #168bff;
+  box-shadow: 0 0 0 1px #168bff;
+  background: #fff;
+}
+
+.eko-theme-card__swatches {
+  display: flex;
+}
+
+.eko-theme-card__swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.eko-theme-card__swatch + .eko-theme-card__swatch {
+  margin-left: -8px;
+}
+
+.eko-theme-card__name {
+  font-size: 16px;
+  font-weight: 800;
+  color: #000;
+}
+
+.eko-theme-card__blurb {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.35;
+}
+
+.eko-theme-card__check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: #168bff;
+  display: grid;
+  place-items: center;
+}
+
+/* Row icons are SVG now (no emoji). */
+.eko-settings__icon {
+  width: 40px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: #000;
+}
+.eko-settings__icon svg {
+  width: 24px;
+  height: 24px;
+}
+.eko-settings__chevron {
+  display: grid;
+  place-items: center;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+.eko-settings__avatar {
+  font-size: 32px;
+  font-weight: 900;
+  color: #22c55e;
+}
