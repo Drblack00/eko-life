@@ -3,7 +3,7 @@
  * - Same-origin static assets: cache-first with background revalidation.
  * - /api/* : network-only, never cached.
  */
-const CACHE = "eko-life-pwa-v2";
+const CACHE = "eko-life-pwa-v3";
 const SHELL = [
   "/",
   "/index.html",
