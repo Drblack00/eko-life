@@ -2574,6 +2574,7 @@ export function HomeRoomSection({
                     className="eko-room__sheet-hide glass"
                     onClick={(e) => {
                       e.stopPropagation();
+                      e.preventDefault();
                       setSheetHidden(true);
                     }}
                     aria-label="Hide the buy sheet"
