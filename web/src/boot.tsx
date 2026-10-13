@@ -48,8 +48,6 @@ function BootScreen() {
     }, 15_000);
 
     // Lazy-load the App chunk while the staged loader plays, then swap in.
-    // GLTF avatar preloading DISABLED (too heavy, causes glitches) — using
-    // lightweight capsule avatar instead.
     const warm = async () => {
       try {
         const mod = await import("./App");
