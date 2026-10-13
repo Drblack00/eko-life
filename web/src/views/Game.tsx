@@ -1275,7 +1275,6 @@ export function Game({
           cleanMode={cleanMode}
           onToggleClean={() => setCleanMode((c) => !c)}
           onOpenApp={openPhoneApp}
-          onOpenShortcuts={() => setShortcutsOpen(true)}
           onOpenCharacter={openCharacterPanel}
         />
       )}
