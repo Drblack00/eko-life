@@ -18,6 +18,10 @@ export interface AvatarCustomization {
   eyebrows: boolean;
   /** Clench fists in idle (default true per user request) */
   fistsClenched: boolean;
+  /** Height scale 0.92–1.08 (default 1.0) */
+  height: number;
+  /** Build/width scale 0.9–1.12 (default 1.0) */
+  build: number;
 }
 
 export const DEFAULT_CUSTOMIZATION: AvatarCustomization = {
@@ -28,6 +32,8 @@ export const DEFAULT_CUSTOMIZATION: AvatarCustomization = {
   beard: false,
   eyebrows: true,
   fistsClenched: true,
+  height: 1.0,
+  build: 1.0,
 };
 
 /** Preset skin tones. */
@@ -154,22 +160,65 @@ export function applyCustomization(
   // Done before animation so Idle_Loop (if it plays) starts from here.
   relaxArms(root);
   if (full.fistsClenched) clenchFists(root, 1.0);
+  // Body proportions (height/build) for different player types.
+  applyProportions(root, full.height, full.build);
+}
+
+/**
+ * Applies height (Y scale) and build (X/Z width) proportions.
+ * Height scales the whole figure; build widens torso/shoulders/hips.
+ * Fully defensive — never throws.
+ */
+export function applyProportions(root: THREE.Object3D, height: number, build: number): void {
+  try {
+    const h = Math.max(0.92, Math.min(1.08, height || 1.0));
+    const b = Math.max(0.9, Math.min(1.12, build || 1.0));
+    // Height: uniform Y scale on the root (keeps feet grounded via loader offset)
+    root.scale.y = h;
+    // Build: widen torso bones on X/Z
+    root.traverse((o) => {
+      try {
+        const n = (o.name || "").toLowerCase();
+        const isTorso = n === "spine" || n === "spine001" || n === "spine002" ||
+          n === "pelvis" || n === "clavicle_l" || n === "clavicle_r";
+        if (!isTorso) return;
+        const bone = o as THREE.Bone;
+        if (!bone.scale) return;
+        // Apply build as X/Z multiplier (preserve existing scale)
+        const baseX = (bone as any).__baseScaleX ?? bone.scale.x;
+        const baseZ = (bone as any).__baseScaleZ ?? bone.scale.z;
+        (bone as any).__baseScaleX = baseX;
+        (bone as any).__baseScaleZ = baseZ;
+        bone.scale.x = baseX * b;
+        bone.scale.z = baseZ * b;
+      } catch {
+        /* ignore */
+      }
+    });
+  } catch {
+    /* never breaks loading */
+  }
 }
 
 /**
  * Rotates arms down to a relaxed at-the-sides stance.
  * Static fallback so the avatar never shows T-pose.
+ * Fully defensive — never throws.
  */
 export function relaxArms(root: THREE.Object3D): void {
-  const D = Math.PI / 180;
-  // Strategy 1: via SkinnedMesh skeletons (most reliable)
-  root.traverse((o) => {
-    if ((o as THREE.SkinnedMesh).isSkinnedMesh) {
-      const skinned = o as THREE.SkinnedMesh;
-      for (const bone of skinned.skeleton.bones) {
-        const n = (bone.name || "").toLowerCase();
-        if (n.includes("upperarm") || n.includes("upper_arm")) {
-          // More precise: check if it's left (contains _l or .l, not _r or .r)
+  try {
+    const D = Math.PI / 180;
+    const updatedSkeletons = new Set<THREE.Skeleton>();
+    // Strategy 1: via SkinnedMesh skeletons (most reliable)
+    root.traverse((o) => {
+      try {
+        const skinned = o as THREE.SkinnedMesh;
+        if (!skinned.isSkinnedMesh || !skinned.skeleton || !skinned.skeleton.bones) return;
+        let modified = false;
+        for (const bone of skinned.skeleton.bones) {
+          if (!bone || !bone.quaternion) continue;
+          const n = (bone.name || "").toLowerCase();
+          if (!n.includes("upperarm") && !n.includes("upper_arm")) continue;
           const isLeft = /[_.]l($|[^a-z])/.test(n);
           const d = isLeft ? 1 : -1;
           bone.quaternion.premultiply(
@@ -178,24 +227,42 @@ export function relaxArms(root: THREE.Object3D): void {
           bone.quaternion.premultiply(
             new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), d * 8 * D)
           );
-          // Mark as modified
+          bone.updateMatrixWorld(true);
           (bone as any).__relaxed = true;
+          modified = true;
         }
+        if (modified) updatedSkeletons.add(skinned.skeleton);
+      } catch {
+        /* ignore per-object errors */
+      }
+    });
+    // Force skeleton matrix update so the pose actually renders
+    for (const skel of updatedSkeletons) {
+      try {
+        skel.update();
+      } catch {
+        /* ignore */
       }
     }
-  });
-  // Strategy 2: traverse fallback for non-skinned setups
-  root.traverse((o) => {
-    if ((o as any).__relaxed) return;
-    const n = (o.name || "").toLowerCase();
-    if (n.includes("upperarm") || n.includes("upper_arm")) {
-      const q = (o as THREE.Bone).quaternion;
-      if (!q) return;
-      const isLeft = /[_.]l($|[^a-z])/.test(n);
-      const d = isLeft ? 1 : -1;
-      q.premultiply(
-        new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, d), 76 * D)
-      );
-    }
-  });
+    // Strategy 2: traverse fallback for non-skinned setups
+    root.traverse((o) => {
+      try {
+        if ((o as any).__relaxed) return;
+        const n = (o.name || "").toLowerCase();
+        if (!n.includes("upperarm") && !n.includes("upper_arm")) return;
+        const q = (o as THREE.Bone).quaternion;
+        if (!q) return;
+        const isLeft = /[_.]l($|[^a-z])/.test(n);
+        const d = isLeft ? 1 : -1;
+        q.premultiply(
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, d), 76 * D)
+        );
+        (o as THREE.Bone).updateMatrixWorld(true);
+      } catch {
+        /* ignore */
+      }
+    });
+  } catch {
+    /* relaxArms never breaks avatar loading */
+  }
 }
