@@ -48,13 +48,10 @@ function BootScreen() {
     }, 15_000);
 
     // Lazy-load the App chunk while the staged loader plays, then swap in.
-    // Avatar GLTF assets preload in the background (fire-and-forget) so a
-    // slow/failed asset fetch can never block the boot sequence.
+    // GLTF avatar preloading DISABLED (too heavy, causes glitches) — using
+    // lightweight capsule avatar instead.
     const warm = async () => {
       try {
-        import("./avatar/gltf/loader").then((m) =>
-          m.loadAvatarAssets().catch(() => null)
-        );
         const mod = await import("./App");
         if (mounted) setLoadedApp(() => mod.App);
       } catch (err) {
