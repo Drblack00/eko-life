@@ -63,7 +63,7 @@
   text-overflow: ellipsis;
 }
 /* palm-700 fails on the dark HUD — lighten at night. */
-[data-theme="night"] .eko-hud__money {
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .eko-hud__money {
   color: var(--palm-400);
 }
 
@@ -225,7 +225,7 @@
   width: calc(100% - var(--space-8));
 }
 
-[data-theme="night"] .eko-hint {
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .eko-hint {
   background: #2a2113;
   color: #fde68a;
 }
@@ -248,6 +248,21 @@
   width: 100%;
 }
 
+/* Tablet+: let tab content breathe wider. */
+@media (min-width: 768px) {
+  .eko-tabpad {
+    max-width: 900px;
+    padding: var(--space-5);
+  }
+}
+
+/* Desktop: full content width like the home dashboard. */
+@media (min-width: 1280px) {
+  .eko-tabpad {
+    max-width: 1200px;
+  }
+}
+
 .eko-tabh {
   font-size: 1.15rem;
   margin-top: var(--space-2);
@@ -261,6 +276,16 @@
   padding: var(--space-4);
   padding-bottom: calc(var(--space-8) + var(--sab));
   height: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Tablet+: map and side panel side-by-side handled by mapwrap height. */
+@media (min-width: 768px) {
+  .eko-city__mapwrap {
+    height: min(64dvh, 620px);
+  }
 }
 
 .eko-city__bar {
@@ -268,12 +293,25 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 18px;
+  flex-wrap: wrap;
+}
+
+.eko-city__pin {
+  margin-right: 2px;
 }
 
 .eko-city__here {
   font-weight: 700;
   font-family: var(--font-display);
   font-size: 1.05rem;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
 }
 
 .eko-city__spawns {
@@ -284,31 +322,35 @@
   border-radius: var(--radius-pill);
   padding: var(--space-1) var(--space-3);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* Phase 5: "Things to do" button in the map view bar. */
 .eko-city__things {
   font-size: 0.85rem;
   font-weight: 700;
-  border: 1px solid var(--eko-border, rgba(255, 255, 255, 0.12));
-  background: var(--eko-card, rgba(255, 255, 255, 0.04));
-  color: inherit;
+  border: 1px solid var(--glass-border);
+  background: var(--accent-soft);
+  color: var(--accent);
   border-radius: var(--radius-pill);
   padding: var(--space-1) var(--space-3);
+  min-height: 44px;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .eko-city__things:hover {
-  border-color: var(--eko-accent, #22d3ee);
+  border-color: var(--accent);
 }
 
 .eko-city__mapwrap {
   position: relative;
   height: min(58dvh, 520px);
   min-height: 320px;
-  border-radius: var(--radius-lg);
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--glass-border);
 }
 
 .eko-city__tip {
@@ -365,8 +407,8 @@
   white-space: nowrap;
 }
 /* palm-700 fails on dark surfaces — lighten at night. */
-[data-theme="night"] .eko-job__pay,
-[data-theme="night"] .eko-food__cost {
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .eko-job__pay,
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .eko-food__cost {
   color: var(--palm-400);
 }
 
@@ -683,7 +725,7 @@
 }
 /* --lagoon-100 is a light chip in both themes: darken it at night so the
    light row text stays legible. */
-[data-theme="night"] .eko-leaders__row--me {
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .eko-leaders__row--me {
   background: #16405f;
 }
 
@@ -707,7 +749,7 @@
      4.5:1 in the day theme, palm-400 in the night theme. */
   color: var(--palm-700);
 }
-[data-theme="night"] .eko-leaders__money {
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .eko-leaders__money {
   color: var(--palm-400);
 }
 .eko-work__group {

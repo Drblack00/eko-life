@@ -1,61 +1,78 @@
-/* Èkó Life Settings — matches the approved cartoon reference exactly.
- * Light blue background, huge black title, white rounded cards,
- * green toggles, red logout. */
+/* Èkó Life Settings — liquid-glass design system.
+ *
+ * Theme-driven: every color comes from the active theme variables, so
+ * this screen restyles automatically with the 4 themes. Reuses the
+ * .glass / .section / .list-row language from liquid-glass.css.
+ */
 
 .eko-settings {
   min-height: 100%;
-  padding: 24px 16px 32px;
-  background: #bfe3f5;
+  padding: 20px 16px calc(32px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   align-items: stretch;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  color: var(--text);
 }
 
 .eko-settings__brand {
   text-align: center;
-  font-size: 28px;
-  font-weight: 900;
-  color: #22c55e;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .eko-settings__title {
   text-align: center;
-  font-size: 64px;
-  font-weight: 900;
-  color: #000;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  margin: 0 0 8px;
+  font-size: clamp(26px, 7vw, 34px);
+  font-weight: 850;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0 0 4px;
+  color: var(--text);
 }
 
 .eko-settings__card {
-  background: #fff;
-  border-radius: 24px;
-  padding: 8px 20px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 6px 18px;
+  box-shadow: var(--card-shadow);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .eko-settings__card {
+    backdrop-filter: blur(22px) saturate(145%);
+    -webkit-backdrop-filter: blur(22px) saturate(145%);
+  }
 }
 
+/* Profile row */
 .eko-settings__profile {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 20px;
+  gap: 14px;
+  padding: 16px 18px;
 }
 
 .eko-settings__avatar {
-  width: 72px;
-  height: 72px;
-  min-width: 72px;
-  min-height: 72px;
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  min-height: 56px;
   border-radius: 50%;
-  background: #f0f4f8;
+  background: var(--accent-soft);
+  color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 40px;
+  font-size: 24px;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 
 .eko-settings__profile-text {
@@ -64,42 +81,49 @@
 }
 
 .eko-settings__name {
-  font-size: 32px;
-  font-weight: 900;
-  color: #000;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .eko-settings__handle {
-  font-size: 20px;
+  font-size: 13px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--muted);
   margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .eko-settings__edit {
-  background: #22c55e;
-  color: #fff;
-  font-size: 24px;
-  font-weight: 800;
-  border: none;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 750;
+  border: 1px solid var(--glass-border);
   border-radius: 999px;
-  padding: 12px 32px;
+  padding: 10px 20px;
+  min-height: 44px;
   cursor: pointer;
   flex-shrink: 0;
 }
-
 .eko-settings__edit:active {
   transform: scale(0.96);
 }
 
+/* Toggle rows */
 .eko-settings__row {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 18px 0;
-  border-bottom: 1px solid #f0f0f0;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
   width: 100%;
   background: none;
   border-left: none;
@@ -107,6 +131,8 @@
   border-top: none;
   text-align: left;
   font: inherit;
+  color: var(--text);
+  min-height: 60px;
 }
 
 .eko-settings__row--last {
@@ -118,37 +144,50 @@
 }
 
 .eko-settings__icon {
-  font-size: 32px;
   width: 40px;
-  text-align: center;
+  min-width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
-  color: #000;
+  border-radius: 13px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.eko-settings__icon svg {
+  width: 22px;
+  height: 22px;
 }
 
 .eko-settings__label {
   flex: 1;
-  font-size: 28px;
-  font-weight: 800;
-  color: #000;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
   letter-spacing: -0.01em;
 }
 
 .eko-settings__chevron {
-  font-size: 32px;
-  color: #9ca3af;
-  font-weight: 300;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
   flex-shrink: 0;
 }
+.eko-settings__chevron svg {
+  width: 18px;
+  height: 18px;
+}
 
-/* Toggle switch — green when on, gray when off. */
+/* Toggle switch — accent when on. */
 .eko-settings-toggle {
   position: relative;
-  width: 72px;
-  height: 44px;
-  min-width: 72px;
-  min-height: 44px;
+  width: 52px;
+  height: 32px;
+  min-width: 52px;
+  min-height: 32px;
   border-radius: 999px;
-  background: #9ca3af;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
   border: none;
   cursor: pointer;
   padding: 0;
@@ -157,66 +196,52 @@
 }
 
 .eko-settings-toggle--on {
-  background: #22c55e;
+  background: var(--accent);
 }
 
 .eko-settings-toggle__knob {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 36px;
-  height: 36px;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   transition: left 0.2s;
 }
 
 .eko-settings-toggle--on .eko-settings-toggle__knob {
-  left: 32px;
+  left: 23px;
 }
 
 .eko-settings__logout {
   display: block;
   width: 100%;
-  padding: 20px 0 12px;
+  padding: 16px 0 10px;
   background: none;
   border: none;
-  font-size: 28px;
-  font-weight: 800;
-  color: #ef4444;
+  font-size: 16px;
+  font-weight: 750;
+  color: #f87171;
   cursor: pointer;
   text-align: center;
-}
-
-/* Compact mode for inside the iPhone */
-.eko-phone .eko-settings {
-  padding: 12px;
-}
-.eko-phone .eko-settings__title {
-  font-size: 32px;
-}
-.eko-phone .eko-settings__row {
-  padding: 12px;
-  font-size: 16px;
-}
-.eko-phone .eko-settings__logout {
-  font-size: 20px;
-  padding: 12px 0 8px;
+  min-height: 48px;
 }
 
 /* ---------------- Appearance / theme cards ---------------- */
 
 .eko-settings__section-title {
-  font-size: 20px;
-  font-weight: 900;
-  color: #000;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
   margin: 0 0 12px;
-  letter-spacing: -0.01em;
 }
 
 .eko-settings__appearance {
-  padding: 20px;
+  padding: 16px 18px;
 }
 
 .eko-theme-cards {
@@ -230,22 +255,22 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  gap: 8px;
   padding: 14px;
   border-radius: 18px;
-  border: 2px solid #ececec;
-  background: #fafafa;
+  border: 1px solid var(--glass-border);
+  background: var(--panel);
   cursor: pointer;
   text-align: left;
   font: inherit;
+  color: var(--text);
   min-height: 44px;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .eko-theme-card--active {
-  border-color: #168bff;
-  box-shadow: 0 0 0 1px #168bff;
-  background: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 .eko-theme-card__swatches {
@@ -255,8 +280,9 @@
 .eko-theme-card__swatch {
   width: 24px;
   height: 24px;
+  min-width: 24px;
   border-radius: 50%;
-  border: 2px solid #fff;
+  border: 2px solid var(--panel);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 
@@ -265,46 +291,44 @@
 }
 
 .eko-theme-card__name {
-  font-size: 16px;
-  font-weight: 800;
-  color: #000;
+  font-size: 15px;
+  font-weight: 750;
+  color: var(--text);
 }
 
 .eko-theme-card__blurb {
   font-size: 12px;
-  color: #6b7280;
-  line-height: 1.35;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .eko-theme-card__check {
   position: absolute;
   top: 10px;
   right: 10px;
-  color: #168bff;
+  color: var(--accent);
   display: grid;
   place-items: center;
+}
+.eko-theme-card__check svg {
+  width: 18px;
+  height: 18px;
 }
 
-/* Row icons are SVG now (no emoji). */
-.eko-settings__icon {
-  width: 40px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  color: #000;
+/* Compact mode inside the phone panel */
+.eko-phone__panel .eko-settings {
+  padding: 12px 12px 24px;
 }
-.eko-settings__icon svg {
-  width: 24px;
-  height: 24px;
+.eko-phone__panel .eko-theme-cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.eko-settings__chevron {
-  display: grid;
-  place-items: center;
-  color: #9ca3af;
-  flex-shrink: 0;
-}
-.eko-settings__avatar {
-  font-size: 32px;
-  font-weight: 900;
-  color: #22c55e;
+
+/* Tablet+: two-column settings */
+@media (min-width: 768px) {
+  .eko-settings {
+    padding: 28px 24px 48px;
+  }
+  .eko-theme-cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }

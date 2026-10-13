@@ -323,9 +323,9 @@ function CityTab({
 
   return (
     <div className="eko-city">
-      <div className="eko-city__bar">
+      <div className="eko-city__bar glass">
         <span className="eko-city__here" aria-live="polite">
-          📍 {hereName}
+          <span className="eko-city__pin" aria-hidden="true">📍</span> {hereName}
         </span>
         {spawns.length > 0 && (
           <span className="eko-city__spawns" aria-label={`${spawns.length} street finds nearby`}>
