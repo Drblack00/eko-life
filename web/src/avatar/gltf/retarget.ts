@@ -12,25 +12,25 @@ import * as THREE from "three";
 /** Anim bone name (as THREE.js sees it, dots stripped) → base character bone name. */
 export const BONE_MAP: Record<string, string> = {
   "DEF-hips": "pelvis",
-  "DEF-spine001": "spine_01",
-  "DEF-spine002": "spine_02",
-  "DEF-spine003": "spine_03",
+  "DEF-spine.001": "spine_01",
+  "DEF-spine.002": "spine_02",
+  "DEF-spine.003": "spine_03",
   "DEF-neck": "neck_01",
   "DEF-head": "Head",
-  "DEF-shoulderL": "clavicle_l",
-  "DEF-shoulderR": "clavicle_r",
-  "DEF-upper_armL": "upperarm_l",
-  "DEF-upper_armR": "upperarm_r",
-  "DEF-forearmL": "lowerarm_l",
-  "DEF-forearmR": "lowerarm_r",
-  "DEF-handL": "hand_l",
-  "DEF-handR": "hand_r",
-  "DEF-thighL": "thigh_l",
-  "DEF-thighR": "thigh_r",
-  "DEF-shinL": "calf_l",
-  "DEF-shinR": "calf_r",
-  "DEF-footL": "foot_l",
-  "DEF-footR": "foot_r",
+  "DEF-shoulder.L": "clavicle_l",
+  "DEF-shoulder.R": "clavicle_r",
+  "DEF-upper_arm.L": "upperarm_l",
+  "DEF-upper_arm.R": "upperarm_r",
+  "DEF-forearm.L": "lowerarm_l",
+  "DEF-forearm.R": "lowerarm_r",
+  "DEF-hand.L": "hand_l",
+  "DEF-hand.R": "hand_r",
+  "DEF-thigh.L": "thigh_l",
+  "DEF-thigh.R": "thigh_r",
+  "DEF-shin.L": "calf_l",
+  "DEF-shin.R": "calf_r",
+  "DEF-foot.L": "foot_l",
+  "DEF-foot.R": "foot_r",
 };
 
 /** Finger bones for fist clenching (base character names). */
@@ -72,7 +72,7 @@ export function retargetClip(
     const baseBone = baseRoot.getObjectByName(baseBoneName);
     if (!baseBone) continue;
 
-    if (prop === "quaternion" && track instanceof THREE.QuaternionKeyframeTrack) {
+    if ((prop === "quaternion" || prop === "rotation") && track instanceof THREE.QuaternionKeyframeTrack) {
       // Retarget: baseQ = delta * baseRest, where delta = animQ * inverse(animRest)
       const values = (track.values as Float32Array).slice();
       const animQ = new THREE.Quaternion();
