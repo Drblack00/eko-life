@@ -188,3 +188,19 @@
   cursor: pointer;
   text-align: center;
 }
+
+/* Compact mode for inside the iPhone */
+.eko-phone .eko-settings {
+  padding: 12px;
+}
+.eko-phone .eko-settings__title {
+  font-size: 32px;
+}
+.eko-phone .eko-settings__row {
+  padding: 12px;
+  font-size: 16px;
+}
+.eko-phone .eko-settings__logout {
+  font-size: 20px;
+  padding: 12px 0 8px;
+}

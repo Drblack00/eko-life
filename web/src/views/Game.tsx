@@ -1001,7 +1001,7 @@ export function Game({
 
   return (
     <div className={cleanMode ? "eko-game eko-game--clean" : "eko-game"}>
-      {tab !== "home" && (
+      {tab !== "home" && tab !== "buy" && (
       <Hud
         you={you}
         status={sock.status}
