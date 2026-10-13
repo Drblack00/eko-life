@@ -214,7 +214,7 @@
   font-weight: 600;
 }
 /* #dc2626 fails on dark surfaces — lighten at night. */
-[data-theme="night"] .eko-create__error {
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .eko-create__error {
   color: #f87171;
 }
 
