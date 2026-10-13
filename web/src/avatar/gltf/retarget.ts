@@ -64,9 +64,11 @@ export function retargetClip(
     const baseBoneName = BONE_MAP[boneName];
     if (!baseBoneName) continue;
 
-    const animRestQ = animRest.get(boneName);
+    // Anim rest pose: if the anim library has no skeleton (animations only),
+    // assume T-pose identity as the rest. Base rest must exist.
+    const animRestQ = animRest.get(boneName) ?? new THREE.Quaternion();
     const baseRestQ = baseRest.get(baseBoneName);
-    if (!animRestQ || !baseRestQ) continue;
+    if (!baseRestQ) continue;
 
     // Verify the base bone exists
     const baseBone = baseRoot.getObjectByName(baseBoneName);
