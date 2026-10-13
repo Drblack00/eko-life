@@ -120,98 +120,81 @@ export function attachHeadgear(
   const assets = getCachedAssets();
   if (!assets) return;
 
-  const head = characterRoot.getObjectByName("Head");
-  if (!head) return;
-
   // Remove any existing headgear
-  const prev = head.getObjectByName("__headgear");
-  if (prev) head.remove(prev);
+  const prev = characterRoot.getObjectByName("__headgear");
+  if (prev) characterRoot.remove(prev);
   const container = new THREE.Group();
   container.name = "__headgear";
+  // Note: hair is rebound to the character skeleton, so container goes on
+  // the character root (not the head bone) — the skeleton positions it.
 
-  // Helper: extract hair/beard meshes from their GLTF scenes as rigid meshes.
-  // These GLTFs contain a full skeleton; we bake the current skinned position
-  // into the geometry and attach rigidly to the head bone.
-  const extractMeshes = (src: THREE.Object3D): THREE.Object3D[] => {
-    const meshes: THREE.Object3D[] = [];
-    src.updateMatrixWorld(true);
-    src.traverse((o) => {
-      const skinned = o as THREE.SkinnedMesh;
-      if (!skinned.isSkinnedMesh && !(o as THREE.Mesh).isMesh) return;
-      // Skip non-mesh nodes
-      if (!((o as THREE.Mesh).isMesh || skinned.isSkinnedMesh)) return;
-
-      let geometry = (o as THREE.Mesh).geometry;
-      const material = (o as THREE.Mesh).material;
-
-      // If skinned, bake the skinning into the geometry
-      if (skinned.isSkinnedMesh && skinned.skeleton) {
-        try {
-          skinned.skeleton.update();
-          const baked = geometry.clone();
-          const pos = baked.getAttribute("position");
-          const skinIndex = baked.getAttribute("skinIndex");
-          const skinWeight = baked.getAttribute("skinWeight");
-          if (pos && skinIndex && skinWeight) {
-            const v = new THREE.Vector3();
-            const temp = new THREE.Vector3();
-            const boneMatrices = skinned.skeleton.boneMatrices;
-            // boneInverses are already applied in boneMatrices
-            for (let i = 0; i < pos.count; i++) {
-              v.fromBufferAttribute(pos, i);
-              temp.set(0, 0, 0);
-              for (let j = 0; j < 4; j++) {
-                const boneIdx = skinIndex.getX(i * 4 + j);
-                const weight = skinWeight.getX(i * 4 + j);
-                if (weight === 0) continue;
-                const m = new THREE.Matrix4().fromArray(boneMatrices, boneIdx * 16);
-                temp.add(v.clone().applyMatrix4(m).multiplyScalar(weight));
-              }
-              pos.setXYZ(i, temp.x, temp.y, temp.z);
-            }
-            // Transform from hair-scene space to head-bone space:
-            // the hair scene root is at origin; we want it relative to head.
-            // For now, keep as-is (hair authored near origin, head bone will position it)
-            geometry = baked;
-          }
-        } catch {
-          /* fall back to original geometry */
+  // Helper: get the hair/beard mesh and rebind it to the character's skeleton.
+  // The hair GLTFs have skeletons with matching bone names; we rebind the
+  // SkinnedMesh to the body character's skeleton so it follows the head.
+  const getHeadgearMesh = (src: THREE.Object3D, characterRoot: THREE.Object3D): THREE.Object3D | null => {
+    try {
+      // Find the first SkinnedMesh or Mesh in the source
+      let srcMesh: THREE.SkinnedMesh | THREE.Mesh | null = null;
+      src.traverse((o) => {
+        if (!srcMesh && ((o as THREE.SkinnedMesh).isSkinnedMesh || (o as THREE.Mesh).isMesh)) {
+          srcMesh = o as THREE.SkinnedMesh;
         }
-      }
+      });
+      if (!srcMesh) return null;
 
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.name = o.name;
-      // Copy world transform (hair scene is at origin, so this is the bind pose position)
-      o.updateWorldMatrix(true, false);
-      mesh.applyMatrix4(o.matrixWorld);
-      meshes.push(mesh);
-    });
-    return meshes;
+      // Find the character's skeleton (from its SkinnedMesh)
+      let charSkeleton: THREE.Skeleton | null = null;
+      characterRoot.traverse((o) => {
+        const sk = o as THREE.SkinnedMesh;
+        if (!charSkeleton && sk.isSkinnedMesh && sk.skeleton) {
+          charSkeleton = sk.skeleton;
+        }
+      });
+      if (!charSkeleton) return null;
+
+      const m = srcMesh as THREE.SkinnedMesh;
+      if (m.isSkinnedMesh) {
+        // Clone the mesh and rebind to character skeleton
+        const cloned = new THREE.SkinnedMesh(m.geometry, m.material);
+        cloned.name = m.name;
+        // Bind to character skeleton — bone names match, so skinning works
+        cloned.bind(charSkeleton as THREE.Skeleton);
+        return cloned;
+      } else {
+        const mesh = srcMesh as THREE.Mesh;
+        const cloned = new THREE.Mesh(mesh.geometry, mesh.material);
+        cloned.name = mesh.name;
+        return cloned;
+      }
+    } catch {
+      return null;
+    }
   };
 
   if (opts.hair !== "none") {
     const hairSrc = assets.hair[opts.hair];
     if (hairSrc) {
-      for (const m of extractMeshes(hairSrc)) {
-        tintHair(m, opts.hairColor);
-        container.add(m);
+      const hair = getHeadgearMesh(hairSrc, characterRoot);
+      if (hair) {
+        tintHair(hair, opts.hairColor);
+        container.add(hair);
       }
     }
   }
   if (opts.beard && assets.beard) {
-    for (const m of extractMeshes(assets.beard)) {
-      tintHair(m, opts.hairColor);
-      container.add(m);
+    const beard = getHeadgearMesh(assets.beard, characterRoot);
+    if (beard) {
+      tintHair(beard, opts.hairColor);
+      container.add(beard);
     }
   }
   const browSrc = opts.body === "female" ? assets.eyebrowsFemale : assets.eyebrows;
   if (opts.eyebrows && browSrc) {
-    for (const m of extractMeshes(browSrc)) {
-      container.add(m);
-    }
+    const brows = getHeadgearMesh(browSrc, characterRoot);
+    if (brows) container.add(brows);
   }
 
-  head.add(container);
+  characterRoot.add(container);
 }
 
 /** Applies a full customization to a character instance. */
