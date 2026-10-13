@@ -5,6 +5,7 @@
 
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { clone as skeletonClone } from "three/addons/utils/SkeletonUtils.js";
 
 const AVATAR_BASE = "/avatars";
 
@@ -113,9 +114,11 @@ export function getCachedAssets(): AvatarAssets | null {
   return cache;
 }
 
-/** Deep-clones a body model for independent use. */
+/** Deep-clones a body model for independent use. Uses SkeletonUtils.clone so the
+ *  skinned mesh binds to the cloned bones (plain .clone() leaves the mesh
+ *  bound to the original skeleton, so bone rotations would have no effect). */
 export function cloneBody(type: BodyType): THREE.Group | null {
   const assets = getCachedAssets();
   if (!assets) return null;
-  return assets.bodies[type].clone(true);
+  return skeletonClone(assets.bodies[type]) as THREE.Group;
 }
