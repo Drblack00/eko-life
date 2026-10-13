@@ -36,23 +36,13 @@
     inset 0 1px 1px rgb(255 255 255 / 0.18);
 }
 /* color-scheme follows the resolved theme (form controls, scrollbars). */
-[data-theme="day"] .eko-phone__panel {
+[data-theme="warm-light"] .eko-phone__panel,
+[data-theme="sage-calm"] .eko-phone__panel {
   color-scheme: light;
 }
-[data-theme="night"] .eko-phone__panel {
+[data-theme="liquid-dark"] .eko-phone__panel,
+[data-theme="midnight-amber"] .eko-phone__panel {
   color-scheme: dark;
-}
-
-/* The TSX renders tiles + header buttons as .glass--tint-dark (dark card,
-   white text). In the day theme the phone follows the theme, so re-skin
-   those as light glass with theme ink — color only, DOM untouched. */
-[data-theme="day"] .eko-phone__tile.glass--tint-dark,
-[data-theme="day"] .eko-phone__back.glass--tint-dark,
-[data-theme="day"] .eko-phone__close.glass--tint-dark {
-  background:
-    linear-gradient(180deg, var(--glass-sheen), transparent 42%),
-    var(--glass-tint);
-  color: var(--text);
 }
 
 /* ---- Wide screens: right-side slide-over ---- */
@@ -318,13 +308,14 @@
   }
 }
 
-/* Narrow phones: a floating iPhone with margins, not a bottom sheet. */
+/* Narrow phones: a floating iPhone with margins, not a bottom sheet.
+   Respects the home indicator via safe-area-inset-bottom. */
 @media (max-width: 699px) {
   .eko-phone__panel--iphone {
     left: 10px;
     right: 10px;
-    top: 10px;
-    bottom: 10px;
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     height: auto;
     border-radius: 54px;
     border-bottom: 2px solid #3a3f4b;

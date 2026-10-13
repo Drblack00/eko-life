@@ -201,8 +201,8 @@ export function Phone({
         aria-modal="true"
         aria-label={isAppOpen ? `${appLabel} — Phone` : "Phone"}
         onClick={(e) => e.stopPropagation()}
-        /* The iPhone screen is always dark — force the night tokens. */
-        data-theme={iphone ? "night" : undefined}
+        /* The iPhone screen is always dark — force the dark glass tokens. */
+        data-theme={iphone ? "liquid-dark" : undefined}
       >
         {iphone ? (
           <>
