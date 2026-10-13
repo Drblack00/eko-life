@@ -119,7 +119,7 @@ export function AvatarEditor({
   /* Machine + loader lifecycle. */
   useEffect(() => {
     mountedRef.current = true;
-    const loader = new AvatarLoader(THREE, {});
+    const loader = new AvatarLoader(THREE);
     loaderRef.current = loader;
 
     /** Structural switch (body/face preset, body type, or brow style —
