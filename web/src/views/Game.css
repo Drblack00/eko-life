@@ -540,7 +540,7 @@
   margin: 0 var(--space-2) calc(var(--sab) + 2px);
   padding: var(--space-2);
   border-radius: var(--radius-pill);
-  background: var(--surface);
+  background: #1a2b3c;
   box-shadow: var(--shadow-md);
   z-index: 10;
   /* Bubble anchor: the lens is absolutely positioned against the bar. */
@@ -579,7 +579,7 @@
   align-items: center;
   justify-content: center;
   padding: 6px 2px;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.55);
   cursor: pointer;
 }
 
@@ -603,7 +603,7 @@
    so the state never depends on animation. */
 .eko-tabs__btn--active {
   background: none;
-  color: var(--palm-700);
+  color: #00e676;
 }
 .eko-tabs__btn--active .eko-tabs__content {
   transform: scale(1.28);
