@@ -532,81 +532,61 @@
 /* ---- Bottom tab bar: floating dock, icons only ---- */
 .eko-tabs {
   display: grid;
-  /* 4 tabs in one row — the magnifying bubble (eko-tabs__pill) hugs the
-     active tab's icon, so it adapts automatically. */
   grid-template-columns: repeat(4, 1fr);
-  /* Sit low: just the iOS safe-area inset plus a whisper of margin, so the
-     dock never collides with the home indicator. */
   margin: 0 var(--space-2) calc(var(--sab) + 2px);
-  padding: var(--space-2);
-  border-radius: var(--radius-pill);
+  padding: 8px;
+  border-radius: 28px;
   background: #1a2b3c;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 8px 24px rgba(26, 43, 60, 0.3);
   z-index: 10;
-  /* Bubble anchor: the lens is absolutely positioned against the bar. */
   position: relative;
 }
 
-/* Magnifying active-tab bubble: a single clear liquid-glass lens that
-   FLIP-morphs between tab buttons (see the effect in TabBar.tsx). Material
-   comes from glass.css (.eko-game .eko-tabs__pill); this is geometry only.
-   JS sets width/height once per switch; the animation itself is
-   transform-only — never layout. */
+/* Hide the magnifying bubble — using green pill active state instead */
 .eko-tabs__pill {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 64px; /* JS sets the exact box around the active tab's content. */
-  height: 56px;
-  border-radius: var(--radius-pill);
-  transform-origin: left top;
-  pointer-events: none;
-  z-index: 0;
+  display: none;
 }
 
 .eko-tabs__btn {
   position: relative;
   z-index: 1;
-  /* Fixed height: the active tab's content zooms (transform scale), so the
-     dock never changes size when switching tabs — no layout shift. */
   min-height: 62px;
   height: 62px;
   min-width: 0;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: 20px;
   background: none;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 6px 2px;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.65);
   cursor: pointer;
 }
 
-/* Icon-only content: a single SVG per tab. The active tab's icon zooms to
-   TAB_ZOOM (1.28) with a spring — the magnification the bubble lens
-   implies. transform-only, so siblings never move. The content is the
-   positioning context for the unread dot (absolute, so it never affects
-   the bubble's measured box). */
+/* Icon + label stacked vertically */
 .eko-tabs__content {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  transition: transform 0.38s cubic-bezier(0.32, 1.45, 0.45, 1);
+  gap: 2px;
 }
 
-/* Active tab: content zooms inside the bubble and takes the accent identity.
-   Day: palm-700 (5.0:1 on the frosted dock); night is overridden in
-   glass.css. Under prefers-reduced-motion the bubble jumps instantly
-   (TabBar.tsx) and the global reduced-motion rule kills this transition,
-   so the state never depends on animation. */
+.eko-tabs__label {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Active tab: green pill background, white icon + label */
 .eko-tabs__btn--active {
-  background: none;
-  color: #00e676;
+  background: #00c853;
+  color: #ffffff;
 }
 .eko-tabs__btn--active .eko-tabs__content {
-  transform: scale(1.28);
+  transform: none;
 }
 
 .eko-tabs__btn:focus-visible {

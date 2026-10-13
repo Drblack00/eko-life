@@ -311,6 +311,9 @@ export function TabBar({
             <span className="eko-tabs__icon" aria-hidden="true">
               <TabIcon tab={t.id} active={tab === t.id} />
             </span>
+            <span className="eko-tabs__label" aria-hidden="true">
+              {t.id === "buy" ? "Shop" : t.label}
+            </span>
             {t.id === "phone" && hasUnread && (
               <span className="eko-tabs__dot" aria-hidden="true" />
             )}
