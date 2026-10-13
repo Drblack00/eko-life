@@ -87,10 +87,7 @@ export class AvatarLoader {
 
   readonly stats = { buildsStarted: 0, buildsDiscarded: 0 };
 
-  constructor(
-    private readonly T: typeof import("three"),
-    private readonly opts: { reducedMotion?: boolean } = {}
-  ) {}
+  constructor(private readonly T: typeof import("three")) {}
 
   load(appearance: unknown, opts: LoadOptions = {}): Promise<AvatarHandle> {
     const validated = validateAppearance(appearance);
@@ -187,11 +184,11 @@ export class AvatarLoader {
     if (stale()) return discarded();
 
     onProgress?.("finalize", 0.9);
-    // Animator with idle
+    // Animator for on-demand animations (walk, dance, etc.).
+    // Default pose is the static relaxed stance from applyCustomization
+    // (arms at sides, fists clenched) — no auto-play, so a broken clip
+    // can never fight the static pose back to T-pose.
     const animator = new AvatarAnimator(bodyModel);
-    if (!opts.reducedMotion && !this.opts.reducedMotion) {
-      animator.play("Idle_Loop");
-    }
 
     group.add(bodyModel);
 
