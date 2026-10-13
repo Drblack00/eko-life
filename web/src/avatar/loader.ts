@@ -14,9 +14,13 @@ import * as THREE from "three";
 import type { AppearanceV1 } from "./schema";
 import { DEFAULT_APPEARANCE_V1, validateAppearance } from "./validation";
 import {
+  loadAvatarAssets,
   getCachedAssets,
+  cloneBody,
+  type BodyType,
 } from "./gltf/loader";
-import { SKIN_TONES } from "./gltf/customizer";
+import { applyCustomization, SKIN_TONES } from "./gltf/customizer";
+import { AvatarAnimator } from "./gltf/animator";
 
 export type LoadStage = "resolve" | "body" | "head" | "finalize";
 
@@ -53,7 +57,17 @@ function skinToHex(app: AppearanceV1): string {
   return "#8d5524";
 }
 
-/** Unused — GLTF hair styles removed. */
+/** Maps AppearanceV1 hair style id to GLTF hair style. */
+function hairToStyle(app: AppearanceV1): "buns" | "long" | "buzzed" | "parted" | "buzzedFemale" | "none" {
+  const id = String(app.hair?.styleId ?? "").toLowerCase();
+  const body: BodyType = app.base?.bodyType === "feminine" ? "female" : "male";
+  if (id.includes("bun")) return "buns";
+  if (id.includes("long")) return "long";
+  if (id.includes("buzz")) return body === "female" ? "buzzedFemale" : "buzzed";
+  if (id.includes("part")) return "parted";
+  if (id.includes("bald") || id.includes("none")) return "none";
+  return body === "female" ? "long" : "buzzed";
+}
 
 /** Maps AppearanceV1 hair color id to hex. */
 function hairColorToHex(app: AppearanceV1): string {
@@ -117,14 +131,18 @@ export class AvatarLoader {
     };
 
     onProgress?.("resolve", 0);
-    // GLTF disabled — using lightweight cartoon avatar instead.
-    // (loadAvatarAssets removed — was causing hangs/glitches)
+    // Ensure GLTF assets are loaded
+    try {
+      await loadAvatarAssets();
+    } catch {
+      notes.push("avatar assets failed to load");
+    }
     await yieldToUI();
     if (stale()) return discarded();
 
     const assets = getCachedAssets();
     const group = new T.Group();
-    group.name = "CartoonAvatar";
+    group.name = "GltfAvatar";
 
     if (!assets) {
       notes.push("assets unavailable — empty figure");
@@ -132,78 +150,81 @@ export class AvatarLoader {
     }
 
     onProgress?.("body", 0.3);
-    // Build lightweight cartoon avatar (no GLTF)
-    const skinColor = skinToHex(app);
-    const skinMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(skinColor), roughness: 0.7 });
-    const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7 });
-    const blackMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
-    const hairMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(hairColorToHex(app)), roughness: 0.8 });
-    
-    const addMesh = (geo: THREE.BufferGeometry, material: THREE.Material, x: number, y: number, z: number) => {
-      const m = new THREE.Mesh(geo, material);
-      m.position.set(x, y, z);
-      m.castShadow = true;
-      group.add(m);
-      return m;
-    };
-    
-    // Body (capsule)
-    addMesh(new THREE.CapsuleGeometry(0.24, 0.32, 6, 14), skinMat, 0, 0.78, 0);
-    // Head (big sphere)
-    addMesh(new THREE.SphereGeometry(0.24, 20, 16), skinMat, 0, 1.35, 0);
-    // Hair cap
-    addMesh(new THREE.SphereGeometry(0.245, 20, 16, 0, Math.PI * 2, 0, Math.PI / 2.1), hairMat, 0, 1.37, 0);
-    // Eyes
-    for (const sx of [-0.09, 0.09]) {
-      addMesh(new THREE.SphereGeometry(0.045, 12, 10), whiteMat, sx, 1.38, 0.2);
-      addMesh(new THREE.SphereGeometry(0.02, 10, 8), blackMat, sx, 1.38, 0.24);
+    const body: BodyType = app.base?.bodyType === "feminine" ? "female" : "male";
+    const bodyModel = cloneBody(body);
+    if (!bodyModel) {
+      notes.push("body clone failed");
+      return { group, dispose: () => {}, appearance: app, notes, discarded: false };
     }
-    // Smile
-    const smile = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.015, 8, 16, Math.PI), blackMat);
-    smile.position.set(0, 1.28, 0.21);
-    smile.rotation.x = Math.PI;
-    smile.rotation.z = Math.PI;
-    group.add(smile);
-    // Arms
-    for (const sx of [-0.34, 0.34]) {
-      addMesh(new THREE.CapsuleGeometry(0.08, 0.28, 4, 10), skinMat, sx, 0.78, 0);
-    }
-    // Legs
-    for (const sx of [-0.13, 0.13]) {
-      addMesh(new THREE.CapsuleGeometry(0.09, 0.3, 4, 10), skinMat, sx, 0.25, 0);
-    }
+
+    // Ground the model
+    const box = new THREE.Box3().setFromObject(bodyModel);
+    const height = box.max.y - box.min.y;
+    bodyModel.scale.setScalar(1.7 / height);
+    const box2 = new THREE.Box3().setFromObject(bodyModel);
+    bodyModel.position.y -= box2.min.y;
 
     await yieldToUI();
     if (stale()) return discarded();
 
     onProgress?.("head", 0.65);
-    // Customization already applied via materials above
+    // Apply customization
+    const hasBeard = String(app.hair?.facialHairId ?? "").toLowerCase().includes("beard");
+    applyCustomization(bodyModel, {
+      body,
+      skinTone: skinToHex(app),
+      hair: hairToStyle(app),
+      hairColor: hairColorToHex(app),
+      beard: hasBeard,
+      eyebrows: true,
+      fistsClenched: true,
+    });
 
     await yieldToUI();
     if (stale()) return discarded();
 
     onProgress?.("finalize", 0.9);
-    // No animator needed for static cartoon avatar
-    
+    // Animator for on-demand animations (walk, dance, etc.).
+    // Default pose is the static relaxed stance from applyCustomization
+    // (arms at sides, fists clenched) — no auto-play, so a broken clip
+    // Animator plays the retargeted Idle_Loop for the correct idle pose.
+    // This is the professional idle from the animation library — arms relaxed
+    // at sides, natural stance, subtle breathing motion.
+    const animator = new AvatarAnimator(bodyModel);
+    try {
+      animator.play("Idle_Loop");
+    } catch {
+      /* if retargeting fails, avatar stays in bind pose */
+    }
+
+    group.add(bodyModel);
+
+    let lastT = performance.now() / 1000;
+    const update = (t: number, dt: number) => {
+      const now = t || performance.now() / 1000;
+      const delta = dt || Math.min(0.05, now - lastT);
+      lastT = now;
+      animator.update(delta);
+    };
+
+    const playAnim = (name: string) => animator.play(name);
+
     const dispose = () => {
-      group.traverse((o) => {
-        if (o instanceof THREE.Mesh) {
-          o.geometry.dispose();
-          const m = o.material as THREE.Material | THREE.Material[];
-          if (Array.isArray(m)) m.forEach(x => x.dispose());
-          else m?.dispose();
-        }
+      animator.dispose();
+      bodyModel.traverse((o) => {
+        if (o instanceof THREE.Mesh) o.geometry.dispose();
       });
     };
 
     onProgress?.("finalize", 1);
     return {
       group,
-      update: () => {},
+      update,
       dispose,
       appearance: app,
       notes,
       discarded: false,
+      playAnim,
     };
   }
 
