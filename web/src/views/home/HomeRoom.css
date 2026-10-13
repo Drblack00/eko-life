@@ -217,22 +217,26 @@
 
 .eko-room__cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
 }
 
 .eko-room__card {
-  /* Frosted tile from .glass (no blur — the sheet behind is the backdrop). */
-  padding: var(--space-3);
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(26, 43, 60, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .eko-room__card.glass {
-  --glass-tint: rgb(255 255 255 / 0.08);
-  --glass-radius: var(--radius-lg);
-  --glass-blur: 12px;
+  --glass-tint: rgb(255 255 255 / 1);
+  --glass-radius: 24px;
+  --glass-blur: 0px;
 }
 
 .eko-room__card-top {
@@ -261,18 +265,18 @@
 
 .eko-room__buy {
   border: none;
-  border-radius: var(--radius-pill);
-  padding: var(--space-2) var(--space-3);
+  border-radius: 99px;
+  padding: 12px 32px;
   font-weight: 800;
-  font-size: 0.88rem;
+  font-size: 1rem;
   cursor: pointer;
-  background: var(--palm-700);
+  background: #00c853;
   color: #fff;
+  font-family: inherit;
 }
 
 .eko-room__buy:disabled {
   background: #d9f6e7;
-  /* #3f6b50 clears 4.5:1 on the mint chip (the old #5f8a73 was 3.4:1). */
   color: #3f6b50;
   cursor: not-allowed;
 }
