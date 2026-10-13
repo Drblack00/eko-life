@@ -427,6 +427,9 @@
   align-content: start;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* Solid paint so the app grid can never show through even if the
+     panel behind it fails (nuclear opacity follow-up, 2026-10-13). */
+  background-color: #0d1526;
 }
 
 .eko-iphone__appbtn {
@@ -618,4 +621,17 @@
     backdrop-filter: none;
     background: rgb(255 255 255 / 0.08);
   }
+}
+
+/* ==================================================================
+   NUCLEAR OPACITY: the phone is a modal and must never be transparent.
+   Base-level guarantee so a missing modifier class or an iOS Safari
+   compositing quirk can never cause bleed-through (2026-10-13).
+   Placed last so it wins over every other panel rule. */
+.eko-phone__panel,
+.eko-phone__panel--iphone,
+.eko-phone__panel--wide {
+  background-color: #0d1526 !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
