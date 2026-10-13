@@ -1,42 +1,58 @@
 /**
- * Èkó Life Avatar Engine — GLTF avatar loading.
+ * Èkó Life Avatar Engine — async avatar loading (Milestone 4).
  *
- * `AvatarLoader` builds avatars from the CC0 GLTF base characters
- * (Universal Base Characters) with retargeted animations
- * (Universal Animation Library, 46 clips).
+ * `AvatarLoader` wraps the synchronous assembler with:
+ * - Staged async builds: the loader yields to the event loop between
+ *   stages (resolve → body → head/hair → finalize) so the UI stays
+ *   responsive. Procedural builds are fast, so progress reporting is
+ *   honest about the stages rather than fake byte counts.
+ * - Request-ID stale guard: rapid successive `load()` calls resolve with
+ *   only the LATEST result delivered; earlier in-flight builds are
+ *   disposed and their promises resolve with `discarded: true` (never
+ *   applied to the scene by this loader).
+ * - Dedup: concurrent `load()` calls for an identical appearance share
+ *   one in-flight build.
+ * - Fallbacks: invalid input → DEFAULT_APPEARANCE_V1; builder/asset
+ *   failures degrade per the assembler's policy. `load()` never rejects
+ *   with a broken scene — the last-resort catch builds the default
+ *   appearance, and only a catastrophic failure rejects.
+ * - `swap()`: keeps the old character visible until the new build is
+ *   ready, then swaps (preserving the old transform) and disposes the old.
+ * - `diffUpdate()`: minimal in-place updates via the assembler.
  *
- * Interface preserved for AvatarEditor compatibility:
- * - load(appearance) → Promise<AvatarHandle>
- * - swap(), diffUpdate(), disposeHandle()
+ * CLIENT-ONLY: imports three.js types + the assembler. Not in `./index.ts`.
  */
 
-import * as THREE from "three";
 import type { AppearanceV1 } from "./schema";
-import { DEFAULT_APPEARANCE_V1, validateAppearance } from "./validation";
 import {
-  loadAvatarAssets,
-  getCachedAssets,
-  cloneBody,
-  type BodyType,
-} from "./gltf/loader";
-import { applyCustomization, SKIN_TONES } from "./gltf/customizer";
-import { AvatarAnimator } from "./gltf/animator";
+  beginStagedAssembly,
+  buildStagedBody,
+  buildStagedHead,
+  diffUpdateAssembled,
+  disposeObjects,
+  finishStagedAssembly,
+  type AssembledAvatar,
+  type AssembledAvatarInternal,
+  type AvatarRig,
+  type DiffSummary,
+  type StagedAssembly,
+} from "./assembler";
+import {
+  DEFAULT_APPEARANCE_V1,
+  validateAppearance,
+} from "./validation";
 
 export type LoadStage = "resolve" | "body" | "head" | "finalize";
 
 export interface LoadOptions {
   onProgress?: (stage: LoadStage, fraction: number) => void;
+  /** Override the prefers-reduced-motion check. */
   reducedMotion?: boolean;
 }
 
-export interface AvatarHandle {
-  group: THREE.Group;
-  update?: (t: number, dt: number) => void;
-  dispose: () => void;
-  appearance: AppearanceV1;
-  notes: string[];
+export interface AvatarHandle extends AssembledAvatar {
+  /** True when a newer load() superseded this request — never applied. */
   discarded: boolean;
-  playAnim?: (name: string) => void;
 }
 
 function cloneDefault(): AppearanceV1 {
@@ -45,55 +61,36 @@ function cloneDefault(): AppearanceV1 {
 
 const yieldToUI = () => new Promise<void>((r) => setTimeout(r, 0));
 
-/** Maps AppearanceV1 skin tone id to hex. */
-function skinToHex(app: AppearanceV1): string {
-  const id = app.base?.skinToneId ?? "";
-  // Try to find hex from catalog, fall back to mid-brown
-  if (/^#[0-9a-f]{6}$/i.test(id)) return id;
-  const lower = String(id).toLowerCase();
-  if (lower.includes("light") || lower.includes("fair")) return SKIN_TONES[0];
-  if (lower.includes("medium")) return SKIN_TONES[3];
-  if (lower.includes("dark") || lower.includes("deep")) return SKIN_TONES[5];
-  return "#8d5524";
-}
-
-/** Maps AppearanceV1 hair style id to GLTF hair style. */
-function hairToStyle(app: AppearanceV1): "buns" | "long" | "buzzed" | "parted" | "buzzedFemale" | "none" {
-  const id = String(app.hair?.styleId ?? "").toLowerCase();
-  const body: BodyType = app.base?.bodyType === "feminine" ? "female" : "male";
-  if (id.includes("bun")) return "buns";
-  if (id.includes("long")) return "long";
-  if (id.includes("buzz")) return body === "female" ? "buzzedFemale" : "buzzed";
-  if (id.includes("part")) return "parted";
-  if (id.includes("bald") || id.includes("none")) return "none";
-  return body === "female" ? "long" : "buzzed";
-}
-
-/** Maps AppearanceV1 hair color id to hex. */
-function hairColorToHex(app: AppearanceV1): string {
-  const id = String(app.hair?.colorId ?? "").toLowerCase();
-  if (/^#[0-9a-f]{6}$/i.test(id)) return id;
-  if (id.includes("black") || id.includes("dark")) return "#1a1a1a";
-  if (id.includes("brown")) return "#3b2a1a";
-  if (id.includes("blonde") || id.includes("gold")) return "#a06a35";
-  if (id.includes("grey") || id.includes("gray") || id.includes("white")) return "#d9d9d9";
-  return "#1a1a1a";
-}
-
 export class AvatarLoader {
   private seq = 0;
   private latest = 0;
   private inflight = new Map<string, { id: number; promise: Promise<AvatarHandle> }>();
+  private internals = new WeakMap<AvatarHandle, AssembledAvatarInternal>();
 
+  /** Diagnostics (tests): builds started vs discarded by the stale guard. */
   readonly stats = { buildsStarted: 0, buildsDiscarded: 0 };
 
-  constructor(private readonly T: typeof import("three")) {}
+  constructor(
+    private readonly T: typeof import("three"),
+    private readonly opts: { reducedMotion?: boolean } = {}
+  ) {}
 
+  /**
+   * Load (build) an avatar for `appearance`. Invalid input falls back to
+   * DEFAULT_APPEARANCE_V1 with a note — never rejects with a broken scene.
+   */
   load(appearance: unknown, opts: LoadOptions = {}): Promise<AvatarHandle> {
     const validated = validateAppearance(appearance);
     const app = validated.ok && validated.appearance ? validated.appearance : cloneDefault();
-    const notes: string[] = validated.ok ? [] : [`invalid appearance; using default`];
+    const notes: string[] = validated.ok
+      ? []
+      : [
+          `invalid appearance (${validated.errors.join("; ")}); ` +
+            `using DEFAULT_APPEARANCE_V1`,
+        ];
 
+    // Dedup: concurrent identical requests share one in-flight build.
+    // The key is the canonical validated appearance (fixed key order).
     const key = JSON.stringify(app);
     const existing = this.inflight.get(key);
     if (existing) return existing.promise;
@@ -101,7 +98,7 @@ export class AvatarLoader {
     const id = ++this.seq;
     this.latest = id;
     this.stats.buildsStarted++;
-    const promise = this.build(id, app, notes, opts).finally(() => {
+    const promise = this.buildStaged(id, app, notes, opts).finally(() => {
       const cur = this.inflight.get(key);
       if (cur && cur.id === id) this.inflight.delete(key);
     });
@@ -109,7 +106,7 @@ export class AvatarLoader {
     return promise;
   }
 
-  private async build(
+  private async buildStaged(
     id: number,
     app: AppearanceV1,
     notes: string[],
@@ -119,115 +116,115 @@ export class AvatarLoader {
     const onProgress = opts.onProgress;
     const stale = () => id !== this.latest;
 
-    const discarded = (): AvatarHandle => {
+    const discardedHandle = (reason: string): AvatarHandle => {
       this.stats.buildsDiscarded++;
-      return {
-        group: new T.Group(),
-        dispose: () => {},
+      const group = new T.Group();
+      const handle: AvatarHandle = {
+        group,
+        rig: {
+          upper: new T.Group(),
+          torso: new T.Mesh(),
+          head: new T.Group(),
+          armL: new T.Group(),
+          armR: new T.Group(),
+          eyeL: new T.Group(),
+          eyeR: new T.Group(),
+          lidL: new T.Group(),
+          lidR: new T.Group(),
+          legL: new T.Group(),
+          legR: new T.Group(),
+          baseArmLX: 0,
+          baseArmRX: 0,
+          baseArmLZ: 0,
+          baseArmRZ: 0,
+          baseLegLX: 0,
+          baseLegRX: 0,
+          baseUpperY: 0,
+        } satisfies AvatarRig,
         appearance: app,
-        notes: [...notes, "discarded: superseded"],
+        notes: [...notes, reason],
+        morphStatus: {} as AvatarHandle["morphStatus"],
+        update: undefined,
         discarded: true,
+        dispose() {},
       };
+      return handle;
     };
 
+    // Stage: resolve — asset resolution + materials (synchronous).
     onProgress?.("resolve", 0);
-    // Ensure GLTF assets are loaded
+    await yieldToUI();
+    if (stale()) {
+      return discardedHandle("discarded: superseded by a newer load() before resolve");
+    }
+
+    let staged: StagedAssembly;
     try {
-      await loadAvatarAssets();
-    } catch {
-      notes.push("avatar assets failed to load");
-    }
-    await yieldToUI();
-    if (stale()) return discarded();
-
-    const assets = getCachedAssets();
-    const group = new T.Group();
-    group.name = "GltfAvatar";
-
-    if (!assets) {
-      notes.push("assets unavailable — empty figure");
-      return { group, dispose: () => {}, appearance: app, notes, discarded: false };
+      staged = beginStagedAssembly(T, app, notes);
+    } catch (err) {
+      // Last resort: the default appearance is self-consistent; if even
+      // that fails, the error propagates (callers keep their old figure).
+      notes.push(
+        `resolve failed (${err instanceof Error ? err.message : String(err)}); ` +
+          `retrying with DEFAULT_APPEARANCE_V1`
+      );
+      staged = beginStagedAssembly(T, cloneDefault(), notes);
     }
 
+    // Stage: body — skin body + garments.
     onProgress?.("body", 0.3);
-    const body: BodyType = app.base?.bodyType === "feminine" ? "female" : "male";
-    const bodyModel = cloneBody(body);
-    if (!bodyModel) {
-      notes.push("body clone failed");
-      return { group, dispose: () => {}, appearance: app, notes, discarded: false };
+    await yieldToUI();
+    if (stale()) {
+      return discardedHandle("discarded: superseded by a newer load() before body");
+    }
+    try {
+      buildStagedBody(staged);
+    } catch (err) {
+      notes.push(
+        `body stage failed (${err instanceof Error ? err.message : String(err)}); ` +
+          `retrying with DEFAULT_APPEARANCE_V1`
+      );
+      disposeObjects([staged.group]);
+      staged = beginStagedAssembly(T, cloneDefault(), notes);
+      buildStagedBody(staged);
     }
 
-    // Ground the model
-    const box = new THREE.Box3().setFromObject(bodyModel);
-    const height = box.max.y - box.min.y;
-    bodyModel.scale.setScalar(1.7 / height);
-    const box2 = new THREE.Box3().setFromObject(bodyModel);
-    bodyModel.position.y -= box2.min.y;
-
-    await yieldToUI();
-    if (stale()) return discarded();
-
+    // Stage: head/hair — head, hair, facial hair.
     onProgress?.("head", 0.65);
-    // Apply customization
-    const hasBeard = String(app.hair?.facialHairId ?? "").toLowerCase().includes("beard");
-    applyCustomization(bodyModel, {
-      body,
-      skinTone: skinToHex(app),
-      hair: hairToStyle(app),
-      hairColor: hairColorToHex(app),
-      beard: hasBeard,
-      eyebrows: true,
-      fistsClenched: true,
+    await yieldToUI();
+    if (stale()) {
+      disposeObjects([staged.group]);
+      return discardedHandle("discarded: superseded by a newer load() after body");
+    }
+    buildStagedHead(staged);
+
+    // Stage: finalize — rig, idle update, disposal wiring.
+    onProgress?.("finalize", 0.9);
+    await yieldToUI();
+    if (stale()) {
+      disposeObjects([staged.group]);
+      return discardedHandle("discarded: superseded by a newer load() before finalize");
+    }
+    const assembled: AssembledAvatarInternal = finishStagedAssembly(staged, {
+      reducedMotion: opts.reducedMotion ?? this.opts.reducedMotion,
     });
 
-    await yieldToUI();
-    if (stale()) return discarded();
-
-    onProgress?.("finalize", 0.9);
-    // Animator for on-demand animations (walk, dance, etc.).
-    // Default pose is the static relaxed stance from applyCustomization
-    // (arms at sides, fists clenched) — no auto-play, so a broken clip
-    // Animator plays the retargeted Idle_Loop for the correct idle pose.
-    // This is the professional idle from the animation library — arms relaxed
-    // at sides, natural stance, subtle breathing motion.
-    const animator = new AvatarAnimator(bodyModel);
-    try {
-      animator.play("Idle_Loop");
-    } catch {
-      /* if retargeting fails, avatar stays in bind pose */
-    }
-
-    group.add(bodyModel);
-
-    let lastT = performance.now() / 1000;
-    const update = (t: number, dt: number) => {
-      const now = t || performance.now() / 1000;
-      const delta = dt || Math.min(0.05, now - lastT);
-      lastT = now;
-      animator.update(delta);
-    };
-
-    const playAnim = (name: string) => animator.play(name);
-
-    const dispose = () => {
-      animator.dispose();
-      bodyModel.traverse((o) => {
-        if (o instanceof THREE.Mesh) o.geometry.dispose();
-      });
-    };
-
-    onProgress?.("finalize", 1);
-    return {
-      group,
-      update,
-      dispose,
-      appearance: app,
-      notes,
+    const handle: AvatarHandle = {
+      ...assembled,
+      notes: [...assembled.notes, ...notes],
       discarded: false,
-      playAnim,
     };
+    this.internals.set(handle, assembled);
+    onProgress?.("finalize", 1);
+    return handle;
   }
 
+  /**
+   * Build a new avatar for `appearance` while `old` stays visible; swap
+   * them (preserving the old transform) once ready, then dispose the old.
+   * If this swap is superseded by a newer load, the old handle is left
+   * untouched and the discarded handle is returned.
+   */
   async swap(
     old: AvatarHandle | null,
     appearance: unknown,
@@ -245,29 +242,49 @@ export class AvatarLoader {
         parent.remove(old.group);
       }
       old.dispose();
+      this.internals.delete(old);
     }
     return built;
   }
 
+  /**
+   * Minimal in-place update of a live handle from oldAppearance to
+   * newAppearance. Returns what was touched. Invalid new appearances
+   * rebuild to the default rather than breaking the scene.
+   */
   diffUpdate(
-    _handle: AvatarHandle,
-    _oldAppearance: AppearanceV1,
-    _newAppearance: unknown
-  ): { rebuilt: boolean; touched: string[]; notes: string[] } {
-    // GLTF: simplest correct behavior is rebuild via swap.
-    // Return "rebuilt" so callers use swap().
-    return {
-      rebuilt: true,
-      touched: ["all"],
-      notes: ["gltf loader: diffUpdate triggers rebuild"],
-    };
+    handle: AvatarHandle,
+    oldAppearance: AppearanceV1,
+    newAppearance: unknown
+  ): DiffSummary {
+    const internal = this.internals.get(handle);
+    if (!internal || handle.discarded) {
+      return {
+        rebuilt: false,
+        touched: [],
+        notes: ["diffUpdate: unknown or discarded handle — no-op"],
+      };
+    }
+    const validated = validateAppearance(newAppearance);
+    const newApp =
+      validated.ok && validated.appearance ? validated.appearance : cloneDefault();
+    const summary = diffUpdateAssembled(internal, oldAppearance, newApp);
+    if (!validated.ok) {
+      summary.notes.unshift(
+        `new appearance invalid (${validated.errors.join("; ")}); rebuilt to default`
+      );
+    }
+    handle.appearance = internal.appearance;
+    handle.notes = internal.notes;
+    return summary;
   }
 
+  /** Dispose a handle built by this loader and forget its internals. */
   disposeHandle(handle: AvatarHandle): void {
     try {
       handle.dispose();
-    } catch {
-      /* noop */
+    } finally {
+      this.internals.delete(handle);
     }
   }
 }
