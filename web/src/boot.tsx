@@ -4,7 +4,13 @@ import { beaconError } from "./lib/beacon";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/glass.css";
+import "./styles/themes.css";
+import "./styles/liquid-glass.css";
 import "./boot.css";
+import { getTheme, setTheme } from "./theme/theme";
+
+// Apply the saved theme before first paint.
+setTheme(getTheme());
 
 const STAGES = [
   "Waking up the lagoon…",
