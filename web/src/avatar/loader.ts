@@ -187,8 +187,15 @@ export class AvatarLoader {
     // Animator for on-demand animations (walk, dance, etc.).
     // Default pose is the static relaxed stance from applyCustomization
     // (arms at sides, fists clenched) — no auto-play, so a broken clip
-    // can never fight the static pose back to T-pose.
+    // Animator plays the retargeted Idle_Loop for the correct idle pose.
+    // This is the professional idle from the animation library — arms relaxed
+    // at sides, natural stance, subtle breathing motion.
     const animator = new AvatarAnimator(bodyModel);
+    try {
+      animator.play("Idle_Loop");
+    } catch {
+      /* if retargeting fails, avatar stays in bind pose */
+    }
 
     group.add(bodyModel);
 
