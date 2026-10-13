@@ -6,6 +6,7 @@
 import * as THREE from "three";
 import { getCachedAssets, type BodyType, type HairStyle } from "./loader";
 import { clenchFists } from "./retarget";
+import { clone as skeletonClone } from "three/addons/utils/SkeletonUtils.js";
 
 export interface AvatarCustomization {
   body: BodyType;
@@ -96,7 +97,15 @@ function tintHair(root: THREE.Object3D, hex: string): void {
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     for (const m of mats) {
       const mat = m as THREE.MeshStandardMaterial;
-      if (mat && "color" in mat) mat.color.copy(color);
+      if (mat && "color" in mat) {
+        // For hair color to show, remove the dark texture and use solid color
+        // (the hair textures are dark and would mute the tint)
+        if (mat.map) {
+          mat.map = null;
+          mat.needsUpdate = true;
+        }
+        mat.color.copy(color);
+      }
     }
   });
 }
@@ -124,19 +133,20 @@ export function attachHeadgear(
   if (opts.hair !== "none") {
     const hairSrc = assets.hair[opts.hair];
     if (hairSrc) {
-      const hair = hairSrc.clone(true);
+      // Use SkeletonUtils.clone for skinned hair meshes (plain clone breaks binding)
+      const hair = skeletonClone(hairSrc) as THREE.Object3D;
       tintHair(hair, opts.hairColor);
       container.add(hair);
     }
   }
   if (opts.beard && assets.beard) {
-    const beard = assets.beard.clone(true);
+    const beard = skeletonClone(assets.beard) as THREE.Object3D;
     tintHair(beard, opts.hairColor);
     container.add(beard);
   }
   const browSrc = opts.body === "female" ? assets.eyebrowsFemale : assets.eyebrows;
   if (opts.eyebrows && browSrc) {
-    container.add(browSrc.clone(true));
+    container.add(skeletonClone(browSrc) as THREE.Object3D);
   }
 
   head.add(container);
