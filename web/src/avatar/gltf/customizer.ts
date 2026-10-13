@@ -156,9 +156,9 @@ export function applyCustomization(
     eyebrows: full.eyebrows,
     body: full.body,
   });
-  // NOTE: relaxArms disabled — manual bone rotation was producing a guard
-  // stance instead of the relaxed idle. The retargeted Idle_Loop animation
-  // (played via AvatarAnimator) provides the correct idle pose.
+  // Apply the idle pose (arms at sides) using quaternions extracted from
+  // the animation library's Idle_Loop. This is the approved idle stance.
+  relaxArms(root);
   if (full.fistsClenched) clenchFists(root, 1.0);
   // Body proportions (height/build) for different player types.
   applyProportions(root, full.height, full.build);
@@ -205,48 +205,59 @@ export function applyProportions(root: THREE.Object3D, height: number, build: nu
  * Static fallback so the avatar never shows T-pose.
  * Fully defensive — never throws.
  */
+/**
+ * Applies the idle pose by setting upperarm bones to the exact quaternions
+ * extracted from the animation library's Idle_Loop first frame.
+ * These are the professional idle pose values.
+ * Fully defensive — never throws.
+ */
 export function relaxArms(root: THREE.Object3D): void {
   try {
-    const D = Math.PI / 180;
-    // Ensure world matrices are current before we compute anything
+    // Idle_Loop first-frame quaternions for upper arms (from anim-lib.gltf)
+    // DEF-upper_arm.L: [-0.2865, 0.6735, -0.4958, 0.4674]
+    // DEF-upper_arm.R: [-0.2942, -0.6807, 0.4693, 0.4795]
+    const IDLE_L = new THREE.Quaternion(-0.2865, 0.6735, -0.4958, 0.4674);
+    const IDLE_R = new THREE.Quaternion(-0.2942, -0.6807, 0.4693, 0.4795);
+
     root.updateMatrixWorld(true);
     const updatedSkeletons = new Set<THREE.Skeleton>();
-    const relaxBone = (bone: THREE.Bone) => {
+
+    const applyIdle = (bone: THREE.Bone) => {
       try {
         if (!bone || !bone.quaternion) return;
         const n = (bone.name || "").toLowerCase();
-        if (!n.includes("upperarm") && !n.includes("upper_arm")) return;
-        if ((bone as any).__relaxed) return;
-        const isLeft = /[_.]l($|[^a-z])/.test(n);
-        // T-pose arms point out along ±X. Rotate in WORLD space around world Z
-        // to swing them down to the sides: left arm (-76°), right arm (+76°).
-        // rotateOnWorldAxis handles the parent-space conversion for us.
-        bone.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), (isLeft ? -76 : 76) * D);
-        // Slight inward tuck around world Y for a natural stance
-        bone.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), (isLeft ? -8 : 8) * D);
+        const isLeft = n === "upperarm_l";
+        const isRight = n === "upperarm_r";
+        if (!isLeft && !isRight) return;
+        if ((bone as any).__idleApplied) return;
+
+        // Set the local quaternion to the idle pose value.
+        // The anim skeleton and base skeleton have similar T-pose rests,
+        // so the local rotations transfer directly.
+        bone.quaternion.copy(isLeft ? IDLE_L : IDLE_R);
         bone.updateMatrixWorld(true);
-        (bone as any).__relaxed = true;
+        (bone as any).__idleApplied = true;
       } catch {
         /* ignore */
       }
     };
-    // Strategy 1: via SkinnedMesh skeletons (most reliable)
+
     root.traverse((o) => {
       try {
         const skinned = o as THREE.SkinnedMesh;
         if (!skinned.isSkinnedMesh || !skinned.skeleton || !skinned.skeleton.bones) return;
         let modified = false;
         for (const bone of skinned.skeleton.bones) {
-          const before = (bone as any).__relaxed;
-          relaxBone(bone);
-          if ((bone as any).__relaxed && !before) modified = true;
+          const before = (bone as any).__idleApplied;
+          applyIdle(bone);
+          if ((bone as any).__idleApplied && !before) modified = true;
         }
         if (modified) updatedSkeletons.add(skinned.skeleton);
       } catch {
-        /* ignore per-object errors */
+        /* ignore */
       }
     });
-    // Force skeleton matrix update so the pose actually renders
+
     for (const skel of updatedSkeletons) {
       try {
         skel.update();
@@ -254,11 +265,12 @@ export function relaxArms(root: THREE.Object3D): void {
         /* ignore */
       }
     }
-    // Strategy 2: traverse fallback for non-skinned setups
+
+    // Fallback traverse
     root.traverse((o) => {
-      if ((o as THREE.Bone).isBone) relaxBone(o as THREE.Bone);
+      if ((o as THREE.Bone).isBone) applyIdle(o as THREE.Bone);
     });
   } catch {
-    /* relaxArms never breaks avatar loading */
+    /* never breaks loading */
   }
 }
