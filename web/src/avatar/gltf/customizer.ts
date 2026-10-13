@@ -156,9 +156,9 @@ export function applyCustomization(
     eyebrows: full.eyebrows,
     body: full.body,
   });
-  // Relax arms to sides (static idle pose) — matches approved stance.
-  // Done before animation so Idle_Loop (if it plays) starts from here.
-  relaxArms(root);
+  // NOTE: relaxArms disabled — manual bone rotation was producing a guard
+  // stance instead of the relaxed idle. The retargeted Idle_Loop animation
+  // (played via AvatarAnimator) provides the correct idle pose.
   if (full.fistsClenched) clenchFists(root, 1.0);
   // Body proportions (height/build) for different player types.
   applyProportions(root, full.height, full.build);
