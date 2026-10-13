@@ -451,7 +451,7 @@
   color: var(--palm-700);
   white-space: nowrap;
 }
-[data-theme="night"] .eko-room__sheet-balance {
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .eko-room__sheet-balance {
   color: var(--palm-400);
 }
 
@@ -611,7 +611,7 @@
   padding: 4px 12px;
   white-space: nowrap;
 }
-[data-theme="night"] .eko-room__placing--compact .eko-room__placing-warn {
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .eko-room__placing--compact .eko-room__placing-warn {
   color: #fbbf24;
 }
 
@@ -653,7 +653,7 @@
   --glass-radius: var(--radius-pill);
   border: 1px dashed var(--palm-500);
 }
-[data-theme="night"] .eko-room__trybar.glass {
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .eko-room__trybar.glass {
   border-color: var(--palm-400);
 }
 

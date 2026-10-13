@@ -181,7 +181,7 @@
   background: var(--lagoon-100);
 }
 
-[data-theme="night"] .eko-furn__item--placed {
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .eko-furn__item--placed {
   background: #14304a;
 }
 
@@ -266,14 +266,14 @@
 .eko-ledger__amt--in {
   color: var(--palm-700);
 }
-[data-theme="night"] .eko-ledger__amt--in {
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .eko-ledger__amt--in {
   color: var(--palm-400);
 }
 
 .eko-ledger__amt--out {
   color: var(--danger);
 }
-[data-theme="night"] .eko-ledger__amt--out {
+[data-theme="liquid-dark"], [data-theme="midnight-amber"] .eko-ledger__amt--out {
   /* #dc2626 fails on dark surfaces — lighten at night. */
   color: #f87171;
 }
