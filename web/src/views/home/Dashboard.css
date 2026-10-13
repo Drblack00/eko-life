@@ -82,7 +82,7 @@
   margin: 4px 0 0;
 }
 
-/* Stat rings */
+/* Stat tiles — cartoon style with progress bars */
 .og-stats {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr 1fr;
@@ -90,51 +90,63 @@
   margin-top: 14px;
 }
 .og-stat {
-  padding: 12px 4px;
+  padding: 14px 8px;
   text-align: center;
+  border-radius: 20px;
 }
-.og-ring {
-  width: 50px;
-  height: 50px;
-  margin: 0 auto 6px;
-  position: relative;
+.og-stat__ico {
+  font-size: 28px;
   display: block;
-}
-.og-ring__v {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 14px;
-  color: #1a2b3c;
+  margin-bottom: 4px;
 }
 .og-stat__label {
-  font-size: 11px;
-  color: #5b7a94;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a2b3c;
+  display: block;
+  margin-bottom: 6px;
+}
+.og-stat__bar {
+  display: block;
+  height: 8px;
+  border-radius: 99px;
+  background: #e8f0f5;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.og-stat__fill {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: #00c853;
+}
+.og-stat__v {
+  font-size: 15px;
+  font-weight: 800;
+  color: #1a2b3c;
 }
 
-/* Quick actions */
+/* Quick actions — 2x2 cartoon grid */
 .og-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
   margin-top: 14px;
 }
 .og-action {
-  padding: 14px 4px;
+  padding: 20px 16px;
   text-align: center;
-  font-weight: 700;
-  font-size: 13px;
+  font-weight: 800;
+  font-size: 17px;
   color: #1a2b3c;
   cursor: pointer;
   font-family: inherit;
+  border-radius: 24px;
 }
 .og-action__ico {
-  font-size: 26px;
+  font-size: 44px;
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .og-action__label {
   color: #1a2b3c;

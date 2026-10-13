@@ -107,38 +107,7 @@ const STATS = [
   { id: "hunger", label: "Hunger", icon: "🍽️", color: "#ff9f1c" },
 ] as const;
 
-function Ring({ value, color }: { value: number; color: string }) {
-  const r = 21;
-  const c = 2 * Math.PI * r;
-  const off = c * (1 - Math.max(0, Math.min(100, value)) / 100);
-  return (
-    <span className="og-ring" aria-hidden="true">
-      <svg width="50" height="50" viewBox="0 0 50 50">
-        <circle
-          cx="25"
-          cy="25"
-          r={r}
-          fill="none"
-          stroke="rgba(255,255,255,0.18)"
-          strokeWidth="6"
-        />
-        <circle
-          cx="25"
-          cy="25"
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth="6"
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={off}
-          transform="rotate(-90 25 25)"
-        />
-      </svg>
-      <span className="og-ring__v">{value}</span>
-    </span>
-  );
-}
+/* Stat tiles use progress bars now — Ring removed. */
 
 export function StatRings({ you }: { you: You }) {
   return (
@@ -147,10 +116,17 @@ export function StatRings({ you }: { you: You }) {
         const v = Math.max(0, Math.min(100, Math.round(Number(you[s.id]) || 0)));
         return (
           <div key={s.id} className="oglass og-stat">
-            <Ring value={v} color={s.color} />
-            <span className="og-stat__label">
-              {s.icon} {s.label}
+            <span className="og-stat__ico" aria-hidden="true">
+              {s.icon}
             </span>
+            <span className="og-stat__label">{s.label}</span>
+            <span className="og-stat__bar" aria-hidden="true">
+              <span
+                className="og-stat__fill"
+                style={{ width: `${v}%`, background: s.color }}
+              />
+            </span>
+            <span className="og-stat__v">{v}</span>
           </div>
         );
       })}
