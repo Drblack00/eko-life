@@ -1324,7 +1324,7 @@ export function Game({
             sock={sock}
             sendAct={sock.sendAct}
             onOpenApp={openPhoneApp}
-            onTab={(t) => (t === "phone" ? setPhoneOpen(true) : setTab(t))}
+            onTab={(t) => { if (t === "phone") setPhoneOpen(true); else { setPhoneOpen(false); setTab(t); } }}
             onOpenNotifications={() => {
               setNotifOpen(true);
               sock.openNotifications();
@@ -1495,7 +1495,7 @@ export function Game({
 
       <TabBar
         tab={tab}
-        onTab={(t) => (t === "phone" ? setPhoneOpen(true) : setTab(t))}
+        onTab={(t) => { if (t === "phone") setPhoneOpen(true); else { setPhoneOpen(false); setTab(t); } }}
         hasUnread={sock.unreadNotifications > 0}
       />
         </>
