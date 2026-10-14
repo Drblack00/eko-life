@@ -1,4 +1,4 @@
-/* Èkó Life — 4-theme liquid-glass design system.
+/* Èkó Life — 5-theme liquid-glass design system.
  *
  * Each theme is selected via [data-theme="..."] on <html> (see
  * theme/theme.tsx). Variable NAMES are identical across themes; only the
@@ -77,7 +77,7 @@
 
 /* ---------------- sage-calm ----------------
    Soft sage background, white/sage cards, muted green accent. */
-[data-theme="sage-calm"] {
+[data-theme="ocean-glass"] { color-scheme: dark; --bg: #0d2242; --panel: #10314f; --panel2: #0e3a5c; --text: #f2f7ff; --muted: #a9c2d4; --line: rgba(255, 255, 255, 0.14); --accent: #2dd4bf; --accent-soft: rgba(45, 212, 191, 0.14); --success: #35d49a; --warning: #ffbf5c; --glass-bg: rgba(13, 42, 66, 0.72); --glass-border: rgba(255, 255, 255, 0.15); --nav-bg: rgba(10, 28, 48, 0.85); --card-shadow: 0 12px 36px rgba(0, 0, 0, 0.3); --hero-scrim: rgba(8, 25, 42, 0.82); --on-accent: #062a26; } [data-theme="ocean-glass"] body { background: linear-gradient(180deg, #0d2242 0%, #0e3a5c 50%, #0a4a44 100%); background-attachment: fixed; } [data-theme="sage-calm"] {
   color-scheme: light;
   --bg: #eef2ec;
   --panel: #ffffff;
