@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Èkó Life theme system — 4 switchable themes for the liquid-glass
+ * Èkó Life theme system — 5 switchable themes for the liquid-glass
  * redesign (2026-10-13).
  *
  * The active theme id is persisted in localStorage under THEME_STORAGE_KEY
@@ -13,7 +13,7 @@ import { useSyncExternalStore } from "react";
  * light/dark/automatic clock system was retired with the redesign.
  */
 
-export type ThemeId = "liquid-dark" | "warm-light" | "midnight-amber" | "sage-calm";
+export type ThemeId = "liquid-dark" | "warm-light" | "midnight-amber" | "sage-calm" | "ocean-glass";
 
 export interface ThemeMeta {
   id: ThemeId;
@@ -48,7 +48,7 @@ export const THEMES: ThemeMeta[] = [
     blurb: "Soft sage quiet with a muted green accent.",
     swatches: ["#eef2ec", "#ffffff", "#5a7d5a"],
   },
-];
+}, { id: "ocean-glass", name: "Ocean Glass", blurb: "Deep ocean gradient with frosted teal glass.", swatches: ["#0d2242", "#0e3a5c", "#2dd4bf"] }, ];
 
 export const THEME_STORAGE_KEY = "eko-theme";
 export const THEME_ATTRIBUTE = "data-theme";
@@ -188,7 +188,7 @@ export function setThemePreference(_next: ThemePreference): void {
 }
 
 /* ------------------------------------------------------------------ */
-/* ThemePicker — 4-theme swatch picker (Me → Settings, CharacterPanel). */
+/* ThemePicker — 5-theme swatch picker (Me → Settings, CharacterPanel). */
 /* ------------------------------------------------------------------ */
 
 /**
