@@ -67,7 +67,7 @@ function useConfirm() {
 /** Affordability: every purchase button shows price + the exact shortfall. */
 function afford(you: You, price: number): { ok: boolean; short: number } {
   const p = Math.max(0, Math.round(price || 0));
-  return { ok: you.money >= p, short: Math.max(0, p - you.money) };
+  return { ok: you.is_admin || you.money >= p, short: you.is_admin ? 0 : Math.max(0, p - you.money) };
 }
 
 function BuyButton({
@@ -320,7 +320,7 @@ function BankSection({
     config.classes?.[you.class]?.starterLoan ??
     (you.starter_loan_available ? 10000 : 0);
 
-  const depOk = amt > 0 && amt <= you.money;
+  const depOk = amt > 0 && (you.is_admin || amt <= you.money);
   const wdOk = amt > 0 && amt <= you.savings;
   const borrowOk = loanAmount > 0 && loanAmount <= loanMax && you.loan <= 0;
 
@@ -428,15 +428,15 @@ function BankSection({
             <Button
               size="md"
               className="eko-home__full"
-              disabled={loanAmount <= 0 || loanAmount > you.money}
+              disabled={loanAmount <= 0 || (!you.is_admin && loanAmount > you.money)}
               onClick={() => {
                 sendAct("repay", { amount: Math.min(loanAmount, you.loan) });
                 setLoanAmt("");
               }}
             >
-              {loanAmount > 0 && loanAmount <= you.money
+              {loanAmount > 0 && (you.is_admin || loanAmount <= you.money)
                 ? `Repay ${naira(Math.min(loanAmount, you.loan))}`
-                : loanAmount > you.money
+                : !you.is_admin && loanAmount > you.money
                   ? `Need ${naira(loanAmount - you.money)} more`
                   : "Repay loan"}
             </Button>
