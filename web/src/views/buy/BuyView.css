@@ -1,19 +1,10 @@
-/* Option C in Ocean Glass (picked 2026-10-14): quick-access catalogue
- * tiles over the deep ocean gradient. */
+/* Buy tab quick-access tiles (Option C, picked 2026-10-14). Tiles follow
+ * the active theme via CSS variables — no hardcoded backgrounds. */
 
 .eko-buy {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-}
-
-.eko-buy--ocean {
-  background: linear-gradient(180deg, #0d2242 0%, #0e3a5c 50%, #0a4a44 100%);
-  background-attachment: fixed;
-  margin: calc(var(--space-4) * -1);
-  padding: var(--space-4);
-  min-height: 100%;
-  color: #fff;
 }
 
 .eko-buy__sechead {
@@ -27,17 +18,17 @@
   font-size: 1.15rem;
   margin: 0;
   font-family: var(--font-display);
-  color: #fff;
+  color: var(--text);
 }
 
 .eko-buy__quick {
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
 }
 
 .eko-buy__note {
   margin: var(--space-1) 0 0;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-muted);
   font-size: 0.85rem;
 }
 
@@ -57,12 +48,12 @@
   border-radius: 18px;
   cursor: pointer;
   font: inherit;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.09);
+  color: var(--text);
+  background: var(--glass-bg);
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--card-shadow);
 }
 
 .eko-buy__tile:active {
