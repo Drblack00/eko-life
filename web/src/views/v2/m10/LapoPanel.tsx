@@ -98,7 +98,7 @@ export function LapoPanel({ token, sock, you, refreshKey }: Props) {
             <Button
               variant="accent"
               onClick={() => sock.sendAct(m10Act("lapo_repay_all"), {})}
-              disabled={you.money < loan.balance}
+              disabled={!you.is_admin && you.money < loan.balance}
             >
               Pay it all ({naira(loan.balance)})
             </Button>
