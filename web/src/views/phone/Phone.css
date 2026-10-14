@@ -283,33 +283,58 @@
 }
 
 /* ================================================================== */
-/* iPhone chrome (Phone 3 — picked 2026-10-12). The panel becomes a    */
-/* real phone: bezel, dynamic island, iOS status bar, Gem Hunt widget, */
-/* 4-column app grid, 4-app dock, home indicator. The screen is always  */
-/* dark (data-theme="night" is forced on the panel). Round elements    */
-/* carry hard min-size floors — iOS Safari must never squeeze them.    */
+/* iPhone chrome (Porcelain D — picked 2026-10-14). The panel becomes a */
+/* real phone: light titanium bezel, working Dynamic Island, iOS status */
+/* bar, 4-column app grid, 4-app dock, home indicator. The screen       */
+/* follows the app theme via --iphone-* tokens. Round elements carry   */
+/* hard min-size floors — iOS Safari must never squeeze them.           */
 /* ================================================================== */
 
 .eko-phone__panel--iphone {
   border-radius: 54px;
-  /* Bezel: outer edge + inner black ring around the screen. */
-  border: 2px solid #3a3f4b;
-  /* Fully opaque device — never glass. The base .eko-phone__panel brings
-     backdrop-filter: blur(26px); cancel it here so map/HUD content behind
-     the sheet can never bleed through (iPhone layer-stack bug, 2026-10-13).
-     Solid background-color sits under the gradient as a paint fallback. */
-  background-color: #0d1526;
+  /* Porcelain hardware (option D, picked 2026-10-14): light titanium frame.
+     The screen wallpaper follows the app theme via the --iphone-* tokens.
+     Fully opaque device — never glass (iPhone layer-stack bug, 2026-10-13):
+     solid background-color sits under the gradient as a paint fallback. */
+  border: 2px solid #d8dbe1;
+  --iphone-text: #14161c;
+  --iphone-muted: rgba(20, 22, 28, 0.62);
+  --iphone-card: rgba(255, 255, 255, 0.68);
+  --iphone-card-border: rgba(20, 22, 28, 0.09);
+  --iphone-screen: #e9edf4;
+  --iphone-homebar: rgba(20, 22, 28, 0.85);
+  background-color: var(--iphone-screen);
   background:
-    linear-gradient(165deg, #1a2542 0%, #0e1730 48%, #090e1c 100%);
+    linear-gradient(180deg, #f5f7fb 0%, #e3e9f3 45%, #ccd6e6 100%);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+  box-shadow:
+    0 30px 80px rgb(0 0 0 / 0.35),
+    0 8px 24px rgb(0 0 0 / 0.22),
+    inset 0 0 0 9px #101319,
+    inset 0 1px 1px rgb(255 255 255 / 0.7);
+  color: var(--iphone-text);
+  padding: 9px; /* the inner bezel ring doubles as screen padding */
+}
+
+/* Dark themes: night wallpaper + light text. */
+[data-theme="liquid-dark"] .eko-phone__panel--iphone,
+[data-theme="midnight-amber"] .eko-phone__panel--iphone {
+  --iphone-text: #f1f5f9;
+  --iphone-muted: rgba(241, 245, 249, 0.62);
+  --iphone-card: rgba(255, 255, 255, 0.13);
+  --iphone-card-border: rgba(255, 255, 255, 0.15);
+  --iphone-screen: #0d1526;
+  --iphone-homebar: rgba(255, 255, 255, 0.9);
+  border-color: #3a3f4b;
+  background-color: var(--iphone-screen);
+  background:
+    linear-gradient(165deg, #1a2542 0%, #0e1730 48%, #090e1c 100%);
   box-shadow:
     0 30px 80px rgb(0 0 0 / 0.6),
     0 8px 24px rgb(0 0 0 / 0.45),
     inset 0 0 0 9px #04060c,
     inset 0 1px 1px rgb(255 255 255 / 0.25);
-  color: #f1f5f9;
-  padding: 9px; /* the inner bezel ring doubles as screen padding */
 }
 
 @media (min-width: 700px) {
@@ -348,7 +373,7 @@
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: #fff;
+  color: inherit;
 }
 
 .eko-iphone__island {
@@ -358,11 +383,77 @@
   transform: translateX(-50%);
   width: 112px;
   height: 30px;
+  min-width: 112px;
   min-height: 30px;
   background: #000;
   border-radius: 999px;
   border: 1px solid #141821;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+.eko-iphone__island:active {
+  transform: translateX(-50%) scale(0.94);
+}
+.eko-iphone__island-inner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.eko-iphone__island-dot { font-size: 14px; }
+.eko-iphone__island--live {
+  animation: eko-island-pulse 2.4s ease-in-out infinite;
+}
+@keyframes eko-island-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(52 211 153 / 0); }
+  50% { box-shadow: 0 0 12px 2px rgb(52 211 153 / 0.45); }
+}
+/* The popup drops from the island like an iOS banner. */
+.eko-iphone__island-pop {
+  position: absolute;
+  top: 100%;
+  left: 16px;
+  right: 16px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 14px 16px;
+  border-radius: 24px;
+  background: var(--iphone-card);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--iphone-card-border);
+  box-shadow:
+    0 12px 32px rgb(0 0 0 / 0.25),
+    inset 0 1px 1px rgb(255 255 255 / 0.18);
+  animation: eko-island-pop 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  transform-origin: top center;
+}
+@keyframes eko-island-pop {
+  from { opacity: 0; transform: translateY(-12px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.eko-iphone__island-cta {
+  margin-top: 8px;
+  align-self: stretch;
+  padding: 10px;
+  border-radius: 14px;
+  border: none;
+  background: #1b7a4d;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+.eko-iphone__island-cta:active { transform: scale(0.98); }
 
 .eko-iphone__statusicons {
   display: inline-flex;
@@ -380,12 +471,12 @@
   margin: 6px 16px 2px;
   padding: 14px 16px;
   border-radius: 24px;
-  background: rgb(255 255 255 / 0.13);
+  background: var(--iphone-card);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
-  border: 1px solid rgb(255 255 255 / 0.15);
+  border: 1px solid var(--iphone-card-border);
   box-shadow: inset 0 1px 1px rgb(255 255 255 / 0.18);
-  color: #fff;
+  color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -398,7 +489,7 @@
   font-size: 10.5px;
   font-weight: 800;
   letter-spacing: 0.12em;
-  color: rgb(255 255 255 / 0.62);
+  color: var(--iphone-muted);
 }
 .eko-iphone__widget-title {
   font-size: 19px;
@@ -408,7 +499,7 @@
 .eko-iphone__widget-sub {
   font-size: 12.5px;
   line-height: 1.45;
-  color: rgb(255 255 255 / 0.72);
+  color: var(--iphone-muted);
   font-style: italic;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -427,9 +518,9 @@
   align-content: start;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* Solid paint so the app grid can never show through even if the
-     panel behind it fails (nuclear opacity follow-up, 2026-10-13). */
-  background-color: #0d1526;
+  /* Transparent: the phone's own opaque wallpaper shows through. The panel
+     itself stays nuclear-opaque, so nothing behind the phone can bleed in. */
+  background-color: transparent;
 }
 
 .eko-iphone__appbtn {
@@ -443,7 +534,7 @@
   gap: 5px;
   min-width: 0;
   font: inherit;
-  color: #fff;
+  color: inherit;
   cursor: pointer;
 }
 .eko-iphone__appbtn:active .eko-iphone__icon {
@@ -486,8 +577,8 @@
   font-size: 10.5px;
   font-weight: 500;
   line-height: 1.2;
-  color: #fff;
-  text-shadow: 0 1px 4px rgb(0 0 0 / 0.65);
+  color: inherit;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -503,10 +594,10 @@
   margin: 12px 14px 2px;
   padding: 10px 6px;
   border-radius: 30px;
-  background: rgb(255 255 255 / 0.15);
+  background: var(--iphone-card);
   -webkit-backdrop-filter: blur(22px);
   backdrop-filter: blur(22px);
-  border: 1px solid rgb(255 255 255 / 0.14);
+  border: 1px solid var(--iphone-card-border);
   box-shadow: inset 0 1px 1px rgb(255 255 255 / 0.2);
 }
 .eko-iphone__appbtn--dock .eko-iphone__icon {
@@ -535,9 +626,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgb(255 255 255 / 0.13);
-  border: 1px solid rgb(255 255 255 / 0.14);
-  color: #fff;
+  background: var(--iphone-card);
+  border: 1px solid var(--iphone-card-border);
+  color: inherit;
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
@@ -554,7 +645,7 @@
   text-align: center;
   font-size: 17px;
   font-weight: 700;
-  color: #fff;
+  color: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -563,6 +654,7 @@
 .eko-iphone__navbtn:focus-visible,
 .eko-iphone__appbtn:focus-visible,
 .eko-iphone__widget:focus-visible,
+.eko-iphone__island:focus-visible,
 .eko-iphone__homebar:focus-visible {
   outline: 2px solid rgb(52 211 153 / 0.9);
   outline-offset: 2px;
@@ -577,11 +669,9 @@
   padding: 4px 12px 16px;
   scrollbar-width: thin;
   scrollbar-color: rgb(128 128 128 / 0.45) transparent;
-  /* Fully opaque: the app-view must never rely on the panel behind it for
-     opacity. Solid dark paint matching the iPhone screen (layer-stack bug
-     follow-up, 2026-10-13) — guarantees no bleed-through on iOS Safari even
-     if a panel rule fails to apply. */
-  background-color: #0d1526;
+  /* Fully opaque: solid theme-aware paint matching the iPhone screen
+     (layer-stack bug follow-up, 2026-10-13). */
+  background-color: var(--iphone-screen);
 }
 .eko-iphone__app::-webkit-scrollbar {
   width: 6px;
@@ -601,7 +691,7 @@
   padding: 0;
   border: none;
   border-radius: 99px;
-  background: rgb(255 255 255 / 0.9);
+  background: var(--iphone-homebar);
   cursor: pointer;
 }
 
@@ -624,14 +714,18 @@
 }
 
 /* ==================================================================
-   NUCLEAR OPACITY: the phone is a modal and must never be transparent.
-   Base-level guarantee so a missing modifier class or an iOS Safari
-   compositing quirk can never cause bleed-through (2026-10-13).
-   Placed last so it wins over every other panel rule. */
+   NUCLEAR OPACITY (theme-aware, 2026-10-14): the phone is a modal and
+   must never be transparent. Porcelain light paint by default, night
+   navy under dark themes. Placed last so it wins over every other
+   panel rule. */
 .eko-phone__panel,
 .eko-phone__panel--iphone,
 .eko-phone__panel--wide {
-  background-color: #0d1526 !important;
+  background-color: #e9edf4 !important;
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
+}
+[data-theme="liquid-dark"] .eko-phone__panel--iphone,
+[data-theme="midnight-amber"] .eko-phone__panel--iphone {
+  background-color: #0d1526 !important;
 }
