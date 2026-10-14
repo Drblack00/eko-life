@@ -16,8 +16,10 @@ import { createGistsRouter, createNewsRouter } from './gists.js';
 import { createBankRouter } from './bank.js';
 import { createBoutiqueRouter } from './boutique.js';
 import { createGovRouter } from './gov.js';
+import { createGemRouter } from './gem.js';
+
 import {
-  CLASSES, LOCATIONS, JOBS, FOOD, FUN, HOUSING, SPAWN, WORLD_BOUNDS,
+  CLASSE, LOCATIONS, JOBS, FOOD, FUN, HOUSING, SPAWN, WORLD_BOUNDS,
   AVATARS, COLORS, PROPERTIES, BIZ, VEHICLES, FURN, HOME_SLOTS,
   BANK, TRAVEL_FARES, STUDY_COST,
   AVATAR_BODIES, AVATAR_SKINS, AVATAR_HAIRS, AVATAR_OUTFITS, AVATAR_FABRICS,
@@ -226,6 +228,7 @@ export function createApiRouter({ hub, getDay }) {
   router.get('/config', (req, res) => {
     res.json({
       classes: CLASSES,
+      
       locations: LOCATIONS,
       jobs: JOBS,
       food: FOOD,
