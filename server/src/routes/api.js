@@ -16,10 +16,6 @@ import { createGistsRouter, createNewsRouter } from './gists.js';
 import { createBankRouter } from './bank.js';
 import { createBoutiqueRouter } from './boutique.js';
 import { createGovRouter } from './gov.js';
-import { createGemRouter } from './gem.js';
-import { createCashWalletRouter } from './cashWallet.js';
-import { createCashFlowsRouter } from './cashFlows.js';
-import { createCashAdminRouter } from './cashAdmin.js';
 import {
   CLASSES, LOCATIONS, JOBS, FOOD, FUN, HOUSING, SPAWN, WORLD_BOUNDS,
   AVATARS, COLORS, PROPERTIES, BIZ, VEHICLES, FURN, HOME_SLOTS,
@@ -341,11 +337,9 @@ export function createApiRouter({ hub, getDay }) {
   // ---- admin (M4) ----
   router.use('/admin', createAdminRouter({ hub, getDay }));
 
-  // ---- cash wallet (fintech M5-M7; all routes behind requireCashOps -> 403 while disabled) ----
-  router.use('/cash-wallet', createCashWalletRouter());
-  router.use('/cash-wallet', createCashFlowsRouter());
-  // ---- cash admin (fintech M9: risk controls, adjustments, review, reconcile) ----
-  router.use('/admin/cash', createCashAdminRouter());
+// NOTE: cash-wallet + cash-admin routers are mounted once in app.js
+  // (app.use('/api/cash-wallet', ...) etc.) — do NOT mount them here too;
+  // double-mounting registers every handler twice.
 
   // ---- me (full character state) ----
   router.get('/me', authMiddleware, async (req, res) => {
