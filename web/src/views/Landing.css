@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   overflow: hidden;
-  background: var(--lagoon-100);
+  background: var(--lagoon-100); isolation: isolate; /* iOS Safari: dedicated stacking context so the fullscreen WebGL map canvas can never composite above the DOM chrome. */
 }
 
 /* The landing is a designed light marketing page (white hero cards, dark
@@ -23,7 +23,7 @@
   color-scheme: light;
 }
 
-.eko-landing__map {
+.eko-landing__map { z-index: 0;
   position: absolute;
   inset: 0;
 }
@@ -52,7 +52,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  background: rgb(255 255 255 / 0.92);
+  background: #ffffff;
   border-radius: var(--radius-pill);
   padding: var(--space-2) var(--space-4);
   box-shadow: var(--shadow-md);
@@ -81,7 +81,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  background: rgb(255 255 255 / 0.92);
+  background: #ffffff;
   border: 0;
   border-radius: var(--radius-pill);
   padding: var(--space-2) var(--space-3);
@@ -138,8 +138,8 @@ button.eko-pill {
 
 .eko-landing__cta-card {
   pointer-events: auto;
-  background: rgb(255 255 255 / 0.94);
-  backdrop-filter: blur(8px);
+  /* Solid white: iOS Safari mis-composites translucent whites over the fullscreen WebGL map (renders them dark). Opaque = bulletproof. */ background: #ffffff;
+  /* translucent backdrop-filter removed: mis-composites over the WebGL map on iOS Safari */
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   padding: var(--space-5) var(--space-6);
