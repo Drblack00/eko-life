@@ -48,7 +48,7 @@ export const THEMES: ThemeMeta[] = [
     blurb: "Soft sage quiet with a muted green accent.",
     swatches: ["#eef2ec", "#ffffff", "#5a7d5a"],
   },
-}, { id: "ocean-glass", name: "Ocean Glass", blurb: "Deep ocean gradient with frosted teal glass.", swatches: ["#0d2242", "#0e3a5c", "#2dd4bf"] }, ];
+{ id: "ocean-glass", name: "Ocean Glass", blurb: "Deep ocean gradient with frosted teal glass.", swatches: ["#0d2242", "#0e3a5c", "#2dd4bf"] }, ];
 
 export const THEME_STORAGE_KEY = "eko-theme";
 export const THEME_ATTRIBUTE = "data-theme";
