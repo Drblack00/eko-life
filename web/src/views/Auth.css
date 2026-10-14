@@ -17,6 +17,11 @@
   --text-muted: var(--neutral-600);
   --primary: var(--lagoon-600);
   --primary-strong: var(--lagoon-700);
+    /* The Card component's frosted glass reads --glass-bg/--glass-border,
+       not --surface: pin those to their day values too, or the card renders
+       dark navy under the night theme while text stays dark ink. */
+    --glass-bg: rgba(255, 255, 255, 0.78);
+    --glass-border: rgba(35, 33, 29, 0.1);
   /* Pin the inherited ink too: without this, plain text inherits the
      night body color even though --text is scoped above. */
   color: var(--text);
