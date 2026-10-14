@@ -134,7 +134,7 @@ function CreateShopForm({ sock, you, onCreated }: { sock: GameSocket; you: You; 
         <Button
           variant="primary"
           size="lg"
-          disabled={!name.trim() || you.money < CREATE_FEE}
+          disabled={!name.trim() || (!you.is_admin && you.money < CREATE_FEE)}
           onClick={() => setConfirm(true)}
         >
           Open shop — {naira(CREATE_FEE)}
@@ -148,7 +148,7 @@ function CreateShopForm({ sock, you, onCreated }: { sock: GameSocket; you: You; 
           </div>
         </div>
       )}
-      {you.money < CREATE_FEE && (
+      {!you.is_admin && you.money < CREATE_FEE && (
         <p className="m10-warn">You need {naira(CREATE_FEE)} to open a shop.</p>
       )}
     </Card>
