@@ -1795,6 +1795,7 @@ export function HomeRoomSection({
   sendAct,
   onBuySheetOpen,
   buyMode = false,
+  buyTabSignal = null,
 }: {
   you: You;
   config: GameConfig;
@@ -1809,6 +1810,9 @@ export function HomeRoomSection({
    *  a "Buy mode" affordance. When false/omitted (default), the entire buy
    *  sheet is not rendered at all — this is how the Home tab loses it. */
   buyMode?: boolean;
+  /** Buy quick-access tiles (BuyView): when this signal changes, the buy
+   *  sheet jumps to the given tab and opens at the half snap. */
+  buyTabSignal?: { tab: BuyTabId; n: number } | null;
 }) {
   const owned: FurnitureEntry[] = useMemo(
     () => (Array.isArray(you.furniture) ? you.furniture : []),
@@ -1977,6 +1981,13 @@ export function HomeRoomSection({
   const activeTab: BuyTabId = tabs.some((t) => t.id === tab)
     ? tab
     : tabs[0]?.id ?? "sleep";
+  // Buy quick-access tiles: jump the sheet to the tapped tab and open it.
+  useEffect(() => {
+    if (!buyTabSignal) return;
+    setTab(buyTabSignal.tab);
+    setSheetSnap("half");
+  }, [buyTabSignal]);
+    
   const [pendingBuy, setPendingBuy] = useState<{
     itemId: string;
     count: number;
