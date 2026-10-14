@@ -61,7 +61,7 @@ function useClock(): string {
 function StatusIcons() {
   return (
     <span className="eko-iphone__statusicons" aria-hidden="true">
-      <svg width="17" height="11" viewBox="0 0 17 11" fill="#fff">
+      <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor">
         <rect x="0" y="7" width="3" height="4" rx="1" />
         <rect x="4.5" y="5" width="3" height="6" rx="1" />
         <rect x="9" y="2.5" width="3" height="8.5" rx="1" />
@@ -69,7 +69,7 @@ function StatusIcons() {
       </svg>
       <svg
         width="16" height="12" viewBox="0 0 16 12"
-        fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round"
+        fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
       >
         <path d="M8 10.6v.1" />
         <path d="M4.9 7.6a4.4 4.4 0 0 1 6.2 0" />
@@ -77,9 +77,9 @@ function StatusIcons() {
         <path d="M0.4 2.5a11 11 0 0 1 15.2 0" />
       </svg>
       <svg width="25" height="12" viewBox="0 0 25 12">
-        <rect x="0.5" y="0.5" width="21" height="11" rx="3.5" fill="none" stroke="#fff" opacity="0.45" />
-        <rect x="2" y="2" width="15" height="8" rx="2" fill="#fff" />
-        <path d="M23.5 4v4a2.2 2.2 0 0 0 0-4z" fill="#fff" opacity="0.45" />
+        <rect x="0.5" y="0.5" width="21" height="11" rx="3.5" fill="none" stroke="currentColor" opacity="0.45" />
+        <rect x="2" y="2" width="15" height="8" rx="2" fill="currentColor" />
+        <path d="M23.5 4v4a2.2 2.2 0 0 0 0-4z" fill="currentColor" opacity="0.45" />
       </svg>
     </span>
   );
@@ -90,34 +90,86 @@ function StatusIcons() {
 /* Tapping opens the full gem dialog (ported above the phone panel).   */
 /* ------------------------------------------------------------------ */
 
-function GemWidget({ token }: { token: string }) {
+/* ------------------------------------------------------------------ */
+/* Dynamic Island — behaves like the real iPhone island. The gem hunt  */
+/* notification lives in the island: a compact live activity when a   */
+/* clue is available, auto-expands to announce a fresh clue, and      */
+/* tapping pops it open to the full detail card with the hunt dialog.  */
+/* ------------------------------------------------------------------ */
+
+function DynamicIsland({ token }: { token: string }) {
   const { gem, reload } = useGemHunt(token);
   const [open, setOpen] = useState(false);
-  if (!gem) return null;
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [announcing, setAnnouncing] = useState(false);
+  const prevClue = useRef<string | null>(null);
+
+  // A fresh clue auto-expands the island briefly, like iOS.
+  useEffect(() => {
+    if (!gem) return;
+    if (prevClue.current === null) {
+      prevClue.current = gem.clue;
+      return;
+    }
+    if (prevClue.current !== gem.clue && !gem.myFound) {
+      prevClue.current = gem.clue;
+      setAnnouncing(true);
+      blip("toast");
+      const t = setTimeout(() => setAnnouncing(false), 4500);
+      return () => clearTimeout(t);
+    }
+    prevClue.current = gem.clue;
+  }, [gem]);
+
+  if (!gem) return <span className="eko-iphone__island" aria-hidden="true" />;
+
+  const showPop = open || announcing;
+  const live = !gem.myFound;
+  const title = live ? "Clue unlocked" : `Found! +${naira(gem.myPrize ?? 0)}`;
+  const sub = live ? `\u201c${gem.clue}\u201d` : gemCountdown(gem.nextGemInMs);
+
+  const toggle = () => {
+    blip("tap");
+    setAnnouncing(false);
+    setOpen((v) => !v);
+  };
+
   return (
     <>
       <button
         type="button"
-        className="eko-iphone__widget"
-        onClick={() => {
-          blip("tap");
-          setOpen(true);
-        }}
-        aria-label="Open the daily gem hunt"
+        className={`eko-iphone__island${live ? " eko-iphone__island--live" : ""}`}
+        onClick={toggle}
+        aria-expanded={showPop}
+        aria-label={showPop ? "Dismiss gem hunt notification" : "Open gem hunt notification"}
       >
-        <span className="eko-iphone__widget-kicker">💎 GEM HUNT</span>
-        <span className="eko-iphone__widget-title">
-          {gem.myFound ? `Found! +${naira(gem.myPrize ?? 0)}` : "Clue unlocked"}
-        </span>
-        <span className="eko-iphone__widget-sub">
-          {gem.myFound ? gemCountdown(gem.nextGemInMs) : `\u201c${gem.clue}\u201d`}
+        <span className="eko-iphone__island-inner" aria-hidden="true">
+          <span className="eko-iphone__island-dot">💎</span>
+          {live && <span className="eko-iphone__island-label">Clue</span>}
         </span>
       </button>
-      {open && (
+      {showPop && (
+        <div className="eko-iphone__island-pop" role="status">
+          <span className="eko-iphone__widget-kicker">💎 GEM HUNT</span>
+          <span className="eko-iphone__widget-title">{title}</span>
+          <span className="eko-iphone__widget-sub">{sub}</span>
+          <button
+            type="button"
+            className="eko-iphone__island-cta"
+            onClick={() => {
+              blip("tap");
+              setDialogOpen(true);
+            }}
+          >
+            🔍 Open hunt
+          </button>
+        </div>
+      )}
+      {dialogOpen && (
         <GemDialog
           gem={gem}
           token={token}
-          onClose={() => setOpen(false)}
+          onClose={() => setDialogOpen(false)}
           onSearched={reload}
         />
       )}
@@ -142,8 +194,8 @@ function AppIcon({ app }: { app: PhoneApp }) {
  * The panel is a real phone: dynamic island, iOS status bar with a live
  * clock, a Gem Hunt widget, a 4-column app grid, a 4-app dock and a home
  * indicator. Tapping the home indicator (or ‹) goes back to the app grid;
- * tapping outside the phone (or ✕ in an app) puts it away. The screen is
- * always dark, like a real phone at night.
+ * tapping outside the phone (or ✕ in an app) puts it away.
+ * The screen follows the app theme (Porcelain D, picked 2026-10-14).
  *
  * The wide Style studio keeps the legacy glass panel (room for the 3D
  * preview) — the iPhone chrome only applies to the standard panel.
@@ -201,14 +253,14 @@ export function Phone({
         aria-modal="true"
         aria-label={isAppOpen ? `${appLabel} — Phone` : "Phone"}
         onClick={(e) => e.stopPropagation()}
-        /* The iPhone screen is always dark — force the dark glass tokens. */
-        data-theme={iphone ? "liquid-dark" : undefined}
+        /* Porcelain (option D, picked 2026-10-14): the iPhone screen follows
+           the app theme — no forced theme override. */
       >
         {iphone ? (
           <>
             <div className="eko-iphone__top">
               <span className="eko-iphone__clock">{clock}</span>
-              <span className="eko-iphone__island" aria-hidden="true" />
+              <DynamicIsland token={token} />
               <StatusIcons />
             </div>
 
@@ -242,7 +294,6 @@ export function Phone({
               </>
             ) : (
               <>
-                <GemWidget token={token} />
                 <nav className="eko-iphone__grid" aria-label="Phone apps">
                   {PHONE_APPS.map((app) => (
                     <button
