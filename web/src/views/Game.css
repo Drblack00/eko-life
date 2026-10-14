@@ -481,6 +481,10 @@
   background: var(--surface-2);
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-3);
+    /* Grid blowout guard: items default to min-width:auto and won't shrink
+     below content width — a huge unbreakable number would force the track
+     wider than the phone and clip the other column off-screen. */
+  min-width: 0;  
 }
 
 .eko-me__rows dt {
@@ -494,6 +498,7 @@
   margin: 0;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: break-word;
 }
 
 .eko-me__actions {
