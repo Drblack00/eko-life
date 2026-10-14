@@ -52,15 +52,12 @@
   cursor: pointer;
 }
 
-/* Floating placing toolbar + item popup over the canvas. */
-
 .eko-room__placing,
 .eko-room__popup {
   position: absolute;
   left: var(--space-3);
   right: var(--space-3);
   bottom: var(--space-3);
-  /* Frosted material comes from .glass (src/styles/glass.css) — layout only. */
   padding: var(--space-3);
   display: flex;
   flex-direction: column;
@@ -68,8 +65,6 @@
   font-size: 0.9rem;
 }
 
-/* Light frost for the popup over the 3D room; the placing toolbar's dark
-   variant is set below. */
 .eko-room__popup.glass {
   --glass-tint: rgb(255 255 255 / 0.74);
   --glass-radius: var(--radius-md);
@@ -84,8 +79,6 @@
 .eko-room__btn {
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: #fff;
-  /* Dark ink on the white button in both themes — the button used to
-     inherit light text from dark parents (white-on-white). */
   color: var(--neutral-900);
   border-radius: var(--radius-pill);
   padding: var(--space-2) var(--space-3);
@@ -96,7 +89,6 @@
 
 .eko-room__btn:disabled {
   background: #d9f6e7;
-  /* #3f6b50 clears 4.5:1 on the mint chip (the old #5f8a73 was 3.4:1). */
   color: #3f6b50;
   border-color: transparent;
   opacity: 1;
@@ -141,8 +133,6 @@
   line-height: 1;
 }
 
-/* Storage strip. */
-
 .eko-room__inventory {
   display: flex;
   align-items: center;
@@ -161,7 +151,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  /* Frosted pill from .glass (no blur — small repeating control). */
   padding: var(--space-1) var(--space-3);
   font-size: 0.85rem;
   font-weight: 600;
@@ -180,21 +169,15 @@
   cursor: not-allowed;
 }
 
-/* Buy-mode catalogue. */
-
 .eko-room__tabs {
   display: flex;
   gap: var(--space-2);
   overflow-x: auto;
   padding-bottom: var(--space-1);
-  /* Workstream B: the tabs row is a scroll container (overflow-x), so its
-     automatic minimum size is 0 — without flex:none it shrinks to nothing
-     whenever the sheet body overflows, clipping every tab button. */
   flex: none;
 }
 
 .eko-room__tab {
-  /* Frosted pill from .glass (no blur — small repeating control). */
   padding: var(--space-2) var(--space-3);
   font-weight: 700;
   font-size: 0.85rem;
@@ -222,7 +205,6 @@
 }
 
 .eko-room__card {
-  /* Frosted tile from .glass (no blur — the sheet behind is the backdrop). */
   padding: var(--space-3);
   display: flex;
   flex-direction: column;
@@ -272,12 +254,9 @@
 
 .eko-room__buy:disabled {
   background: #d9f6e7;
-  /* #3f6b50 clears 4.5:1 on the mint chip (the old #5f8a73 was 3.4:1). */
   color: #3f6b50;
   cursor: not-allowed;
 }
-
-/* ---- M15 buy-mode v2 ---- */
 
 .eko-room__card--poor {
   opacity: 0.85;
@@ -303,8 +282,6 @@
   flex: 2;
 }
 
-/* Design tab: wall/floor swatches. */
-
 .eko-room__design {
   display: flex;
   flex-direction: column;
@@ -323,7 +300,6 @@
 }
 
 .eko-room__swatch {
-  /* Frosted tile from .glass (no blur — small repeating control). */
   padding: var(--space-2);
   display: flex;
   flex-direction: column;
@@ -369,8 +345,6 @@
   color: var(--text-muted);
 }
 
-/* ---- M16: Buy bottom sheet over the room stage ---- */
-
 .eko-room__sheet {
   position: absolute;
   left: 0;
@@ -379,8 +353,6 @@
   z-index: 5;
   display: flex;
   flex-direction: column;
-  /* Theme-following frosted material (Fix Round 2: the old hardcoded dark
-     tint left the sheet stuck dark in the Light theme). */
   overflow: hidden;
   color: var(--text);
   transition: height 0.22s ease;
@@ -425,7 +397,6 @@
   width: 44px;
   height: 4px;
   border-radius: 999px;
-  /* Theme-aware grabber: dark on the light sheet, light on the dark one. */
   background: rgb(128 128 128 / 0.5);
 }
 
@@ -436,8 +407,6 @@
   white-space: nowrap;
 }
 
-/* Workstream C: in buyMode the handle doubles as the tab's primary
- * affordance — a small accent pill under the grip marks it. */
 .eko-room__sheet--buymode .eko-room__sheet-grip {
   background: var(--palm-400);
   box-shadow: 0 0 8px var(--palm-400);
@@ -447,7 +416,6 @@
   margin-left: auto;
   font-weight: 800;
   font-size: 0.9rem;
-  /* palm-400 fails on light surfaces — dark green in the day theme. */
   color: var(--palm-700);
   white-space: nowrap;
 }
@@ -456,7 +424,6 @@
 }
 
 .eko-room__sheet-hide {
-  /* Frosted mini-pill from .glass (no blur — it sits on the sheet). */
   color: var(--text);
   padding: var(--space-1) var(--space-3);
   font-weight: 700;
@@ -482,10 +449,6 @@
   flex-direction: column;
   gap: var(--space-2);
 }
-
-/* Buy sheet content — theme ink (Fix Round 2: the old hardcoded light text
-   assumed the always-dark sheet). Frosted tints, no blur on the small
-   repeating controls (the sheet itself carries the blur). */
 
 .eko-room__sheet .eko-room__tab {
   color: var(--text);
@@ -538,15 +501,12 @@
   color: var(--text-muted);
 }
 
-/* Reopen pill when the sheet is hidden. */
-
 .eko-room__sheet-fab {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
   bottom: var(--space-3);
   z-index: 5;
-  /* Theme-following frosted pill. */
   color: var(--text);
   padding: var(--space-2) var(--space-4);
   font-weight: 800;
@@ -559,8 +519,6 @@
   --glass-radius: var(--radius-pill);
 }
 
-/* ---- M16: compact placing toolbar (≤64px, theme-following, bottom-docked) ---- */
-
 .eko-room__placing--compact {
   left: var(--space-2);
   right: var(--space-2);
@@ -568,8 +526,6 @@
   z-index: 6;
   max-height: 64px;
   justify-content: center;
-  /* Material from .glass — theme-following frost keeps the 3D room readable
-     behind in both themes. */
   color: var(--text);
   padding: var(--space-1) var(--space-2);
 }
@@ -604,7 +560,6 @@
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  /* Amber edge kept as the warning signal; frost from .glass. */
   color: #92400e;
   font-size: 0.75rem;
   font-weight: 700;
@@ -621,13 +576,9 @@
   border: 1px solid rgb(251 191 36 / 0.55);
 }
 
-/* Tapped-item popup floats above the sheet. */
-
 .eko-room__popup {
   z-index: 6;
 }
-
-/* Free-preview banner: compact top-docked pill, never covering room center. */
 
 .eko-room__trybar {
   position: absolute;
@@ -636,7 +587,6 @@
   right: auto;
   transform: translateX(-50%);
   max-width: calc(100% - var(--space-3));
-  /* Frosted material from .glass; the dashed palm edge marks preview mode. */
   color: var(--text);
   padding: var(--space-1) var(--space-2);
   display: flex;
@@ -668,8 +618,6 @@
   font-size: 0.78rem;
   flex: 0 0 auto;
 }
-
-/* Tapped-item action rows. */
 
 .eko-room__actions {
   display: flex;
@@ -709,17 +657,11 @@
   color: var(--text-muted);
 }
 
-/* ---- Workstream B: landscape side-panel sheet ---- */
-/* In landscape the Buy sheet docks to the stage's right edge as a side
-   panel (width snaps) so the room and the catalogue stay usable together
-   on short viewports. Portrait keeps the bottom-sheet behavior above. */
-
 .eko-room__sheet--side {
   left: auto;
   right: 0;
   top: 0;
   bottom: 0;
-  /* Material from .glass; left edge rounds toward the room. */
   transition: width 0.22s ease;
 }
 
@@ -727,7 +669,6 @@
   --glass-radius: var(--radius-lg) 0 0 var(--radius-lg);
 }
 
-/* The handle spans the panel's top edge; drags run horizontally. */
 .eko-room__sheet--side .eko-room__sheet-handle {
   cursor: ew-resize;
 }
@@ -736,7 +677,6 @@
   display: none;
 }
 
-/* Collapsed rail: icon only, centered. */
 .eko-room__sheet-rail {
   display: none;
 }
@@ -762,21 +702,15 @@
   padding-right: 0;
 }
 
-/* One card column in the half panel; the grid opens up at full width. */
 .eko-room__sheet--side.eko-room__sheet--half .eko-room__cards {
   grid-template-columns: 1fr;
 }
 
-/* Shorter stage in landscape: the room stays in view above the fold. */
 @media (orientation: landscape) {
   .eko-room__canvas {
     height: min(340px, 52dvh);
   }
 }
-
-/* ---- Workstream B: buy-sheet loading placeholder ---- */
-/* Shown in the sheet body until the catalogue config arrives — never a
-   tall blank panel. Subtle and on-brand (dark theme). */
 
 .eko-room__loading {
   display: flex;
@@ -787,7 +721,6 @@
 
 .eko-room__shimmer {
   border-radius: var(--radius-md);
-  /* Neutral grey shimmer — reads on both the light and dark sheet. */
   background: linear-gradient(
     100deg,
     rgb(128 128 128 / 0.08) 30%,
@@ -816,14 +749,173 @@
   }
 }
 
-/* Reduced transparency: the room surfaces now follow the theme, so the
-   global .glass fallback (solid theme surface, no blur) in
-   styles/glass.css covers them — no room-specific overrides needed. */
-
-/* Reduced motion: static placeholder, no shimmer sweep. */
 @media (prefers-reduced-motion: reduce) {
   .eko-room__shimmer {
     animation: none;
     background: rgb(128 128 128 / 0.10);
   }
+}
+
+/* ============ Shop-in-place (Buy tab, 2026-10-14) ============
+   The room itself is the shop: hotspot pills on the stage pick a surface,
+   and the inline tray below the room shows that surface's options.
+   No bottom sheet is rendered in this mode. */
+
+.eko-shop .eko-room__canvas {
+  height: min(52vh, 480px);
+  min-height: 340px;
+}
+
+.eko-shop__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.eko-shop__title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.eko-shop__balance {
+  color: #35d49a;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.eko-room__hotspots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.eko-room__hotspot {
+  pointer-events: auto;
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  border: 1px solid rgba(245, 166, 35, 0.65);
+  background: rgba(5, 12, 22, 0.82);
+  color: #ffd98a;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  min-height: 34px;
+}
+
+.eko-room__hotspot span[aria-hidden="true"] {
+  font-size: 0.95rem;
+  line-height: 1;
+  color: #f5a623;
+}
+
+.eko-room__hotspot--active {
+  background: rgba(245, 166, 35, 0.22);
+  border-color: #f5a623;
+  color: #fff;
+}
+
+.eko-room__hotspot--wall {
+  top: 10px;
+  left: 10px;
+}
+
+.eko-room__hotspot--floor {
+  top: 10px;
+  right: 10px;
+}
+
+.eko-room__hotspots--row {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.eko-room__hotspots--row .eko-room__hotspot {
+  position: static;
+}
+
+.eko-room__tray {
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.eko-room__tray-head {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #2dd4bf;
+  margin-bottom: var(--space-2);
+}
+
+.eko-room__tray-row {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+  -webkit-overflow-scrolling: touch;
+}
+
+.eko-room__tray-row .eko-room__swatch {
+  flex: 0 0 auto;
+  min-width: 104px;
+}
+
+.eko-room__tray-card {
+  flex: 0 0 auto;
+  width: 168px;
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: stretch;
+}
+
+.eko-room__tray-card--poor {
+  opacity: 0.75;
+}
+
+.eko-room__tray-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.eko-room__tray-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.eko-room__tray-meta strong {
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eko-room__tray-sub {
+  font-size: 0.78rem;
+  color: #ffd98a;
+  font-weight: 800;
+}
+
+.eko-room__tray-card .eko-room__buy {
+  margin-top: var(--space-1);
 }
