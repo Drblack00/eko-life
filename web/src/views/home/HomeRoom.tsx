@@ -13,6 +13,7 @@ import {
   type You,
 } from "../../game/types";
 import { buildAvatarLook } from "../avatar/avatarModel";
+import { blip } from "../../lib/sound";
 import {
   footprintCells,
   fitsInGrid,
@@ -32,6 +33,7 @@ import {
   roomSizeFor,
   buyTabFor,
   visibleBuyTabs,
+  BUY_TABS,
   normalizeStyleEntry,
   validHex,
   itemActionsFor,
@@ -1796,6 +1798,7 @@ export function HomeRoomSection({
   onBuySheetOpen,
   buyMode = false,
   buyTabSignal = null,
+  shopInPlace = false,
 }: {
   you: You;
   config: GameConfig;
@@ -1813,6 +1816,11 @@ export function HomeRoomSection({
   /** Buy quick-access tiles (BuyView): when this signal changes, the buy
    *  sheet jumps to the given tab and opens at the half snap. */
   buyTabSignal?: { tab: BuyTabId; n: number } | null;
+  /** Shop-in-place (Buy tab, picked 2026-10-14): no bottom sheet. The room
+   *  itself is the shop — hotspot pills on the room pick a surface
+   *  (wall/floor/furniture tab) and an inline tray below the room shows
+   *  that surface's options. */
+  shopInPlace?: boolean;
 }) {
   const owned: FurnitureEntry[] = useMemo(
     () => (Array.isArray(you.furniture) ? you.furniture : []),
@@ -1987,6 +1995,30 @@ export function HomeRoomSection({
     setTab(buyTabSignal.tab);
     setSheetSnap("half");
   }, [buyTabSignal]);
+
+  /* ---------- Shop-in-place surface selection ----------
+   * "wall"/"floor" = the two Design surfaces; otherwise a furniture BuyTabId.
+   * Hotspots on the room set this; the inline tray below the room renders
+   * the matching options. Defaults to walls, then floors, then the first
+   * non-empty furniture tab. */
+  type ShopSurface = "wall" | "floor" | BuyTabId;
+  const shopSurfaces = useMemo<ShopSurface[]>(() => {
+    const list: ShopSurface[] = [];
+    if (wallStyles.length > 0) list.push("wall");
+    if (floorStyles.length > 0) list.push("floor");
+    for (const t of tabs) if (t.id !== "design") list.push(t.id);
+    return list;
+  }, [wallStyles, floorStyles, tabs]);
+  const [shopSurface, setShopSurface] = useState<ShopSurface>("wall");
+  const activeSurface: ShopSurface = shopSurfaces.includes(shopSurface)
+    ? shopSurface
+    : shopSurfaces[0] ?? "sleep";
+  const shopTabLabel =
+    activeSurface === "wall"
+      ? "WALL · PAINT"
+      : activeSurface === "floor"
+        ? "FLOOR · STYLES"
+        : `${(BUY_TABS.find((t) => t.id === activeSurface)?.label ?? activeSurface).toUpperCase()} · FURNITURE`;
     
   const [pendingBuy, setPendingBuy] = useState<{
     itemId: string;
@@ -2351,14 +2383,27 @@ export function HomeRoomSection({
   /* ---------- render ---------- */
 
   return (
-    <section className="eko-home__section" id="home-room" aria-label="Home Room">
-      <h2 className="eko-home__h">
-        <span aria-hidden="true">🏠</span> My Home
-      </h2>
-      <p className="eko-home__note">
-        Placed furniture boosts your daily vibes. {placedCount}/{maxPlaced}{" "}
-        slots used.
-      </p>
+    <section
+      className={`eko-home__section${shopInPlace ? " eko-shop" : ""}`}
+      id="home-room"
+      aria-label="Home Room"
+    >
+      {shopInPlace ? (
+        <div className="eko-shop__head">
+          <h2 className="eko-shop__title">My Home</h2>
+          <span className="eko-shop__balance">{naira(you.money)}</span>
+        </div>
+      ) : (
+        <>
+          <h2 className="eko-home__h">
+            <span aria-hidden="true">🏠</span> My Home
+          </h2>
+          <p className="eko-home__note">
+            Placed furniture boosts your daily vibes. {placedCount}/{maxPlaced}{" "}
+            slots used.
+          </p>
+        </>
+      )}
 
       <div className="eko-room__wrap">
         <div className="eko-room__toolbar">
@@ -2390,6 +2435,70 @@ export function HomeRoomSection({
             onTapEmpty={handleTapEmpty}
             apiRef={apiRef}
           />
+          {/* Shop-in-place hotspots: tap a surface on the room to shop it. */}
+          {shopInPlace && !placing && (
+            <div className="eko-room__hotspots" aria-label="Shop by surface">
+              {wallStyles.length > 0 && (
+                <button
+                  type="button"
+                  className={`eko-room__hotspot glass eko-room__hotspot--wall${
+                    activeSurface === "wall"
+                      ? " eko-room__hotspot--active"
+                      : ""
+                  }`}
+                  onClick={() => {
+                    blip("tap");
+                    setShopSurface("wall");
+                  }}
+                  aria-pressed={activeSurface === "wall"}
+                  aria-label="Shop wall paint"
+                >
+                  <span aria-hidden="true">+</span> Wall
+                </button>
+              )}
+              {floorStyles.length > 0 && (
+                <button
+                  type="button"
+                  className={`eko-room__hotspot glass eko-room__hotspot--floor${
+                    activeSurface === "floor"
+                      ? " eko-room__hotspot--active"
+                      : ""
+                  }`}
+                  onClick={() => {
+                    blip("tap");
+                    setShopSurface("floor");
+                  }}
+                  aria-pressed={activeSurface === "floor"}
+                  aria-label="Shop floor styles"
+                >
+                  <span aria-hidden="true">+</span> Floor
+                </button>
+              )}
+              <div className="eko-room__hotspots--row" role="group" aria-label="Furniture categories">
+                {tabs
+                  .filter((t) => t.id !== "design")
+                  .map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className={`eko-room__hotspot glass${
+                        activeSurface === t.id
+                          ? " eko-room__hotspot--active"
+                          : ""
+                      }`}
+                      onClick={() => {
+                        blip("tap");
+                        setShopSurface(t.id);
+                      }}
+                      aria-pressed={activeSurface === t.id}
+                      aria-label={`Shop ${t.label}`}
+                    >
+                      <span aria-hidden="true">+</span> {t.label}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
           {preview && previewStyle && (
             <div className="eko-room__trybar glass" role="status">
               <span className="eko-room__trybar-text">
@@ -2538,8 +2647,9 @@ export function HomeRoomSection({
           {/* M16: Buy catalogue as a bottom sheet over the room stage
               (workstream B: right-docked side panel in landscape).
               Workstream C: rendered only in buyMode (dedicated Buy tab);
-              on Home the entire buy-sheet block stays out of the DOM. */}
-          {buyMode && !placing && !sheetHidden && (
+              on Home the entire buy-sheet block stays out of the DOM.
+              Shop-in-place replaces the sheet with hotspots + inline tray. */}
+          {buyMode && !shopInPlace && !placing && !sheetHidden && (
             <div
               className={`eko-room__sheet eko-room__sheet--${sheetSnap}${
                 landscape ? " eko-room__sheet--side" : ""
@@ -2755,8 +2865,8 @@ export function HomeRoomSection({
             </div>
           )}
           {/* Workstream C: the show-sheet FAB is part of the buy sheet and
-              only exists in buyMode. */}
-          {buyMode && !placing && sheetHidden && (
+              only exists in buyMode (never in shop-in-place mode). */}
+          {buyMode && !shopInPlace && !placing && sheetHidden && (
             <button
               type="button"
               className="eko-room__sheet-fab glass"
@@ -2767,6 +2877,105 @@ export function HomeRoomSection({
             </button>
           )}
         </div>
+
+        {/* Shop-in-place tray: inline options for the selected surface.
+            Walls/floors reuse the StyleSwatch (tap = live preview, the
+            trybar over the room confirms the buy); furniture tabs reuse the
+            catalogue card buy flow. */}
+        {shopInPlace && !placing && (
+          <div className="eko-room__tray glass" aria-label="Shop options">
+            <div className="eko-room__tray-head">{shopTabLabel}</div>
+            {(activeSurface === "wall" || activeSurface === "floor") ? (
+              <div
+                className="eko-room__tray-row"
+                role="group"
+                aria-label={shopTabLabel}
+              >
+                {(activeSurface === "wall" ? wallStyles : floorStyles).map(
+                  (s) => {
+                    const kind: "wall" | "floor" = activeSurface;
+                    return (
+                      <StyleSwatch
+                        key={s.id}
+                        style={s}
+                        currentId={
+                          kind === "wall" ? ownedWallId : ownedFloorId
+                        }
+                        previewing={
+                          preview?.kind === kind && preview.id === s.id
+                        }
+                        onTap={() => tapStyle(kind, s)}
+                      />
+                    );
+                  }
+                )}
+              </div>
+            ) : (
+              <div
+                className="eko-room__tray-row"
+                role="list"
+                aria-label={shopTabLabel}
+              >
+                {catalog
+                  .filter((c) => buyTabFor(c) === activeSurface)
+                  .map((c) => {
+                    const price = priceOf(c);
+                    const ok = you.money >= price;
+                    const short = Math.max(0, price - you.money);
+                    const ownedCount = owned.filter(
+                      (f) =>
+                        furnitureItemId(f).toLowerCase() ===
+                        String(c.id).toLowerCase()
+                    ).length;
+                    const isPending =
+                      pendingBuy?.itemId === String(c.id).toLowerCase();
+                    return (
+                      <div
+                        key={c.id}
+                        role="listitem"
+                        className={`eko-room__tray-card glass${
+                          ok ? "" : " eko-room__tray-card--poor"
+                        }`}
+                      >
+                        <span
+                          className="eko-room__tray-icon"
+                          aria-hidden="true"
+                        >
+                          {c.icon ?? "🪑"}
+                        </span>
+                        <div className="eko-room__tray-meta">
+                          <strong>
+                            {c.name}
+                            {ownedCount > 0 && ` ×${ownedCount}`}
+                          </strong>
+                          <span className="eko-room__tray-sub">
+                            {naira(price)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="eko-room__buy"
+                          disabled={!ok || !!pendingBuy}
+                          onClick={() => startBuy(c.id)}
+                          aria-label={
+                            ok
+                              ? `Buy ${c.name} for ${naira(price)}`
+                              : `Cannot afford ${c.name}: need ${naira(short)} more`
+                          }
+                        >
+                          {isPending
+                            ? "…"
+                            : ok
+                              ? "Buy"
+                              : `Need ${naira(short)}`}
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
 
         {unplaced.length > 0 && (
           <div className="eko-room__inventory">
