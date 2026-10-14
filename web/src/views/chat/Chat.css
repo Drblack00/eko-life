@@ -535,7 +535,7 @@
 }
 /* --lagoon-100 is a light chip in both themes: darken it at night so the
    light message text stays legible. */
-[data-theme="liquid-dark"], [data-theme="midnight-amber"] .eko-dm--mine {
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-dm--mine {
   background: #16405f;
 }
 
