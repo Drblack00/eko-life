@@ -55,7 +55,7 @@ export function HousingPanel({ sock, you }: Props) {
             <Button
               variant="primary"
               size="lg"
-              disabled={you.money < tier.buy}
+              disabled={!you.is_admin && you.money < tier.buy}
               onClick={() => setConfirm(true)}
             >
               Buy outright — {naira(tier.buy)}
@@ -71,7 +71,7 @@ export function HousingPanel({ sock, you }: Props) {
               </div>
             </div>
           )}
-          {you.money < tier.buy && (
+          {!you.is_admin && you.money < tier.buy && (
             <p className="m10-warn">
               You need {naira(tier.buy - you.money)} more. Visit a Housing Office to buy.
             </p>
