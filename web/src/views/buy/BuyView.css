@@ -1,6 +1,5 @@
-/* Workstream C — BUY tab header treatment. The catalogue sheet itself
- * carries the "Buy mode" handle affordance; this header gives the tab a
- * clear, premium title above the room stage. */
+/* Option C in Ocean Glass (picked 2026-10-14): quick-access catalogue
+ * tiles over the deep ocean gradient. */
 
 .eko-buy {
   display: flex;
@@ -8,58 +7,80 @@
   gap: var(--space-2);
 }
 
-.eko-buy__head {
+.eko-buy--ocean {
+  background: linear-gradient(180deg, #0d2242 0%, #0e3a5c 50%, #0a4a44 100%);
+  background-attachment: fixed;
+  margin: calc(var(--space-4) * -1);
+  padding: var(--space-4);
+  min-height: 100%;
+  color: #fff;
+}
+
+.eko-buy__sechead {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-radius: 18px;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: var(--space-2);
 }
 
-.eko-buy__head-icon {
-  font-size: 1.6rem;
-  line-height: 1;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
-}
-
-.eko-buy__head-text {
-  min-width: 0;
-}
-
-.eko-buy__head-title {
+.eko-buy__title {
+  font-size: 1.15rem;
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 800;
-  /* The glass card adapts to the theme — use the theme ink token so the
-   * title stays legible in both light and dark themes. */
-  color: var(--text);
-  letter-spacing: 0.01em;
+  font-family: var(--font-display);
+  color: #fff;
 }
 
-.eko-buy__head-sub {
-  margin: 2px 0 0;
+.eko-buy__quick {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.eko-buy__note {
+  margin: var(--space-1) 0 0;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.85rem;
+}
+
+.eko-buy__tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.eko-buy__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-3) var(--space-2);
+  border-radius: 18px;
+  cursor: pointer;
+  font: inherit;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.09);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.12);
+}
+
+.eko-buy__tile:active {
+  transform: scale(0.96);
+}
+
+.eko-buy__tile-icon {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.eko-buy__tile-label {
   font-size: 0.78rem;
-  font-weight: 600;
-  /* Theme ink: the old hardcoded dark slate went unreadable in the night
-     theme. */
-  color: var(--text-muted);
-  line-height: 1.35;
+  font-weight: 700;
 }
 
 @media (min-width: 720px) {
-  .eko-buy__head {
-    padding: var(--space-3) var(--space-4);
-  }
-
-  .eko-buy__head-icon {
-    font-size: 2rem;
-  }
-
-  .eko-buy__head-title {
-    font-size: 1.25rem;
-  }
-
-  .eko-buy__head-sub {
-    font-size: 0.85rem;
+  .eko-buy__tiles {
+    grid-template-columns: repeat(6, 1fr);
   }
 }
