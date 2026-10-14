@@ -42,7 +42,7 @@ export function BuyView({
   };
 
   return (
-    <div className="eko-tabpad eko-buy eko-buy--ocean">
+    <div className="eko-tabpad eko-buy">
       <div className="eko-buy__sechead">
         <h2 className="eko-buy__title">
           <span aria-hidden="true">🛍️</span> Catalogue
