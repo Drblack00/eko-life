@@ -9,6 +9,7 @@ import {
 } from "../game/types";
 import { AvatarStudio } from "./avatar/AvatarStudio";
 import { Button, Card, Skeleton, useToast } from "../components";
+import { markCloudSaveDirty } from "../lib/cloudSave";
 import "./CreateCharacter.css";
 
 /**
@@ -141,6 +142,7 @@ export function CreateCharacter({
       } catch {
         /* private mode: creation just re-asks next session */
       }
+      markCloudSaveDirty();
       toast(`Your Lagos story begins, ${clean}!`, "success");
       onDone();
     } catch (err) {
@@ -156,6 +158,7 @@ export function CreateCharacter({
         } catch {
           /* ignore */
         }
+        markCloudSaveDirty();
         onDone();
         return;
       }

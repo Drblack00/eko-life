@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import "./Walkthrough.css";
+import { markCloudSaveDirty } from "../lib/cloudSave";
 
 /* ------------------------------------------------------------------ */
 /* Walkthrough — skippable first-launch coach-mark overlay. 5 steps,    */
@@ -53,6 +54,7 @@ export function Walkthrough({
     } catch {
       /* private mode — the overlay just closes */
     }
+    markCloudSaveDirty();
     onDone();
   }, [onDone]);
 

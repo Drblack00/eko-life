@@ -39,6 +39,14 @@ import { BankApp } from "./bank/BankApp";
 import { BoutiqueApp } from "./boutique/BoutiqueApp";
 import { RichListApp } from "./richlist/RichListApp";
 import { GovApp } from "./gov/GovApp";
+// Crews — player clans: discover, join, shared goals, league board.
+import { CrewsApp } from "./crews/CrewsApp";
+// Story Questlines — chat-thread story arcs.
+import { StoryApp } from "./story/StoryApp";
+// Live Events Calendar — season banner, day timeline, RSVPs.
+import { EventsApp } from "./events/EventsApp";
+// UGC Design Contests — duel voting, 2-tap entries.
+import { ContestsApp } from "./contests/ContestsApp";
 import { StyleApp } from "./StyleApp";
 import { ElectionSheet } from "./election/ElectionSheet";
 import { HomeTab, type HomeFocus } from "./home/HomeTab";
@@ -1124,6 +1132,34 @@ export function Game({
           return (
             <div className="eko-tabpad">
               <GovApp token={token} you={you} />
+            </div>
+          );
+        case "crews":
+          // Crews — player clans: discover, join, shared goals, league board.
+          return (
+            <div className="eko-tabpad">
+              <CrewsApp token={token} />
+            </div>
+          );
+        case "story":
+          // Story Questlines — chat-thread story arcs.
+          return (
+            <div className="eko-tabpad">
+              <StoryApp token={token} />
+            </div>
+          );
+        case "events":
+          // Live Events Calendar — season banner, day timeline, RSVPs.
+          return (
+            <div className="eko-tabpad">
+              <EventsApp token={token} />
+            </div>
+          );
+        case "contests":
+          // UGC Design Contests — duel voting, 2-tap entries.
+          return (
+            <div className="eko-tabpad">
+              <ContestsApp token={token} />
             </div>
           );
         case "style":
