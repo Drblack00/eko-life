@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, ApiError, asList, type ClassInfo } from "../lib/api";
+import { api, ApiError, asList, type CityInfo, type ClassInfo } from "../lib/api";
 import {
   AVATAR_LOOK_DEFAULTS,
   AVATAR_LOOK_FALLBACK_OPTIONS,
@@ -8,9 +8,11 @@ import {
   type AvatarLookOptions,
 } from "../game/types";
 import { AvatarStudio } from "./avatar/AvatarStudio";
+import { CityPicker } from "./CityPicker";
 import { Button, Card, Skeleton, useToast } from "../components";
 import { markCloudSaveDirty } from "../lib/cloudSave";
 import "./CreateCharacter.css";
+import "./CityPicker.css";
 
 /**
  * M2 character creation. Effects are shown BEFORE choosing (audit improvement).
@@ -61,6 +63,10 @@ export function CreateCharacter({
   // server serves avatarLook; the staged look is saved on submit only.
   const [lookOpts, setLookOpts] = useState<AvatarLookOptions | null>(null);
   const [look, setLook] = useState<AvatarLook>(AVATAR_LOOK_DEFAULTS);
+  // Home City V1: playable cities from /api/config; 'lagos' is the safe
+  // default if the endpoint fails or returns none (never crash creation).
+  const [cities, setCities] = useState<CityInfo[]>([]);
+  const [cityId, setCityId] = useState("lagos");
   const [busy, setBusy] = useState(false);
   const [nameError, setNameError] = useState("");
   const [submitError, setSubmitError] = useState("");
@@ -87,6 +93,15 @@ export function CreateCharacter({
         if (Array.isArray(cfg.colors) && cfg.colors.length > 0) {
           setColorOpts(cfg.colors);
           if (!cfg.colors.includes(color)) setColor(cfg.colors[0]);
+        }
+        // Home City V1: city summaries from the server (array or keyed
+        // object). Prefer 'lagos' when present, else take the first.
+        const cityList = asList(cfg.cities);
+        if (cityList.length > 0) {
+          setCities(cityList);
+          setCityId(
+            cityList.some((c) => c.id === "lagos") ? "lagos" : cityList[0].id
+          );
         }
         // M15: prefer the server's avatar option lists (fall back to local).
         const serverLook = cfg.avatarLook;
@@ -129,6 +144,8 @@ export function CreateCharacter({
     }
     setNameError("");
     setBusy(true);
+    const cityName =
+      cities.find((c) => c.id === cityId)?.name ?? "Lagos";
     try {
       await api.createCharacter(token, {
         name: clean,
@@ -136,6 +153,7 @@ export function CreateCharacter({
         avatar,
         color,
         avatar_look: sanitizeAvatarLook(look, lookOpts ?? undefined),
+        city: cityId,
       });
       try {
         localStorage.setItem(`eko_char_done:${username}`, "1");
@@ -143,7 +161,7 @@ export function CreateCharacter({
         /* private mode: creation just re-asks next session */
       }
       markCloudSaveDirty();
-      toast(`Your Lagos story begins, ${clean}!`, "success");
+      toast(`Your ${cityName} story begins, ${clean}!`, "success");
       onDone();
     } catch (err) {
       setBusy(false);
@@ -176,6 +194,8 @@ export function CreateCharacter({
   };
 
   const selectedClass = classes?.find((c) => c.id === classId);
+  const selectedCityName =
+    cities.find((c) => c.id === cityId)?.name ?? "Lagos";
 
   return (
     <div className="eko-create">
@@ -193,8 +213,8 @@ export function CreateCharacter({
       <main className="eko-create__main">
         <h1 className="eko-create__title">Who are you in this city?</h1>
         <p className="eko-create__sub">
-          Pick a name, a background and a look. Your choices shape your
-          starting money, your home and how the hustle pays you.
+          Pick a name, a city, a background and a look. Your choices shape
+          your starting money, your home and how the hustle pays you.
         </p>
 
         {loadError ? (
@@ -267,6 +287,30 @@ export function CreateCharacter({
                   </button>
                 ))}
               </div>
+            </section>
+
+            <section aria-labelledby="cc-city">
+              <h2 id="cc-city" className="eko-create__h2">
+                Choose your city
+              </h2>
+              <p className="eko-create__3dnote">
+                Your hustle starts somewhere. Where's home?
+              </p>
+              {cities.length > 0 ? (
+                <CityPicker
+                  cities={cities}
+                  selectedId={cityId}
+                  onSelect={setCityId}
+                />
+              ) : (
+                <div
+                  className="eko-create__loading"
+                  aria-label="Loading cities"
+                >
+                  <Skeleton height={102} />
+                  <Skeleton height={102} />
+                </div>
+              )}
             </section>
 
             <section aria-labelledby="cc-look">
@@ -376,10 +420,10 @@ export function CreateCharacter({
               loading={busy}
               className="eko-create__submit"
             >
-              Start my Lagos story
+              {`Start in ${selectedCityName} →`}
             </Button>
             <p className="eko-create__fineprint">
-              One character per account. Choose wisely — Lagos remembers.
+              One character per account. Choose wisely — your city remembers.
             </p>
           </form>
         )}
