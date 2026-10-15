@@ -33,11 +33,22 @@ import { NEWS_CACHE_MS } from './db.js';
 import { createCashWalletRouter } from './routes/cashWallet.js';
 import { createCashFlowsRouter } from './routes/cashFlows.js';
 import { createCashAdminRouter } from './routes/cashAdmin.js';
+// Express 4 async safety: patch Router.prototype once at boot so every
+// async route handler auto-forwards rejections to error middleware.
+import { patchExpressAsync } from './lib/asyncHandler.js';
+
+patchExpressAsync();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export async function createApp() {
   await initDb();
+
+  // Migrations (2026-10-15): idempotent schema migrations run after the
+  // legacy inline schema. New installs apply them; existing installs skip
+  // via the meta-table record. See server/migrations/README.md.
+  const { runMigrations } = await import('../migrations/runner.js');
+  await runMigrations();
 
   // Fintech foundation (M5/M6a): idempotent seeding of the chart of
   // accounts and the v1 fee policy. Uses INSERT OR IGNORE / ON CONFLICT
