@@ -23,6 +23,8 @@ export interface ApiLocation {
   tags?: string[];
   /** M3: travel fare in naira (optional). */
   fare?: number;
+  /** Home City V1: city ids where this venue appears; absent = everywhere. */
+  cities?: string[];
   lat?: number;
   lng?: number;
   x?: number;
@@ -54,6 +56,8 @@ export interface JobInfo {
   cooldownSec: number;
   certRequired?: boolean;
   icon: string;
+  /** Home City V1: city ids where this job is offered; absent = everywhere. */
+  cities?: string[];
 }
 
 export interface FoodInfo {
@@ -253,6 +257,8 @@ export interface GameConfig {
   floors?: WallFloorOption[];
   /** Phase 5: venue activities — flat list; match against a location's tags. */
   venueActivities?: VenueActivity[];
+  /** Home City V1: playable city summaries (optional until the server lands). */
+  cities?: CityInfo[];
 }
 
 /**
@@ -313,6 +319,7 @@ export function normalizeConfig(raw: Record<string, unknown> | undefined): GameC
     walls: asList(r.walls as GameConfig["walls"]),
     floors: asList(r.floors as GameConfig["floors"]),
     venueActivities: asList(r.venueActivities as GameConfig["venueActivities"]),
+    cities: asList(r.cities as GameConfig["cities"]),
   };
 }
 
@@ -320,6 +327,18 @@ export function normalizeConfig(raw: Record<string, unknown> | undefined): GameC
 export function asList<T>(v: T[] | Record<string, T> | undefined | null): T[] {
   if (!v) return [];
   return Array.isArray(v) ? v : Object.values(v);
+}
+
+/** Home City V1: a playable Nigerian city. */
+export interface CityInfo {
+  id: string;
+  name: string;
+  state: string;
+  tagline: string;
+  emoji: string;
+  starting_cash?: number;
+  pay_mult?: number;
+  cost_mult?: number;
 }
 
 /** Authoritative character state (GET /api/me). */
@@ -367,6 +386,12 @@ export interface Me {
   customized?: boolean;
   /** M15: staged 3D avatar look (server contract: character.avatar_look). */
   avatar_look?: AvatarLook | null;
+  /** Home City V1: origin city id (e.g. 'lagos'). */
+  homeCity?: string;
+  /** Home City V1: city the player is currently in. */
+  currentCity?: string;
+  /** Home City V1: summary of the current city. */
+  city?: CityInfo | null;
 }
 
 export interface PublicStats {
@@ -591,6 +616,8 @@ export const api = {
       color: string;
       /** M15: staged 3D look (sanitized client-side; server re-validates). */
       avatar_look?: AvatarLook;
+      /** Home City V1: home city id (server validates; UI picker lands later). */
+      city?: string;
     }
   ) =>
     request<{ ok: boolean; character?: Me }>("/api/characters", {
@@ -600,6 +627,29 @@ export const api = {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(body),
+    }),
+  /**
+   * Home City V1: inter-city travel. mode is 'bus' | 'flight'; the server
+   * deducts the fare from gameplay coins and moves the character.
+   */
+  travelCity: (
+    token: string,
+    city: string,
+    mode: "bus" | "flight" = "bus"
+  ) =>
+    request<{
+      ok: boolean;
+      fare: number;
+      mode: string;
+      city: CityInfo;
+      character?: Me;
+    }>("/api/travel/city", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ city, mode }),
     }),
   /** M3 money ledger — newest first. The server wraps rows in `{transactions}`. */
   transactions: (token: string, limit = 50) =>
