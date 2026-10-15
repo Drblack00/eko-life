@@ -8,7 +8,7 @@ import {
   type BillboardCreative,
 } from "./billboardCanvas";
 import {
-  districtLabelsForCity,
+  DISTRICT_LABELS,
   DISTRICT_WORLD_H,
   PIN_LABEL_ZOOM_DIST,
   PIN_PILL_DY,
@@ -250,12 +250,9 @@ function xg(
 export function CityMap({
   pins,
   onPinSelect,
-  cityId,
 }: {
   pins: PinLocation[];
   onPinSelect: (pin: PinLocation) => void;
-  /** Home City V1: district label pack id (default 'lagos'). */
-  cityId?: string;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -263,11 +260,7 @@ export function CityMap({
   const selectRef = useRef(onPinSelect);
   /** Assigned by the mount effect; lets the pin layer refresh when `pins` changes. */
   const rebuildRef = useRef<((list: PinLocation[]) => void) | null>(null);
-  /** Home City V1: rebuilds district labels for the current cityId. */
-  const districtRebuildRef = useRef<(() => void) | null>(null);
-  const cityRef = useRef(cityId);
   pinsRef.current = pins;
-  cityRef.current = cityId;
   selectRef.current = onPinSelect;
 
   useEffect(() => {
@@ -297,23 +290,7 @@ export function CityMap({
 
     function buildScene(billboards: BillboardSpec[]) {
     const scene = new THREE.Scene();
-    // Realistic sky: vertical gradient.
-    {
-      const sc = document.createElement("canvas");
-      sc.width = 4; sc.height = 256;
-      const sx = sc.getContext("2d")!;
-      const grad = sx.createLinearGradient(0, 0, 0, 256);
-      grad.addColorStop(0, "#7fb2e5");
-      grad.addColorStop(0.55, "#bcd6ef");
-      grad.addColorStop(0.8, "#e8eef2");
-      grad.addColorStop(1, "#f5f0e6");
-      sx.fillStyle = grad;
-      sx.fillRect(0, 0, 4, 256);
-      const skyTex = new THREE.CanvasTexture(sc);
-      skyTex.colorSpace = THREE.SRGBColorSpace;
-      scene.background = skyTex;
-    }
-    scene.fog = new THREE.Fog(0xd4dee8, 130, 280);
+    scene.background = new THREE.Color(0xbfdbfe);
     scene.fog = new THREE.Fog(0xbfdbfe, 220, 420);
 
     let renderer: THREE.WebGLRenderer;
@@ -339,10 +316,6 @@ export function CityMap({
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
     hostEl.appendChild(renderer.domElement);
 
     const camera = new THREE.PerspectiveCamera(42, 1, 1, 800);
@@ -373,14 +346,6 @@ export function CityMap({
     scene.add(new THREE.HemisphereLight(0xe0f2fe, 0x86a860, 0.9));
     const sun = new THREE.DirectionalLight(0xfff7e6, 1.6);
     sun.position.set(-60, 120, 40);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -110;
-    sun.shadow.camera.right = 110;
-    sun.shadow.camera.top = 110;
-    sun.shadow.camera.bottom = -110;
-    sun.shadow.camera.far = 400;
-    sun.shadow.bias = -0.0005;
     scene.add(sun);
 
     // Seabed / base
@@ -389,7 +354,6 @@ export function CityMap({
       new THREE.MeshStandardMaterial({ color: 0xc2b280, roughness: 1 })
     );
     base.position.y = -2;
-    base.receiveShadow = true;
     scene.add(base);
 
     // Lagoon water (animated vertices)
@@ -401,7 +365,7 @@ export function CityMap({
     );
     waterGeo.rotateX(-Math.PI / 2);
     const waterMat = new THREE.MeshStandardMaterial({
-      color: 0x00b4d8,
+      color: 0x0ea5e9,
       roughness: 0.35,
       metalness: 0.15,
       transparent: true,
@@ -413,11 +377,11 @@ export function CityMap({
     const waterBase = waterGeo.attributes.position.array.slice();
 
     const landMat = new THREE.MeshStandardMaterial({
-      color: 0x22c55e,
+      color: 0x4ade80,
       roughness: 1,
     });
     const landMat2 = new THREE.MeshStandardMaterial({
-      color: 0x16a34a,
+      color: 0x38c173,
       roughness: 1,
     });
 
@@ -457,9 +421,6 @@ export function CityMap({
       { x: 52, z: 8, r: 8 }, // hospital
       { x: -58, z: -44, r: 6 }, // school
       { x: 28, z: 41, r: 13 }, // market row
-      { x: -30, z: -60, r: 10 }, // church
-      { x: 55, z: -50, r: 10 }, // mosque
-      { x: -20, z: 55, r: 15 }, // danfo park
     ];
 
     /** True when a spot of radius `pad` is free of pins, billboards, roads, landmarks. */
@@ -492,7 +453,7 @@ export function CityMap({
     }
 
     // ---- Buildings: warm houses with pyramid roofs ----
-    const HOUSE_N = 140;
+    const HOUSE_N = 90;
     const houseGeo = new THREE.BoxGeometry(1, 1, 1);
     const houseMat = new THREE.MeshStandardMaterial({ roughness: 0.95 });
     const houses = new THREE.InstancedMesh(houseGeo, houseMat, HOUSE_N);
@@ -500,8 +461,8 @@ export function CityMap({
     roofGeo.rotateY(Math.PI / 4); // square pyramid, edges axis-aligned
     const roofMat = new THREE.MeshStandardMaterial({ roughness: 0.95 });
     const roofs = new THREE.InstancedMesh(roofGeo, roofMat, HOUSE_N);
-    const housePalette = [0xf2d492, 0xf4a259, 0xfdf0d5, 0xe9c46a, 0xf6bd60];
-    const roofPalette = [0xff6b6b, 0x4ecdc4, 0xffd93d, 0xa78bfa];
+    const housePalette = [0xe8cf9f, 0xc97b4e, 0xf6ecd9, 0xd9a05b, 0xe4b183];
+    const roofPalette = [0xb4502e, 0x8f4a2f, 0x6e4423, 0xa85b32];
     let hp = 0;
     let guard = 0;
     while (hp < HOUSE_N && guard++ < 6000) {
@@ -532,17 +493,15 @@ export function CityMap({
     dummy.rotation.set(0, 0, 0);
     finalizeInstances(houses, hp);
     finalizeInstances(roofs, hp);
-    houses.castShadow = true;
-    roofs.castShadow = true;
 
     // ---- Mid-rise blocks (pale, subtle variation) ----
-    const MID_N = 95;
+    const MID_N = 60;
     const mids = new THREE.InstancedMesh(
       new THREE.BoxGeometry(1, 1, 1),
       new THREE.MeshStandardMaterial({ roughness: 0.9 }),
       MID_N
     );
-    const midPalette = [0xffffff, 0xe0f2fe, 0xfff7e6, 0xfce4ec, 0xe8f5e9, 0xfff3e0];
+    const midPalette = [0xf8fafc, 0xe9eef3, 0xf3e9d7, 0xdfe8f2, 0xf5e6c4];
     let mp = 0;
     guard = 0;
     while (mp < MID_N && guard++ < 6000) {
@@ -565,10 +524,9 @@ export function CityMap({
     }
     dummy.rotation.set(0, 0, 0);
     finalizeInstances(mids, mp);
-    mids.castShadow = true;
 
-    // ---- Glass towers (island skyline + a mainland cluster) ----
-    const TOWER_N = 14;
+    // ---- Glass towers (island skyline) ----
+    const TOWER_N = 8;
     const towers = new THREE.InstancedMesh(
       new THREE.BoxGeometry(1, 1, 1),
       new THREE.MeshStandardMaterial({
@@ -577,19 +535,11 @@ export function CityMap({
       }),
       TOWER_N
     );
-    const towerPalette = [0x38bdf8, 0x4ecdc4, 0xffd93d, 0xff6b6b, 0xa78bfa];
-    // Window strips wrapping each tower (dark glass bands per floor).
-    const winStrips = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshStandardMaterial({ color: 0x14324a, roughness: 0.25, metalness: 0.5 }),
-      TOWER_N * 6
-    );
-    let wsp = 0;
+    const towerPalette = [0x7dd3fc, 0x38bdf8, 0xa5d8ff, 0x5eb3e8];
     let twp = 0;
     guard = 0;
     while (twp < TOWER_N && guard++ < 2000) {
-      // 70% island skyline, 30% mainland cluster (Ikeja).
-      const x = rand() < 0.7 ? scatterX(1) : scatterX(-1);
+      const x = scatterX(1); // island only
       const z = scatterZ(24);
       if (!spotClear(x, z, 5.5)) continue;
       const w = 6 + rand() * 3;
@@ -602,19 +552,9 @@ export function CityMap({
       towers.setMatrixAt(twp, dummy.matrix);
       col.setHex(towerPalette[(rand() * towerPalette.length) | 0]);
       towers.setColorAt(twp, col);
-      // 6 window bands up the tower faces.
-      for (let f = 0; f < 6 && wsp < TOWER_N * 6; f++) {
-        const fy = 3 + 2 + (f * (h - 3)) / 6;
-        dummy.position.set(x, fy, z);
-        dummy.scale.set(w * 1.02, 0.9, d * 1.02);
-        dummy.updateMatrix();
-        winStrips.setMatrixAt(wsp++, dummy.matrix);
-      }
       twp++;
     }
     finalizeInstances(towers, twp);
-    finalizeInstances(winStrips, wsp);
-    towers.castShadow = true;
 
     // ---- Roads: gray avenues with dashed center lines ----
     const roadMat = new THREE.MeshStandardMaterial({
@@ -644,84 +584,6 @@ export function CityMap({
       dashes.setMatrixAt(i, dummy.matrix);
     });
     finalizeInstances(dashes, dashPositions.length);
-
-    // ---- Street life: danfo buses + cars cruising the avenues ----
-    // Two instanced meshes (bodies + window bands) share per-frame matrices.
-    const VEH_N = 26;
-    const vehs = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.25 }),
-      VEH_N
-    );
-    const vehWins = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.3, metalness: 0.4 }),
-      VEH_N
-    );
-    const vehPalette = [0xef4444, 0x3b82f6, 0xf8fafc, 0x1f2937, 0x22c55e, 0x0ea5e9];
-    const vehData: Array<{
-      x: number;
-      z: number;
-      speed: number;
-      dir: 1 | -1;
-      len: number;
-      h: number;
-      danfo: boolean;
-    }> = [];
-    for (let i = 0; i < VEH_N; i++) {
-      const side = i % 2 === 0 ? -1 : 1;
-      const danfo = rand() < 0.45;
-      const dir = (rand() < 0.5 ? 1 : -1) as 1 | -1;
-      // Two lanes per avenue, offset from the center line.
-      vehData.push({
-        x: side * ROAD_X + (dir === 1 ? 1.7 : -1.7),
-        z: (rand() - 0.5) * 150,
-        speed: (danfo ? 7 : 11) + rand() * 4,
-        dir,
-        len: danfo ? 7.5 : 4.2,
-        h: danfo ? 2.7 : 1.8,
-        danfo,
-      });
-      col.setHex(danfo ? 0xf5b301 : vehPalette[(rand() * vehPalette.length) | 0]);
-      vehs.setColorAt(i, col);
-    }
-    scene.add(vehs);
-    scene.add(vehWins);
-
-    // ---- Streetlights along both avenues ----
-    const LIGHT_N = 24;
-    const poles = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.12, 0.17, 7, 6),
-      new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.7 }),
-      LIGHT_N
-    );
-    const lamps = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(0.45, 8, 8),
-      new THREE.MeshStandardMaterial({
-        color: 0xfef9c3,
-        emissive: 0xfde047,
-        emissiveIntensity: 0.55,
-        roughness: 0.4,
-      }),
-      LIGHT_N
-    );
-    let lip = 0;
-    for (const side of [-1, 1] as const) {
-      for (let z = -77; z <= 77 && lip < LIGHT_N; z += 14) {
-        const x = side * (ROAD_X + 4.8);
-        dummy.rotation.set(0, 0, 0);
-        dummy.scale.set(1, 1, 1);
-        dummy.position.set(x, 3 + 3.5, z);
-        dummy.updateMatrix();
-        poles.setMatrixAt(lip, dummy.matrix);
-        dummy.position.set(x - side * 1.1, 3 + 6.9, z);
-        dummy.updateMatrix();
-        lamps.setMatrixAt(lip, dummy.matrix);
-        lip++;
-      }
-    }
-    finalizeInstances(poles, lip);
-    finalizeInstances(lamps, lip);
 
     // ---- Bridges over the lagoon (merged deck + rails + pillars) ----
     const bridgeMat = new THREE.MeshStandardMaterial({
@@ -842,43 +704,6 @@ export function CityMap({
       finalizeInstances(posts, stallZ.length * 4);
       finalizeInstances(awnings, stallZ.length);
     }
-    // Church: white nave + pitched roof + steeple with a gold cross
-    {
-      const roof = new THREE.ConeGeometry(1, 1, 4);
-      roof.rotateY(Math.PI / 4);
-      const parts = [
-        paint(xg(new THREE.BoxGeometry(8, 5, 12), -30, 5.5, -60), 0xffffff),
-        paint(xg(roof, -30, 9.4, -60, 6.6, 2.8, 9.6), 0xb4502e),
-        paint(xg(new THREE.BoxGeometry(3, 9, 3), -30, 7.5, -52.5), 0xf8fafc),
-        paint(xg(new THREE.ConeGeometry(1, 1, 4).rotateY(Math.PI / 4), -30, 13.6, -52.5, 2.7, 2.4, 2.7), 0x8f4a2f),
-        paint(xg(new THREE.BoxGeometry(0.28, 1.7, 0.28), -30, 15.6, -52.5), 0xfbbf24),
-        paint(xg(new THREE.BoxGeometry(1, 0.28, 0.28), -30, 15.7, -52.5), 0xfbbf24),
-      ];
-      scene.add(new THREE.Mesh(mergeGeometries(parts, false)!, landmarkMat));
-    }
-    // Mosque: sand prayer hall + green dome + minaret
-    {
-      const dome = new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-      const parts = [
-        paint(xg(new THREE.BoxGeometry(10, 5, 10), 55, 5.5, -50), 0xf5e6c4),
-        paint(xg(dome, 55, 8, -50, 4.4, 3.6, 4.4), 0x16a34a),
-        paint(xg(new THREE.CylinderGeometry(0.9, 1.1, 14, 8), 62.5, 10, -50), 0xf5e6c4),
-        paint(xg(new THREE.ConeGeometry(1, 1, 8), 62.5, 18.4, -50, 1.5, 2, 1.5), 0x16a34a),
-      ];
-      scene.add(new THREE.Mesh(mergeGeometries(parts, false)!, landmarkMat));
-    }
-    // Danfo park: paved lot with 5 parked yellow danfos
-    {
-      const parts: THREE.BufferGeometry[] = [
-        paint(xg(new THREE.BoxGeometry(28, 0.5, 15), -20, 3.2, 55), 0x9ca3af),
-      ];
-      for (let i = 0; i < 5; i++) {
-        const dx = -30 + i * 5.2;
-        parts.push(paint(xg(new THREE.BoxGeometry(4.2, 2.6, 2.4), dx, 4.8, 55), 0xf5b301));
-        parts.push(paint(xg(new THREE.BoxGeometry(4.25, 0.9, 2.45), dx, 5.7, 55), 0x1f2937));
-      }
-      scene.add(new THREE.Mesh(mergeGeometries(parts, false)!, landmarkMat));
-    }
 
     // Palm trees — instanced cones (existing look)
     const treeGeo = new THREE.ConeGeometry(1.6, 5, 6);
@@ -886,7 +711,7 @@ export function CityMap({
       color: 0x16a34a,
       roughness: 1,
     });
-    const TREES = 110;
+    const TREES = 70;
     const trees = new THREE.InstancedMesh(treeGeo, treeMat, TREES);
     let tp = 0;
     guard = 0;
@@ -906,7 +731,7 @@ export function CityMap({
     finalizeInstances(trees, tp);
 
     // Leafy trees — instanced trunks + icosahedron canopies
-    const LEAFY = 85;
+    const LEAFY = 55;
     const trunkGeo = new THREE.CylinderGeometry(0.35, 0.55, 2.6, 6);
     const trunkMat = new THREE.MeshStandardMaterial({ roughness: 1 });
     const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, LEAFY);
@@ -963,9 +788,6 @@ export function CityMap({
       ["HOSPITAL", 52, 14.5, 8],
       ["SCHOOL", -58, 13, -44],
       ["MARKET", 28, 11.5, 41],
-      ["CHURCH", -30, 14.5, -60],
-      ["MOSQUE", 55, 14.5, -50],
-      ["DANFO PARK", -20, 11.5, 55],
     ];
     for (const [text, x, y, z] of landmarkLabels) {
       const tex = makeLabelTexture(text);
@@ -991,7 +813,7 @@ export function CityMap({
       }
       districtGroup.clear();
       const colors = resolvePillColors(readThemeVar);
-      for (const d of districtLabelsForCity(cityRef.current)) {
+      for (const d of DISTRICT_LABELS) {
         const tex = makePillTexture(d.name, colors);
         const spr = new THREE.Sprite(
           new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false })
@@ -1008,7 +830,6 @@ export function CityMap({
       }
     };
     buildDistrictLabels();
-    districtRebuildRef.current = buildDistrictLabels;
 
     // Sailboats on the lagoon — merged hull + mast + triangular sail each
     const boats: THREE.Mesh[] = [];
@@ -1023,7 +844,7 @@ export function CityMap({
     sailShape.lineTo(1.8, 0.4);
     sailShape.closePath();
     const hullPalette = [0xef4444, 0x3b82f6, 0x22c55e, 0xf59e0b, 0xf8fafc, 0xf97316];
-    const boatZ = [-68, -52, -34, -16, 2, 18, 34, 50, 64, 76];
+    const boatZ = [-62, -32, -14, 10, 28, 58];
     boatZ.forEach((z0, i) => {
       const parts = [
         paint(xg(new THREE.BoxGeometry(3.6, 1.1, 1.6), 0, 0.55, 0), hullPalette[i]),
@@ -1263,13 +1084,10 @@ export function CityMap({
     // Animation
     const clock = new THREE.Clock();
     let raf = 0;
-    let lastT = 0;
     const render = () => renderer.render(scene, camera);
     const animate = () => {
       raf = requestAnimationFrame(animate);
       const t = clock.getElapsedTime();
-      const dt = Math.min(Math.max(t - lastT, 0), 0.05);
-      lastT = t;
       if (!reducedMotion) {
         // Water shimmer
         const pos = waterGeo.attributes.position;
@@ -1295,24 +1113,6 @@ export function CityMap({
           b.rotation.z = Math.sin(t * 1.1 + i) * 0.05;
           b.rotation.y = Math.sin(t * 0.2 + ph) * 0.3;
         });
-        // Danfos + cars cruise the avenues (wrap around at the map edges)
-        for (let i = 0; i < vehData.length; i++) {
-          const v = vehData[i];
-          v.z += v.speed * v.dir * dt;
-          if (v.z > 86) v.z = -86;
-          else if (v.z < -86) v.z = 86;
-          dummy.rotation.set(0, 0, 0);
-          dummy.position.set(v.x, 3.35 + v.h / 2, v.z);
-          dummy.scale.set(2.6, v.h, v.len);
-          dummy.updateMatrix();
-          vehs.setMatrixAt(i, dummy.matrix);
-          dummy.position.set(v.x, 3.35 + v.h * 0.7, v.z);
-          dummy.scale.set(2.62, v.h * 0.32, v.len * 0.62);
-          dummy.updateMatrix();
-          vehWins.setMatrixAt(i, dummy.matrix);
-        }
-        vehs.instanceMatrix.needsUpdate = true;
-        vehWins.instanceMatrix.needsUpdate = true;
         controls.update();
       }
       render();
@@ -1344,7 +1144,6 @@ export function CityMap({
     return () => {
       cancelled = true;
       rebuildRef.current = null;
-      districtRebuildRef.current = null;
       for (const fn of cleanups.splice(0)) {
         try {
           fn();
@@ -1361,11 +1160,6 @@ export function CityMap({
   useEffect(() => {
     rebuildRef.current?.(pins);
   }, [pins]);
-
-  // Home City V1: swap the district-label pack when the player's city changes.
-  useEffect(() => {
-    districtRebuildRef.current?.();
-  }, [cityId]);
 
   return (
     <div className="eko-citymap" ref={hostRef} role="img" aria-label="3D toy city of Lagos with clickable location pins">
