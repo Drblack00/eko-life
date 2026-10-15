@@ -19,6 +19,7 @@ import {
   AVATAR_TOP_COLORS, AVATAR_BOTTOM_COLORS, DEFAULT_AVATAR, WALLS, FLOORS,
   cleanText, DAY_MS,
 } from '../game/data.js';
+import { cityIds, citySummary, allCityVenues, allCityJobs } from '../game/cities.js';
 import { decayTick, distUnits, applyDayEconomy } from '../game/sim.js';
 import { handleAct, settleDayRent, settleDayEconomy, collectSpawn } from '../game/actions.js';
 // M5: elections + social layer
@@ -168,6 +169,8 @@ export function createHub({ getDay }) {
       loan_free: !!Number(c.loan_free),
       cert: Number(c.cert),
       locationId: c.location_id,
+      homeCity: c.home_city || 'lagos',
+      currentCity: c.current_city || 'lagos',
       x: conn.pos.lat,
       y: conn.pos.lng,
       lat: conn.pos.lat,
@@ -298,7 +301,10 @@ export function createHub({ getDay }) {
       endsIn,
       chat: chatHist,
       config: {
-        classes: CLASSES, locations: LOCATIONS, jobs: JOBS,
+        // Home City V1: city summaries + city-scoped venues/jobs merged in
+        // (mirrors GET /api/config).
+        cities: cityIds().map(citySummary),
+        classes: CLASSES, locations: [...LOCATIONS, ...allCityVenues()], jobs: [...JOBS, ...allCityJobs()],
         food: FOOD, fun: FUN, housing: HOUSING, spawn: SPAWN, bounds: WORLD_BOUNDS,
         properties: PROPERTIES, biz: BIZ, vehicles: VEHICLES, furn: FURN,
         homeSlots: HOME_SLOTS, bank: BANK, travelFares: TRAVEL_FARES, studyCost: STUDY_COST,
