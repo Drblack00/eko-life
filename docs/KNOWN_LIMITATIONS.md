@@ -41,7 +41,12 @@ item names what must still be checked and by whom.
   `listRoster`) have never executed. The **first production deploy must run the
   post-deploy smoke test** in `docs/DEPLOY.md` (register → login → act →
   `/api/health` reports `db:"postgres"`).
-- **Not deployed.** No deploy was performed in M6 (the user's call). The Render
+- **Deployed (updated 2026-10-15).** The "Not deployed" note below is stale —
+  the game has been deployed to Render many times since M6 and is live at
+  https://ekolife.onrender.com. `/api/health` returns 200 with `"db":"postgres"`
+  and startup logs confirm `[db] PostgreSQL connected`, so the PG data path
+  runs in production. Free-tier cold starts (~30–60s) remain unmeasured.
+- **Not deployed (M6, stale).** No deploy was performed in M6 (the user's call). The Render
   Blueprint (`render.yaml`) was re-verified against the repo layout and
   `npm run build:web` works from the repo root, but no build has run on Render
   yet. Free-tier cold starts (~30–60s) are unmeasured.
