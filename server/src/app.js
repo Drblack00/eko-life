@@ -65,7 +65,10 @@ export async function createApp() {
   // HMAC verification. Harmless for every other route (parsed body is
   // unchanged).
   app.use(express.json({
-    limit: '32kb',
+    // 1mb: contest entry photos arrive as data URLs (server caps them at
+    // 512KB in the contests router). Still conservative; everything else
+    // sends tiny JSON.
+    limit: '1mb',
     verify: (req, _res, buf) => { req.rawBody = buf; },
   }));
 
