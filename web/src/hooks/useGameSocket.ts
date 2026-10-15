@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "../components";
 import { normalizeConfig, type GameConfig } from "../lib/api";
+import { markCloudSaveDirty } from "../lib/cloudSave";
 import type {
   ActName,
   ChatEntry,
@@ -546,6 +547,14 @@ export function useGameSocket(token: string | null): GameSocket {
   /** Server-authoritative total (`{t:'dm_unread', n}`) — null until first push. */
   const [dmTotal, setDmTotal] = useState<number | null>(null);
   const [blocked, setBlocked] = useState<Record<number, string>>(loadBlocked);
+
+  // Cloud saves: when the server wins a sync conflict (or a fresh login
+  // pulls a newer blocked map), refresh in-memory state from localStorage.
+  useEffect(() => {
+    const refresh = () => setBlocked(loadBlocked());
+    window.addEventListener("eko:cloud-save-applied", refresh);
+    return () => window.removeEventListener("eko:cloud-save-applied", refresh);
+  }, []);
 
   // --- M21: notifications ---
   const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
@@ -1477,6 +1486,7 @@ export function useGameSocket(token: string | null): GameSocket {
         }
         return next;
       });
+      markCloudSaveDirty();
       sendSocial("block", { playerId });
     },
     [sendSocial]
@@ -1493,6 +1503,7 @@ export function useGameSocket(token: string | null): GameSocket {
         }
         return next;
       });
+      markCloudSaveDirty();
       sendSocial("unblock", { playerId });
     },
     [sendSocial]
