@@ -1,0 +1,468 @@
+/* Crews — player clans phone app. Dense, information-first; tokens only. */
+
+.eko-crews {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: var(--space-4);
+}
+
+/* ---- header ---- */
+.eko-crews__hd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.eko-crews__hd b {
+  font-size: 15px;
+}
+
+.eko-crews__back {
+  font-size: 20px;
+  line-height: 1;
+  padding: 2px 8px 2px 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.eko-crews__sort {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+}
+
+.eko-crews__new {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ---- section headers ---- */
+.eko-crews__sec {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  padding: 10px 14px 4px;
+}
+
+/* ---- dense rows ---- */
+.eko-crews__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.eko-crews__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.eko-crews__row--mine {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.eko-crews__crest {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  border: none;
+  color: var(--neutral-0);
+  cursor: pointer;
+  padding: 0;
+}
+
+button.eko-crews__main {
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.eko-crews__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.eko-crews__name {
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eko-crews__meta {
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.eko-crews__xp {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--primary);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.eko-crews__join {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.eko-crews__join:disabled {
+  opacity: 0.5;
+}
+
+.eko-crews__member-badge {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* ---- detail header ---- */
+.eko-crews__dhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px 2px;
+}
+
+.eko-crews__dhead h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.eko-crews__dhead span.eko-crews__crest {
+  cursor: default;
+}
+
+/* ---- tabs ---- */
+.eko-crews__tabs {
+  display: flex;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  margin-top: var(--space-2);
+}
+
+.eko-crews__tabs button {
+  flex: 1;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 10px 2px;
+  color: var(--text-muted);
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.eko-crews__tabs button.on {
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+}
+
+/* ---- leaderboard ---- */
+.eko-crews__rank {
+  width: 24px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--accent);
+  text-align: center;
+  flex: none;
+}
+
+.eko-crews__up {
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.eko-crews__down {
+  color: var(--danger);
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* ---- goal card ---- */
+.eko-crews__goalbox {
+  margin: 8px 14px 0;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  border-radius: var(--radius-md);
+}
+
+.eko-crews__bar {
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.eko-crews__bar > i {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--primary), var(--lagoon-500));
+}
+
+.eko-crews__goalmeta {
+  margin-top: 6px;
+}
+
+.eko-crews__cta {
+  margin: 10px 14px 0;
+}
+
+.eko-crews__contribute {
+  width: 100%;
+  background: var(--accent);
+  color: var(--neutral-900);
+  font-weight: 800;
+  font-size: 13px;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 11px;
+  cursor: pointer;
+}
+
+.eko-crews__contribute:disabled {
+  opacity: 0.5;
+}
+
+/* ---- overview ---- */
+.eko-crews__overview {
+  padding: var(--space-3) 14px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.eko-crews__tagline {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.eko-crews__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.eko-crews__stats > div {
+  background: var(--surface-2);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+}
+
+.eko-crews__stats dt {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.eko-crews__stats dd {
+  margin: 2px 0 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.eko-crews__leave {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  background: none;
+  color: var(--danger);
+  cursor: pointer;
+}
+
+/* ---- states ---- */
+.eko-crews__notice {
+  margin: var(--space-2) 14px 0;
+  font-size: 12px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.eko-crews__loading,
+.eko-crews__empty {
+  padding: var(--space-4) 14px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.eko-crews__empty button {
+  margin-top: var(--space-2);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--accent);
+  color: var(--neutral-900);
+  cursor: pointer;
+}
+
+.eko-crews__error {
+  padding: var(--space-4) 14px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--danger);
+}
+
+.eko-crews__error button {
+  margin-top: var(--space-2);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--text) 20%, transparent);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* ---- dialogs ---- */
+.eko-crews__dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgb(0 0 0 / 0.5);
+}
+
+.eko-crews__dialog-box {
+  width: 100%;
+  max-width: 340px;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  box-shadow: var(--shadow-lg);
+}
+
+.eko-crews__dialog-box h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.eko-crews__dialog-box p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.eko-crews__dialog-box input {
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--text) 20%, transparent);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.eko-crews__icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.eko-crews__icons button {
+  font-size: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
+  background: var(--surface-2);
+  cursor: pointer;
+}
+
+.eko-crews__icons button.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.eko-crews__dialog-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.eko-crews__dialog-actions button {
+  flex: 1;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.eko-crews__dialog-actions button:first-child {
+  border: 1px solid color-mix(in srgb, var(--text) 20%, transparent);
+  background: none;
+  color: var(--text);
+}
+
+.eko-crews__dialog-actions button:last-child {
+  border: none;
+  background: var(--accent);
+  color: var(--neutral-900);
+}
+
+.eko-crews__dialog-actions button:disabled {
+  opacity: 0.5;
+}
