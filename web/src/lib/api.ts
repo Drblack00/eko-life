@@ -329,6 +329,8 @@ export interface Me {
   character_id?: number;
   username: string;
   name: string;
+  /** Cloud-save wiring: true for guest accounts (cloud sync stays local-only). */
+  is_guest?: boolean;
   /** Character panel: masked account email (null when the account has none). */
   email_masked?: string | null;
   class: string | null;
@@ -1112,6 +1114,85 @@ export const govApi = {
 };
 
 /* ------------------------------------------------------------------ */
+/* UGC Design Contests — duel voting, ranked leaderboard, 2-tap entry. */
+/* ------------------------------------------------------------------ */
+export interface ContestDesign {
+  emoji: string;
+  colors: [string, string];
+  blurb: string;
+}
+
+export interface ContestEntry {
+  id: number;
+  title: string;
+  design: ContestDesign;
+  username: string;
+  votes: number;
+  /** 0..1 — fraction of the leader's votes, drives the vote bar. */
+  share: number;
+  isMine: boolean;
+}
+
+export interface ContestSummary {
+  id: number;
+  title: string;
+  category: "outfit" | "apartment";
+  status: string;
+  endsAt: string;
+  daysLeft: number;
+  prizeText: string;
+  voteBudgetPerDay: number;
+  entryCount: number;
+  totalVotes: number;
+}
+
+export interface ContestDetail {
+  contest: ContestSummary;
+  entries: ContestEntry[];
+  votesLeft: number;
+  streak: number;
+}
+
+export interface DuelPair {
+  pair: [ContestEntry, ContestEntry] | null;
+  reason: string | null;
+  duelNo: number;
+  votesLeft: number;
+  streak: number;
+}
+
+export interface ContestVoteResult {
+  ok: boolean;
+  entryId: number;
+  votes: number;
+  votesLeft: number;
+  streak: number;
+}
+
+export const contestsApi = {
+  /** Active contests first, then past. */
+  list: (token: string) => authGet<ContestSummary[]>("/api/contests", token),
+  /** Ranked leaderboard + viewer's votes-left today + streak. */
+  detail: (token: string, id: number) =>
+    authGet<ContestDetail>(`/api/contests/${id}`, token),
+  /** Random head-to-head pair the viewer hasn't voted on. */
+  duel: (token: string, id: number) =>
+    authGet<DuelPair>(`/api/contests/${id}/duel`, token),
+  /** Tap-the-winner vote for one entry. */
+  vote: (token: string, id: number, entryId: number) =>
+    authPost<ContestVoteResult>(`/api/contests/${id}/vote`, token, {
+      entry_id: entryId,
+    }),
+  /** 2-tap entry submit: title + emoji/colors/blurb design. */
+  enter: (token: string, id: number, title: string, design: ContestDesign) =>
+    authPost<{ ok: boolean; entry: ContestEntry }>(
+      `/api/contests/${id}/entries`,
+      token,
+      { title, design }
+    ),
+};
+
+/* ------------------------------------------------------------------ */
 /* Phase 9 — Daily Gem Hunt: riddle clue + search current location.    */
 /* ------------------------------------------------------------------ */
 export interface GemState {
@@ -1140,4 +1221,252 @@ export const gemApi = {
   /** Search the player's current location for today's gem. */
   search: (token: string) =>
     authPost<GemSearchResult>("/api/gem/search", token, {}),
+};
+
+/* ------------------------------------------------------------------ */
+/* Crews: player clans — discover, create, join, shared goal, league.  */
+/* ------------------------------------------------------------------ */
+
+/** One crew in the discover list. */
+export interface CrewSummary {
+  id: string;
+  name: string;
+  tagline: string;
+  icon: string;
+  foundedAt: number;
+  memberCount: number;
+  weeklyXp: number;
+  totalXp: number;
+  rank: number;
+  myRole: string | null;
+}
+
+/** One member of a crew. */
+export interface CrewMember {
+  userId: number;
+  username: string;
+  role: string;
+  xp: number;
+  joinedAt: number;
+}
+
+/** The crew's active shared goal. */
+export interface CrewGoal {
+  title: string;
+  target: number;
+  raised: number;
+  pct: number;
+  endsAt: number;
+  daysLeft: number;
+}
+
+/** One row of the weekly league leaderboard. */
+export interface CrewBoardEntry {
+  id: string;
+  name: string;
+  icon: string;
+  memberCount: number;
+  weeklyXp: number;
+  rank: number;
+  movement: number;
+  isMine: boolean;
+}
+
+/** Full crew detail payload (GET /api/crews/:id). */
+export interface CrewDetail {
+  crew: CrewSummary;
+  goal: CrewGoal | null;
+  members: CrewMember[];
+  board: CrewBoardEntry[];
+  my: { crewId: string | null; role: string | null };
+}
+
+export type CrewSort = "active" | "members" | "xp";
+
+export const crewsApi = {
+  /** Discover crews, sorted (crews start empty until players create them). */
+  list: (token: string, sort: CrewSort = "active") =>
+    authGet<{ crews: CrewSummary[]; myCrewId: string | null; sort: CrewSort }>(
+      `/api/crews?sort=${sort}`,
+      token
+    ),
+  /** Create a crew (name 3–24 chars) — the creator becomes founder. */
+  create: (token: string, args: { name: string; tagline: string; icon: string }) =>
+    authPost<{ ok: boolean; crew: CrewSummary }>("/api/crews", token, args),
+  /** Full crew detail: info, members, shared goal, league board. */
+  detail: (token: string, id: string) =>
+    authGet<CrewDetail>(`/api/crews/${encodeURIComponent(id)}`, token),
+  /** Join a crew (one crew at a time). */
+  join: (token: string, id: string) =>
+    authPost<{ ok: boolean; crewId: string; notice?: string }>(
+      `/api/crews/${encodeURIComponent(id)}/join`,
+      token,
+      {}
+    ),
+  /** Leave a crew (last one out disbands it). */
+  leave: (token: string, id: string) =>
+    authPost<{ ok: boolean; disbanded?: boolean; notice?: string }>(
+      `/api/crews/${encodeURIComponent(id)}/leave`,
+      token,
+      {}
+    ),
+  /** Chip gameplay coins into the crew's shared goal. */
+  contribute: (token: string, id: string, amount: number) =>
+    authPost<{
+      ok: boolean;
+      raised: number;
+      target: number;
+      pct: number;
+      balance: number;
+      xpEarned: number;
+      notice?: string;
+    }>(`/api/crews/${encodeURIComponent(id)}/contribute`, token, { amount }),
+};
+
+/* ---------------- Story Questlines (chat-thread story arcs) ---------------- */
+
+export interface StoryChoice {
+  id: number;
+  label: string;
+  consequenceHint: string | null;
+  rewardCoins: number;
+  rewardXp: number;
+}
+
+export interface StoryScene {
+  id: number;
+  sceneNo: number;
+  speaker: string;
+  text: string;
+  choicePrompt: string | null;
+  choices: StoryChoice[];
+}
+
+export interface StoryChapter {
+  id: number;
+  chapterNo: number;
+  title: string;
+  locked: boolean;
+  scenes: StoryScene[];
+}
+
+export interface StoryListItem {
+  id: number;
+  title: string;
+  synopsis: string;
+  chaptersCount: number;
+  coverEmoji: string;
+  unread: number;
+  completed: boolean;
+  progress: { chapterNo: number; sceneNo: number } | null;
+}
+
+export interface StoryDetail {
+  story: {
+    id: number;
+    title: string;
+    synopsis: string;
+    chaptersCount: number;
+    coverEmoji: string;
+  };
+  completed: boolean;
+  progress: { chapterNo: number; sceneNo: number; completedAt: number | null } | null;
+  chapters: StoryChapter[];
+}
+
+export interface StoryAdvanceResult {
+  ok: boolean;
+  completed: boolean;
+  progress: { chapterNo: number; sceneNo: number };
+  reward: { coins: number; xp: number; leveledUp: boolean; skill: string; skillLevel: number };
+}
+
+export const storyApi = {
+  /** Story threads with per-user unread/progress badges. */
+  list: (token: string) => authGet<{ stories: StoryListItem[] }>("/api/stories", token),
+  /** Chapters + scenes up to the reader's progress. */
+  detail: (token: string, id: number) => authGet<StoryDetail>(`/api/stories/${id}`, token),
+  /** Tap a reply bubble (choiceId null = continue a narrative scene). */
+  advance: (token: string, id: number, chapterNo: number, sceneNo: number, choiceId: number | null) =>
+    authPost<StoryAdvanceResult>(`/api/stories/${id}/advance`, token, {
+      chapter_no: chapterNo,
+      scene_no: sceneNo,
+      choice_id: choiceId,
+    }),
+};
+
+/* ------------------------------------------------------------------ */
+/* Live Events Calendar — seasons, day-grouped timeline, RSVPs.        */
+/* ------------------------------------------------------------------ */
+export interface EventSeason {
+  tag: string;
+  title: string;
+  window: string;
+  blurb: string | null;
+  emoji: string;
+}
+
+export interface EventSummary {
+  id: string;
+  title: string;
+  emoji: string;
+  venue: string;
+  timeLabel: string;
+  startsAt: number;
+  endsAt: number;
+  isLive: boolean;
+  isRecurring: boolean;
+  recurringRule: string | null;
+  prizeText: string | null;
+  attendees: number;
+  myStatus: "going" | "remind" | null;
+}
+
+export interface EventDayGroup {
+  key: string;
+  label: string;
+  events: EventSummary[];
+}
+
+export interface EventDetailRow {
+  icon: string;
+  rich: string;
+}
+
+export interface EventDetail extends EventSummary {
+  details: EventDetailRow[];
+  seasonTag: string | null;
+}
+
+export interface EventAttendee {
+  username: string;
+  initials: string;
+}
+
+export const eventsApi = {
+  /** Upcoming events, grouped by day (server labels: TODAY · THU / SATURDAY / NEXT WEEK). */
+  list: (token: string) =>
+    authGet<{ now: number; seasons: EventSeason[]; days: EventDayGroup[] }>(
+      "/api/events",
+      token
+    ),
+  /** Event detail + attendee sample. */
+  detail: (token: string, id: string) =>
+    authGet<{ event: EventDetail; goingCount: number; attendees: EventAttendee[] }>(
+      `/api/events/${encodeURIComponent(id)}`,
+      token
+    ),
+  /** Join or remind — upserts the viewer's RSVP. */
+  rsvp: (token: string, id: string, status: "going" | "remind") =>
+    authPost<{ ok: boolean; myStatus: "going" | "remind"; attendees: number; goingCount: number }>(
+      `/api/events/${encodeURIComponent(id)}/rsvp`,
+      token,
+      { status }
+    ),
+  /** Cancel the viewer's RSVP. */
+  cancelRsvp: (token: string, id: string) =>
+    authDelete<{ ok: boolean; myStatus: null }>(
+      `/api/events/${encodeURIComponent(id)}/rsvp`,
+      token
+    ),
 };
