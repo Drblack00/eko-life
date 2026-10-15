@@ -102,7 +102,7 @@ test('negative amounts are rejected everywhere (bank / loan / repay)', async () 
   // nothing moved: DB is untouched by all four attempts
   const me = await get('/api/me', g.json.token);
   assert.equal(me.status, 200);
-  assert.equal(me.json.money, 5000);
+  assert.equal(me.json.money, 5000); // guest never customized: default character
   assert.equal(me.json.savings, 0);
   assert.equal(me.json.loan, 0);
   ws.close();
@@ -110,7 +110,8 @@ test('negative amounts are rejected everywhere (bank / loan / repay)', async () 
 
 test('double-spend race: two concurrent deposits → only one succeeds', async () => {
   const g = await post('/api/auth/guest', { ageConfirm: true });
-  // guest starts with exactly ₦5,000 cash — enough for ONE deposit of 5,000
+  // guest starts with exactly ₦5,000 cash (never customized)
+  // — enough for ONE deposit of 5,000
   const { ws, msgs } = await connect(g.json.token);
   const init = await waitFor(msgs, m => m.t === 'init');
   assert.equal(init.you.money, 5000);

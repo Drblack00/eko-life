@@ -121,7 +121,7 @@ test('M3 data: 60+ tagged locations, 10 jobs, 4+ career paths', () => {
   assert.ok(Object.keys(data.PROPERTIES).length >= 3);
   assert.ok(Object.keys(data.BIZ).length >= 3);
   assert.ok(Object.keys(data.VEHICLES).length >= 3);
-  assert.equal(Object.keys(data.FURN).length, 16); // M14: 6 original + 10 buy-mode items
+  assert.equal(Object.keys(data.FURN).length, 22); // M14: 6 original + 10 buy-mode items + 6 later additions
   assert.equal(data.HOME_SLOTS, 6);
 });
 
@@ -153,7 +153,7 @@ test('buy_biz: one business per player', async () => {
   const { ws, msgs } = await connectAs(A);
   act(ws, { a: 'buy_biz', biz: 'mamaput' }); // ₦50,000
   const got = await waitFor(msgs, m => m.t === 'you' && m.you.biz === 'mamaput');
-  assert.equal(got.you.money, 0);
+  assert.equal(got.you.money, 2000); // 52000 (silver_spoon + Lagos cash) - 50000
 
   act(ws, { a: 'buy_biz', biz: 'carwash' });
   const err = await waitFor(msgs, m => m.t === 'err' && /already own/i.test(m.text));
@@ -170,18 +170,18 @@ test('bank/loan/repay: math holds, validations reject junk', async () => {
 
   act(ws, { a: 'bank', op: 'deposit', amount: 20000 });
   let you = await waitFor(msgs, m => m.t === 'you' && m.you.savings === 20000);
-  assert.equal(you.you.money, 30000);
+  assert.equal(you.you.money, 32000); // 52000 - 20000
 
   act(ws, { a: 'bank', op: 'withdraw', amount: 5000 });
   you = await waitFor(msgs, m => m.t === 'you' && m.you.savings === 15000);
-  assert.equal(you.you.money, 35000);
+  assert.equal(you.you.money, 37000); // 32000 + 5000
 
   act(ws, { a: 'bank', op: 'deposit', amount: -100 });
   await waitFor(msgs, m => m.t === 'err' && /valid amount/i.test(m.text));
 
   act(ws, { a: 'loan', amount: 50000 });
   you = await waitFor(msgs, m => m.t === 'you' && m.you.loan === 50000);
-  assert.equal(you.you.money, 85000);
+  assert.equal(you.you.money, 87000); // 37000 + 50000 loan
 
   act(ws, { a: 'loan', amount: 1000 }); // none while outstanding
   await waitFor(msgs, m => m.t === 'err' && /repay your current loan/i.test(m.text));
@@ -191,12 +191,12 @@ test('bank/loan/repay: math holds, validations reject junk', async () => {
 
   act(ws, { a: 'repay', amount: 10000 });
   you = await waitFor(msgs, m => m.t === 'you' && m.you.loan === 40000);
-  assert.equal(you.you.money, 75000);
+  assert.equal(you.you.money, 77000); // 87000 - 10000 repay
 
   act(ws, { a: 'repay', amount: 999999 }); // clamps to outstanding loan
   you = await waitFor(msgs, m => m.t === 'you' && m.note && /fully repaid/i.test(m.note));
   assert.equal(you.you.loan, 0);
-  assert.equal(you.you.money, 35000);
+  assert.equal(you.you.money, 37000); // 77000 - 40000 repay
 
   const tx = await db.listTransactions(A.userId);
   const kinds = tx.map(t => t.kind);

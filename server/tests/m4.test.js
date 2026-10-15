@@ -76,14 +76,14 @@ async function streetSmartPlayer(username) {
 test('starter loan: street_smart claims exactly ₦10,000 at 0%, flag consumed', async () => {
   const token = await streetSmartPlayer('starter_one');
   const me0 = await get('/api/me', token);
-  assert.equal(me0.json.money, 5000);
+  assert.equal(me0.json.money, 7000); // street_smart (5000) + Lagos starting cash (2000)
 
   const { ws, msgs } = await connect(token);
   await waitFor(msgs, m => m.t === 'init');
   msgs.length = 0;
   ws.send(JSON.stringify({ t: 'act', a: 'loan', amount: 10000 }));
   const you = await waitFor(msgs, m => m.t === 'you' && m.note && m.note.includes('0% interest'));
-  assert.equal(you.you.money, 15000);
+  assert.equal(you.you.money, 17000); // 7000 + ₦10,000 starter loan
   assert.equal(you.you.loan, 10000);
   assert.equal(you.you.loan_free, true);
 

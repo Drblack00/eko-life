@@ -75,7 +75,7 @@ test('two clients connect and receive init', async () => {
   assert.ok(initA.you.username.startsWith('Guest_'));
   assert.equal(initA.day, 1);
   assert.ok(initA.config);
-  assert.equal(initA.config.locations.length, 68); // M3 world expansion
+  assert.equal(initA.config.locations.length, 86); // M3 (68) + Home City V1 (18)
 
   ({ ws: wsB, msgs: msgsB } = await connect(tokenB));
   const initB = await waitFor(msgsB, m => m.t === 'init');

@@ -52,8 +52,8 @@ test('GET /api/stats (public counters)', async () => {
 test('GET /api/config returns server-authoritative game data', async () => {
   const { status, json } = await get('/api/config');
   assert.equal(status, 200);
-  assert.equal(json.locations.length, 68); // M3 world expansion
-  assert.equal(json.jobs.length, 10);     // M3 job paths
+  assert.equal(json.locations.length, 86); // M3 world expansion (68) + Home City V1 (18)
+  assert.equal(json.jobs.length, 19);     // M3 job paths (10) + Home City V1 (9)
   assert.equal(json.food.length, 5);
   assert.equal(json.fun.length, 5);       // M3: +club_night
   assert.ok(json.classes.silver_spoon);

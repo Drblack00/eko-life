@@ -117,7 +117,7 @@ test('character creation: one-time only, class package applied', async () => {
   const ch = first.json.character;
   assert.equal(ch.name, 'SilverOne');
   assert.equal(ch.class, 'silver_spoon');
-  assert.equal(ch.money, 50000);          // silver_spoon package
+  assert.equal(ch.money, 52000);          // silver_spoon package (50000 + Lagos starting cash 2000)
   assert.equal(ch.housing, 'selfcon');
   assert.equal(ch.happiness, 70);         // 60 base + 10 class bonus
   assert.equal(ch.avatar, '😎');
@@ -138,7 +138,7 @@ test('character creation: one-time only, class package applied', async () => {
     name: 'Hustler', class: 'street_smart', avatar: '🧑', color: '#22d3ee',
   }, g2.json.token);
   assert.equal(ss.status, 200);
-  assert.equal(ss.json.character.money, 5000);
+  assert.equal(ss.json.character.money, 7000); // street_smart (5000) + Lagos starting cash (2000)
   assert.equal(ss.json.character.housing, 'face-me');
   assert.equal(ss.json.character.starter_loan_available, true);
 });
@@ -166,7 +166,7 @@ test('work: legacy instant work retired — points to 1-hour shifts', async () =
   assert.ok(err);
   // no money moved, no ledger row
   const c = await db.getCharacter(A.userId);
-  assert.equal(Number(c.money), 5000);
+  assert.equal(Number(c.money), 7000); // street_smart (5000) + Lagos starting cash (2000)
   const tx = await db.listTransactions(A.userId);
   assert.ok(!tx.find(t => t.kind === 'work_pay'));
   ws.close();
@@ -424,7 +424,7 @@ test('guest → register → create-character → WS act full flow', async () =>
   // play over WS
   const { ws, msgs, init } = await connectAs({ token });
   assert.equal(init.you.name, 'FullFlow');
-  assert.equal(init.you.money, 5000);
+  assert.equal(init.you.money, 7000); // street_smart + Lagos starting cash
   await act(msgs, ws, { a: 'travel', locationId: 'oshodi' });
   await waitFor(msgs, m => m.t === 'you' && m.you.locationId === 'oshodi');
   await act(msgs, ws, { a: 'shift_start', job: 'danfo_conductor' });
