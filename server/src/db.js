@@ -1051,6 +1051,34 @@ export async function initDb() {
     await ensureColumn('friendships', 'updated_ts', 'INTEGER NOT NULL DEFAULT 0', 'BIGINT NOT NULL DEFAULT 0');
     // Phase 4 (Èkó Reserve): unpaid weekly upkeep bills (no interest, no lockouts)
     await ensureColumn('characters', 'bill_arrears', 'INTEGER NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0');
+    // Home City V1: origin city + city the player is currently in
+    // (no-op on fresh DBs / when migration 010 already ran).
+    await ensureColumn('characters', 'home_city', "TEXT DEFAULT 'lagos'", "TEXT DEFAULT 'lagos'");
+    await ensureColumn('characters', 'current_city', "TEXT DEFAULT 'lagos'", "TEXT DEFAULT 'lagos'");
+    // Home City V1: cities table (migration 010 seeds it; IF NOT EXISTS
+    // keeps this safe to run alongside the migration on every boot).
+    await dbRun(
+      `CREATE TABLE IF NOT EXISTS cities (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        state TEXT NOT NULL,
+        tagline TEXT NOT NULL,
+        emoji TEXT NOT NULL DEFAULT '🏙️',
+        starting_cash INTEGER NOT NULL DEFAULT 5000,
+        pay_mult REAL NOT NULL DEFAULT 1,
+        cost_mult REAL NOT NULL DEFAULT 1
+      )`,
+      `CREATE TABLE IF NOT EXISTS cities (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        state TEXT NOT NULL,
+        tagline TEXT NOT NULL,
+        emoji TEXT NOT NULL DEFAULT '🏙️',
+        starting_cash INTEGER NOT NULL DEFAULT 5000,
+        pay_mult REAL NOT NULL DEFAULT 1,
+        cost_mult REAL NOT NULL DEFAULT 1
+      )`,
+      []);
     // Money columns → BIGINT on Postgres (int32 overflow seen in production
     // offline economy settlement; no-op on fresh DBs and SQLite).
     await ensurePgBigint('characters', 'money');
@@ -1104,6 +1132,24 @@ export async function initDb() {
     await ensureColumn('friendships', 'updated_ts', 'INTEGER NOT NULL DEFAULT 0', '');
     // Phase 4 (Èkó Reserve): unpaid weekly upkeep bills (no interest, no lockouts)
     await ensureColumn('characters', 'bill_arrears', 'INTEGER NOT NULL DEFAULT 0', '');
+    // Home City V1: origin city + current city (no-op on fresh DBs)
+    await ensureColumn('characters', 'home_city', "TEXT DEFAULT 'lagos'", '');
+    await ensureColumn('characters', 'current_city', "TEXT DEFAULT 'lagos'", '');
+    // Home City V1: cities table (migration 010 seeds it; IF NOT EXISTS keeps
+    // this safe to run alongside the migration on every boot).
+    await dbRun(
+      `CREATE TABLE IF NOT EXISTS cities (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        state TEXT NOT NULL,
+        tagline TEXT NOT NULL,
+        emoji TEXT NOT NULL DEFAULT '🏙️',
+        starting_cash INTEGER NOT NULL DEFAULT 5000,
+        pay_mult REAL NOT NULL DEFAULT 1,
+        cost_mult REAL NOT NULL DEFAULT 1
+      )`,
+      `SELECT 1`,
+      []);
     console.log(`[db] SQLite connected (${dbPath === ':memory:' ? 'in-memory' : 'local file'})`);
   }
 }
@@ -1307,6 +1353,7 @@ export async function saveCharacter(c) {
     appearanceRev, avatarLookJson, c.home_wall ?? null, c.home_floor ?? null,
     appearanceRev, appearanceRev,
     billArrears,
+    c.home_city || 'lagos', c.current_city || 'lagos',
     Date.now(), c.user_id];
   await runQ(
     `UPDATE characters SET name=?, class=?, avatar=?, color=?, money=?, energy=?, health=?,
@@ -1319,6 +1366,7 @@ export async function saveCharacter(c) {
       home_wall=?, home_floor=?,
       appearance_rev=CASE WHEN COALESCE(appearance_rev,0) <= ? THEN ? ELSE appearance_rev END,
       bill_arrears=?,
+      home_city=?, current_city=?,
       updated_at=? WHERE user_id=?`,
     `UPDATE characters SET name=$1, class=$2, avatar=$3, color=$4, money=$5, energy=$6, health=$7,
       happiness=$8, hunger=$9, housing=$10, property=$11, vehicle=$12, biz=$13, savings=$14, loan=$15,
@@ -1330,7 +1378,8 @@ export async function saveCharacter(c) {
       home_wall=$38, home_floor=$39,
       appearance_rev=CASE WHEN COALESCE(appearance_rev,0) <= $40 THEN $41 ELSE appearance_rev END,
       bill_arrears=$42,
-      updated_at=$43 WHERE user_id=$44`,
+      home_city=$43, current_city=$44,
+      updated_at=$45 WHERE user_id=$46`,
     params);
 }
 
