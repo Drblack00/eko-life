@@ -1,0 +1,285 @@
+/* Story Questlines — phone chat-thread UI (mockup story-option-c).
+   Theme tokens only; no hardcoded colors. Mobile-first, light DOM. */
+
+.story-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 420px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+/* ---------- thread list ---------- */
+
+.story-hd {
+  display: flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-4) var(--space-1);
+}
+.story-hd b {
+  font-size: 19px;
+  font-family: var(--font-display);
+}
+.story-unread-pill {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 800;
+  background: var(--danger);
+  color: var(--neutral-0);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+}
+
+.story-thread {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 11px var(--space-4);
+  border: 0;
+  border-bottom: 1px solid var(--surface-2);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+.story-thread:active {
+  background: var(--surface-2);
+}
+
+.story-ava {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex: none;
+  background: var(--surface-2);
+}
+.story-ava-sm {
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+}
+
+.story-inf {
+  flex: 1;
+  min-width: 0;
+}
+.story-inf b {
+  font-size: 13px;
+  display: block;
+}
+.story-inf p {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: var(--space-1) 0 0;
+}
+
+.story-rt {
+  text-align: right;
+  flex: none;
+}
+.story-lbl {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.story-badge {
+  display: inline-block;
+  min-width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  color: var(--neutral-0);
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+  line-height: 20px;
+  padding: 0 6px;
+  margin-top: var(--space-1);
+}
+
+.story-locked {
+  cursor: default;
+}
+.story-locked-txt {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.story-foot {
+  padding: var(--space-4);
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.story-tip {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: var(--space-2) var(--space-4);
+  margin: 0;
+}
+.story-err {
+  color: var(--danger);
+}
+
+/* ---------- chat view ---------- */
+
+.story-chtop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--surface-2);
+  background: var(--surface);
+  flex: none;
+}
+.story-back {
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 var(--space-1);
+}
+.story-chtitle b {
+  font-size: 13px;
+  display: block;
+}
+.story-online {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.story-chbody {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.story-divider {
+  align-self: center;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+  margin: var(--space-2) 0;
+}
+
+.story-notice {
+  align-self: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-align: center;
+  margin: var(--space-2) 0;
+}
+
+.story-bub {
+  max-width: 82%;
+  padding: 9px var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.story-them {
+  background: var(--surface-2);
+  border: 1px solid var(--surface-2);
+  border-bottom-left-radius: var(--space-1);
+  align-self: flex-start;
+}
+.story-me {
+  background: var(--primary);
+  color: var(--neutral-0);
+  border-bottom-right-radius: var(--space-1);
+  align-self: flex-end;
+}
+.story-who {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 2px;
+  letter-spacing: 0.03em;
+}
+.story-tm {
+  display: block;
+  font-size: 9px;
+  opacity: 0.75;
+  margin-top: var(--space-1);
+  text-align: right;
+}
+
+.story-typing {
+  align-self: flex-start;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: 10px var(--space-4);
+  font-size: 14px;
+  letter-spacing: 3px;
+  color: var(--text-muted);
+}
+
+.story-reward {
+  flex: none;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--primary);
+  padding: var(--space-1) var(--space-3);
+}
+
+.story-replies {
+  flex: none;
+  padding: var(--space-3) var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--surface);
+  border-top: 1px solid var(--surface-2);
+}
+.story-reply {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: center;
+  padding: 11px var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  color: var(--primary-strong);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.story-reply:active {
+  background: var(--surface-2);
+}
+.story-reply:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.story-reply-hint {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
