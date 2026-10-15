@@ -26,6 +26,14 @@ export const PHONE_APPS: PhoneApp[] = [
   { id: "richlist", label: "Rich List", icon: "🏆" },
   // Phase 8: Èkó Gov — governor election + governance.
   { id: "gov", label: "Èkó Gov", icon: "🏛️" },
+  // Crews — player clans: discover, join, shared goals, league board.
+  { id: "crews", label: "Crews", icon: "🛡️" },
+  // Story Questlines — chat-thread story arcs.
+  { id: "story", label: "Stories", icon: "📖" },
+  // Live Events Calendar — season banner, day timeline, RSVPs.
+  { id: "events", label: "Events", icon: "📅" },
+  // UGC Design Contests — duel voting, 2-tap entries.
+  { id: "contests", label: "Contests", icon: "🎨" },
   { id: "style", label: "Style", icon: "✨" },
   { id: "room", label: "My Room", icon: "🏠" },
   { id: "me", label: "Me", icon: "🧑" },
