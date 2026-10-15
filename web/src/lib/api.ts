@@ -1126,6 +1126,8 @@ export interface ContestEntry {
   id: number;
   title: string;
   design: ContestDesign;
+  /** Optional player-snapped photo (data URL); shown instead of the emoji art. */
+  photo: string | null;
   username: string;
   votes: number;
   /** 0..1 — fraction of the leader's votes, drives the vote bar. */
@@ -1183,12 +1185,12 @@ export const contestsApi = {
     authPost<ContestVoteResult>(`/api/contests/${id}/vote`, token, {
       entry_id: entryId,
     }),
-  /** 2-tap entry submit: title + emoji/colors/blurb design. */
-  enter: (token: string, id: number, title: string, design: ContestDesign) =>
+  /** 2-tap entry submit: title + emoji/colors/blurb design + optional photo. */
+  enter: (token: string, id: number, title: string, design: ContestDesign, photo?: string | null) =>
     authPost<{ ok: boolean; entry: ContestEntry }>(
       `/api/contests/${id}/entries`,
       token,
-      { title, design }
+      { title, design, photo: photo ?? null }
     ),
 };
 
