@@ -33,6 +33,7 @@ import { NEWS_CACHE_MS } from './db.js';
 import { createCashWalletRouter } from './routes/cashWallet.js';
 import { createCashFlowsRouter } from './routes/cashFlows.js';
 import { createCashAdminRouter } from './routes/cashAdmin.js';
+import { createCloudSaveRouter } from './routes/cloudSave.js';
 // Express 4 async safety: patch Router.prototype once at boot so every
 // async route handler auto-forwards rejections to error middleware.
 import { patchExpressAsync } from './lib/asyncHandler.js';
@@ -122,6 +123,8 @@ export async function createApp() {
 
   // ---- API ----
   app.use('/api', createApiRouter({ hub, getDay }));
+  // ---- Cloud saves: per-user ancillary state sync ----
+  app.use('/api', createCloudSaveRouter());
   // ---- Cash wallet (fintech): inert 403s while CASH_OPS_ENABLED is off ----
   app.use('/api/cash-wallet', createCashWalletRouter());
   app.use('/api/cash-wallet', createCashFlowsRouter());

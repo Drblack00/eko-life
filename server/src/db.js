@@ -464,7 +464,14 @@ CREATE TABLE IF NOT EXISTS risk_reviews (
   reviewed_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_risk_reviews_withdrawal ON risk_reviews(withdrawal_id);
-CREATE INDEX IF NOT EXISTS idx_risk_reviews_status ON risk_reviews(status);`;
+CREATE INDEX IF NOT EXISTS idx_risk_reviews_status ON risk_reviews(status);
+-- Cloud saves (TASK 1): per-user ancillary state (blocked users,
+-- walkthrough flag, char-creation flag) synced across devices.
+CREATE TABLE IF NOT EXISTS cloud_saves (
+  user_id INTEGER PRIMARY KEY,
+  payload TEXT NOT NULL DEFAULT '{}',
+  updated_at BIGINT NOT NULL
+);`;
 
 const PG_SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -905,7 +912,14 @@ CREATE TABLE IF NOT EXISTS risk_reviews (
   reviewed_at BIGINT
 );
 CREATE INDEX IF NOT EXISTS idx_risk_reviews_withdrawal ON risk_reviews(withdrawal_id);
-CREATE INDEX IF NOT EXISTS idx_risk_reviews_status ON risk_reviews(status);`;
+CREATE INDEX IF NOT EXISTS idx_risk_reviews_status ON risk_reviews(status);
+-- Cloud saves (TASK 1): per-user ancillary state (blocked users,
+-- walkthrough flag, char-creation flag) synced across devices.
+CREATE TABLE IF NOT EXISTS cloud_saves (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id),
+  payload TEXT NOT NULL DEFAULT '{}',
+  updated_at BIGINT NOT NULL
+);`;
 async function runQ(sqliteSql, pgSql, params) {
   if (pool) { await pool.query(pgSql, params); return { changes: 0 }; }
   const r = sdb.prepare(sqliteSql).run(...params);
