@@ -16,8 +16,11 @@ import { createGistsRouter, createNewsRouter } from './gists.js';
 import { createBankRouter } from './bank.js';
 import { createBoutiqueRouter } from './boutique.js';
 import { createGovRouter } from './gov.js';
+import { createCrewsRouter } from './crews.js';
+import { createStoryRouter } from './story.js';
+import { createEventsRouter } from './events.js';
+import { createContestsRouter } from './contests.js';
 import { createGemRouter } from './gem.js';
-
 import {
   CLASSES, LOCATIONS, JOBS, FOOD, FUN, HOUSING, SPAWN, WORLD_BOUNDS,
   AVATARS, COLORS, PROPERTIES, BIZ, VEHICLES, FURN, HOME_SLOTS,
@@ -92,6 +95,8 @@ function characterBody(user, c, day) {
     character_id: c.id,
     username: user.username,
     name: c.name,
+    // Cloud-save wiring: lets the client skip sync for guest accounts (local-only).
+    is_guest: !!Number(user.is_guest),
     class: c.class,
     avatar: c.avatar,
     color: c.color,
@@ -228,7 +233,6 @@ export function createApiRouter({ hub, getDay }) {
   router.get('/config', (req, res) => {
     res.json({
       classes: CLASSES,
-      
       locations: LOCATIONS,
       jobs: JOBS,
       food: FOOD,
@@ -329,6 +333,18 @@ export function createApiRouter({ hub, getDay }) {
   // ---- Phase 8: Èkó Gov — governor election + governance REST ----
   router.use('/gov', createGovRouter({ hub, getDay }));
 
+  // ---- Story Questlines: chat-thread story arcs (gameplay coins only) ----
+  router.use('/stories', createStoryRouter());
+
+  // ---- Crews: player clans — discover, join, shared goals, league board ----
+  router.use('/crews', createCrewsRouter());
+
+  // ---- Live Events Calendar: seasons, day timeline, RSVPs ----
+  router.use('/events', createEventsRouter());
+
+  // ---- UGC Design Contests: duel voting, 2-tap entries ----
+  router.use('/contests', createContestsRouter());
+
   // ---- Phase 9: Daily Gem Hunt (gameplay coins only) ----
   router.use('/gem', createGemRouter({ getDay }));
 
@@ -340,7 +356,7 @@ export function createApiRouter({ hub, getDay }) {
   // ---- admin (M4) ----
   router.use('/admin', createAdminRouter({ hub, getDay }));
 
-// NOTE: cash-wallet + cash-admin routers are mounted once in app.js
+  // NOTE: cash-wallet + cash-admin routers are mounted once in app.js
   // (app.use('/api/cash-wallet', ...) etc.) — do NOT mount them here too;
   // double-mounting registers every handler twice.
 
