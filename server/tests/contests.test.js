@@ -19,7 +19,9 @@ test.before(async () => {
   const { runMigrations } = await import('../migrations/runner.js');
   await runMigrations();
   const app = express();
-  app.use(express.json());
+  // 2mb here (not the 1mb prod cap): the oversized-photo test must reach
+  // route validation to assert the 400, not die at the body parser.
+  app.use(express.json({ limit: '2mb' }));
   app.use('/api/contests', createContestsRouter());
   server = await new Promise((resolve) => {
     const s = app.listen(0, '127.0.0.1', () => resolve(s));
@@ -217,4 +219,60 @@ test('auth is required', async () => {
   assert.equal(r.status, 401);
   const r2 = await post(`/api/contests/${contestId}/vote`, { entry_id: 1 });
   assert.equal(r2.status, 401);
+});
+
+const tinyPhoto = 'data:image/jpeg;base64,' + 'A'.repeat(1000);
+
+test('entry photo: valid photo is accepted and round-trips', async () => {
+  const u = await seedUser();
+  const r = await post(`/api/contests/${contestId}/entries`,
+    { title: 'My Real Aso-ebi', design: design('👗'), photo: tinyPhoto }, u.token);
+  assert.equal(r.status, 200);
+  assert.ok(r.json.ok);
+  assert.equal(r.json.entry.photo, tinyPhoto);
+  // photo appears on the leaderboard row…
+  const d = await get(`/api/contests/${contestId}`, u.token);
+  const row = d.json.entries.find((e) => e.id === r.json.entry.id);
+  assert.ok(row, 'entry on leaderboard');
+  assert.equal(row.photo, tinyPhoto);
+  // …and in duel pairs (vote out others' entries is not needed: just check shape)
+  const dueler = await seedUser();
+  const duel = await get(`/api/contests/${contestId}/duel`, dueler.token);
+  if (duel.json.pair) {
+    for (const p of duel.json.pair) {
+      assert.ok('photo' in p, 'duel pair entries carry photo');
+    }
+  }
+});
+
+test('entry photo: invalid prefix is rejected', async () => {
+  const u = await seedUser();
+  const r = await post(`/api/contests/${contestId}/entries`,
+    { title: 'Sneaky', design: design('👔'), photo: 'data:text/plain;base64,AAAA' }, u.token);
+  assert.equal(r.status, 400);
+  assert.match(r.json.error, /data URL/);
+  const r2 = await post(`/api/contests/${contestId}/entries`,
+    { title: 'Sneaky 2', design: design('👔'), photo: 'not-a-data-url' }, u.token);
+  assert.equal(r2.status, 400);
+});
+
+test('entry photo: oversized photo is rejected', async () => {
+  const u = await seedUser();
+  const big = 'data:image/jpeg;base64,' + 'A'.repeat(512 * 1024);
+  const r = await post(`/api/contests/${contestId}/entries`,
+    { title: 'Too Big', design: design('👔'), photo: big }, u.token);
+  assert.equal(r.status, 400);
+  assert.match(r.json.error, /too large/);
+});
+
+test('entry photo: omitted photo still works (photo null)', async () => {
+  const u = await seedUser();
+  const r = await post(`/api/contests/${contestId}/entries`,
+    { title: 'Emoji Only', design: design('💃') }, u.token);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.entry.photo, null);
+  const d = await get(`/api/contests/${contestId}`, u.token);
+  const row = d.json.entries.find((e) => e.id === r.json.entry.id);
+  assert.ok(row);
+  assert.equal(row.photo, null);
 });
