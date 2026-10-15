@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useGameSocket } from "../hooks/useGameSocket";
 import {
@@ -19,103 +19,60 @@ import {
   spawnLabel,
   spawnMapXY,
   type ActName,
+  type LeaderEntry,
   type StreetSpawn,
   type You,
 } from "../game/types";
 import {
   Button,
+  Card,
   Loading,
   Sheet,
   Skeleton,
   StatBar,
 } from "../components";
-// Perf (low-end Android): everything below the first paint is code-split.
-// Only the home-tab shell (HUD + HomeView + TabBar) stays in the initial
-// bundle; tabs, phone apps and dialogs load on demand. (The 3D map stays
-// eager: Landing renders it above the fold on the critical path.)
-const EatTab = lazy(() =>
-  import("./EatTab").then((m) => ({ default: m.EatTab }))
-);
-const ChatTab = lazy(() =>
-  import("./chat/ChatTab").then((m) => ({ default: m.ChatTab }))
-);
-const FriendsPage = lazy(() =>
-  import("./Friends").then((m) => ({ default: m.FriendsPage }))
-);
-const GistApp = lazy(() =>
-  import("./gist/GistApp").then((m) => ({ default: m.GistApp }))
-);
-const BankApp = lazy(() =>
-  import("./bank/BankApp").then((m) => ({ default: m.BankApp }))
-);
-const BoutiqueApp = lazy(() =>
-  import("./boutique/BoutiqueApp").then((m) => ({ default: m.BoutiqueApp }))
-);
-const RichListApp = lazy(() =>
-  import("./richlist/RichListApp").then((m) => ({ default: m.RichListApp }))
-);
-const GovApp = lazy(() =>
-  import("./gov/GovApp").then((m) => ({ default: m.GovApp }))
-);
+import { EatTab } from "./EatTab";
+import { ChatTab } from "./chat/ChatTab";
+import { FriendsPage } from "./Friends";
+import { GistApp } from "./gist/GistApp";
+import { BankApp } from "./bank/BankApp";
+import { BoutiqueApp } from "./boutique/BoutiqueApp";
+import { RichListApp } from "./richlist/RichListApp";
+import { GovApp } from "./gov/GovApp";
 // Crews — player clans: discover, join, shared goals, league board.
-const CrewsApp = lazy(() =>
-  import("./crews/CrewsApp").then((m) => ({ default: m.CrewsApp }))
-);
+import { CrewsApp } from "./crews/CrewsApp";
 // Story Questlines — chat-thread story arcs.
-const StoryApp = lazy(() =>
-  import("./story/StoryApp").then((m) => ({ default: m.StoryApp }))
-);
+import { StoryApp } from "./story/StoryApp";
 // Live Events Calendar — season banner, day timeline, RSVPs.
-const EventsApp = lazy(() =>
-  import("./events/EventsApp").then((m) => ({ default: m.EventsApp }))
-);
+import { EventsApp } from "./events/EventsApp";
 // UGC Design Contests — duel voting, 2-tap entries.
-const ContestsApp = lazy(() =>
-  import("./contests/ContestsApp").then((m) => ({ default: m.ContestsApp }))
-);
-const StyleApp = lazy(() =>
-  import("./StyleApp").then((m) => ({ default: m.StyleApp }))
-);
-const ElectionSheet = lazy(() =>
-  import("./election/ElectionSheet").then((m) => ({ default: m.ElectionSheet }))
-);
-import type { HomeFocus } from "./home/HomeTab";
-const HomeTab = lazy(() =>
-  import("./home/HomeTab").then((m) => ({ default: m.HomeTab }))
-);
+import { ContestsApp } from "./contests/ContestsApp";
+import { StyleApp } from "./StyleApp";
+import { ElectionSheet } from "./election/ElectionSheet";
+import { HomeTab, type HomeFocus } from "./home/HomeTab";
 import { HomeView } from "./home/HomeView";
-const HomeRoomSection = lazy(() =>
-  import("./home/HomeRoom").then((m) => ({ default: m.HomeRoomSection }))
-);
-const AdminView = lazy(() =>
-  import("./Admin").then((m) => ({ default: m.AdminView }))
-);
+import { HomeRoomSection } from "./home/HomeRoom";
+import { LedgerSheet } from "./home/LedgerSheet";
+import { AdminView } from "./Admin";
 import { TabBar, TABS, type Tab } from "./TabBar";
-import {
-  SettingsView,
-  useMusicToggle,
-  useNightModeToggle,
-} from "./SettingsView";
 export { TABS };
 export type { Tab };
-const Phone = lazy(() =>
-  import("./phone/Phone").then((m) => ({ default: m.Phone }))
-);
-const BuyView = lazy(() =>
-  import("./buy/BuyView").then((m) => ({ default: m.BuyView }))
-);
-import { WALKTHROUGH_KEY, Walkthrough } from "./Walkthrough";
-import type { CharacterTabId } from "./CharacterPanel";
-const CharacterPanel = lazy(() =>
-  import("./CharacterPanel").then((m) => ({ default: m.CharacterPanel }))
-);
+import { Phone } from "./phone/Phone";
+import { BuyView } from "./buy/BuyView";
+import { Walkthrough, WALKTHROUGH_KEY } from "./Walkthrough";
+import { ThemePicker } from "../theme/theme";
+import { CharacterPanel, type CharacterTabId } from "./CharacterPanel";
+import "./CharacterPanel.css";
 // M21: notifications (bell, panel, live toasts).
 import {
   NotificationBell,
   NotificationPanel,
   NotificationToasts,
 } from "./Notifications";
-import { type NotificationEntry, type NotificationPrefs } from "../game/types";
+import "./Notifications.css";
+import { NOTIFICATION_PREF_LABELS, type NotificationEntry, type NotificationPrefs } from "../game/types";
+import "./Walkthrough.css";
+import "./Admin.css";
 import "./Game.css";
 // Home screen chrome (Phase 1 of the reference audit): top status pill,
 // floating cards, work/travel pills, announcement pill, shortcuts.
@@ -129,50 +86,22 @@ import "./home/HomeChrome.css";
 import { moodFor } from "./home/homeChrome";
 import { blip, isSoundEnabled, setSoundEnabled } from "../lib/sound";
 // Phase 5: venue dialogs with activities ("things to do").
-const ThingsToDoDialog = lazy(() =>
-  import("./VenuePanel").then((m) => ({ default: m.ThingsToDoDialog }))
-);
-const VenueExtras = lazy(() =>
-  import("./VenuePanel").then((m) => ({ default: m.VenueExtras }))
-);
+import { ThingsToDoDialog, VenueExtras } from "./VenuePanel";
+import "./VenuePanel.css";
 import { parseVenueHash } from "../game/venues";
 // V2 milestones: shifts (M7), needs (M8), daily (M9), economy (M10),
 // governance (M11), skills/academy (M12).
-import { Clock } from "./v2/m7/Clock";
+import { Clock, JobsTab } from "./v2/m7";
 import type { ShiftTrackInfo } from "./v2/m7";
-const JobsTab = lazy(() =>
-  import("./v2/m7/JobsTab").then((m) => ({ default: m.JobsTab }))
-);
 import "./v2/m7/m7.css";
-const NeedsPanel = lazy(() =>
-  import("./v2/m8/NeedsPanel").then((m) => ({ default: m.NeedsPanel }))
-);
-const DailyTab = lazy(() =>
-  import("./v2/m9").then((m) => ({ default: m.DailyTab }))
-);
-const EconomyTab = lazy(() =>
-  import("./v2/m10").then((m) => ({ default: m.EconomyTab }))
-);
-const SkillsPanel = lazy(() =>
-  import("./v2/m12").then((m) => ({ default: m.SkillsPanel }))
-);
-const AcademyView = lazy(() =>
-  import("./v2/m12").then((m) => ({ default: m.AcademyView }))
-);
-
-/**
- * Suspense boundary for on-demand (code-split) views. The spinner only
- * flashes while the chunk loads — no visual change once cached.
- */
-function LazyView({
-  children,
-  message = "Loading…",
-}: {
-  children: ReactNode;
-  message?: string;
-}) {
-  return <Suspense fallback={<Loading message={message} />}>{children}</Suspense>;
-}
+import { NeedsPanel } from "./v2/m8/NeedsPanel";
+import "./v2/m8/NeedsPanel.css";
+import { DailyTab } from "./v2/m9";
+import "./v2/m9/DailyTab.css";
+import { EconomyTab } from "./v2/m10";
+import "./v2/m10/m10.css";
+import { SkillsPanel, AcademyView } from "./v2/m12";
+import "./v2/m12/m12.css";
 
 /**
  * HUD: top status pill (avatar · name · live clock · mood · online) plus
@@ -404,9 +333,9 @@ function CityTab({
 
   return (
     <div className="eko-city">
-      <div className="eko-city__bar">
+      <div className="eko-city__bar glass">
         <span className="eko-city__here" aria-live="polite">
-          📍 {hereName}
+          <span className="eko-city__pin" aria-hidden="true">📍</span> {hereName}
         </span>
         {spawns.length > 0 && (
           <span className="eko-city__spawns" aria-label={`${spawns.length} street finds nearby`}>
@@ -551,14 +480,68 @@ function LocationActions({
 }
 
 /** City leaderboard — top 10 by money. Hides itself until GET /api/leaderboard lands. */
+function LeaderboardCard({ token, you }: { token: string; you: You }) {
+  const [leaders, setLeaders] = useState<LeaderEntry[] | null | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    api
+      .leaderboard(token)
+      .then((rows) => {
+        if (live) setLeaders(rows);
+      })
+      .catch(() => {
+        if (live) setLeaders(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [token]);
+  if (leaders === null || leaders === undefined) return null;
+  if (leaders.length === 0) return null;
+  const medals = ["🥇", "🥈", "🥉"];
+  return (
+    <Card className="eko-me__card">
+      <h2 className="eko-tabh" style={{ marginTop: 0 }}>
+        🏆 City rankings
+      </h2>
+      <ol className="eko-leaders">
+        {leaders.map((l, i) => {
+          const isMe =
+            (typeof l.id === "number" && l.id === you.id) ||
+            l.username === you.username;
+          return (
+            <li
+              key={`${l.username}-${i}`}
+              className={`eko-leaders__row ${isMe ? "eko-leaders__row--me" : ""}`}
+            >
+              <span className="eko-leaders__rank" aria-hidden="true">
+                {medals[i] ?? `${i + 1}.`}
+              </span>
+              <strong className="eko-leaders__name">
+                @{l.username}
+                {isMe && " (you)"}
+              </strong>
+              <span className="eko-leaders__money">{naira(l.money)}</span>
+            </li>
+          );
+        })}
+      </ol>
+    </Card>
+  );
+}
 
 function MeTab({
   you,
+  config,
+  token,
+  onSleep,
+  onRest,
   onSignOut,
+  onUpgrade,
+  onOpenAdmin,
   onReplayWalkthrough,
   notifPrefs,
   onNotifPrefs,
-  onEditProfile,
 }: {
   you: You;
   config: GameConfig | null;
@@ -572,8 +555,8 @@ function MeTab({
   notifPrefs: NotificationPrefs | null;
   onNotifPrefs: (p: Partial<NotificationPrefs>) => void;
   sendAct: (a: ActName, params?: Record<string, unknown>) => void;
-  onEditProfile: () => void;
 }) {
+  const [ledgerOpen, setLedgerOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(isSoundEnabled());
   const toggleSound = () => {
     const next = !soundOn;
@@ -581,42 +564,215 @@ function MeTab({
     setSoundOn(next);
     if (next) blip("tap");
   };
-  const [musicOn, toggleMusic] = useMusicToggle();
-  const [nightModeOn, toggleNightMode] = useNightModeToggle();
-
-  const handleShare = () => {
-    const url = window.location.origin;
-    if (navigator.share) {
-      navigator.share({ title: "Èkó Life", url }).catch(() => {});
-    } else {
-      try {
-        navigator.clipboard.writeText(url);
-      } catch {
-        /* clipboard unavailable */
-      }
-    }
-  };
-
+  const className =
+    config?.classes?.[you.class]?.name ?? you.class ?? "Wanderer";
+  const housingName =
+    config?.housing?.[you.housing]?.name ?? you.housing ?? "—";
   return (
-    <SettingsView
-      displayName={you.name}
-      username={you.username}
-      notifPrefs={notifPrefs}
-      onNotifPrefs={onNotifPrefs}
-      soundOn={soundOn}
-      onToggleSound={toggleSound}
-      musicOn={musicOn}
-      onToggleMusic={toggleMusic}
-      nightModeOn={nightModeOn}
-      onToggleNightMode={toggleNightMode}
-      onEdit={onEditProfile}
-      onTheme={() => {}}
-      onLanguage={() => {}}
-      onHelp={onReplayWalkthrough}
-      onRate={() => {}}
-      onShare={handleShare}
-      onLogout={onSignOut}
-    />
+    <div className="eko-tabpad eko-me">
+      <Card className="eko-me__card">
+        <div className="eko-me__head">
+          <span
+            className="eko-me__avatar"
+            style={{ backgroundColor: you.color }}
+            aria-hidden="true"
+          >
+            {you.avatar}
+          </span>
+          <div>
+            <strong className="eko-me__name">{you.name}</strong>
+            <div className="eko-me__sub">
+              {className} · {housingName}
+              {you.cert > 0 && " · 🎓 Certified"}
+            </div>
+          </div>
+        </div>
+        <dl className="eko-me__rows">
+          <div>
+            <dt>Wallet</dt>
+            {/* M21: admins see unlimited (private view); the coins column
+                itself stays small so the leaderboard shows the decoy. */}
+            <dd>{you.is_admin ? "∞ Unlimited" : naira(you.money)}</dd>
+          </div>
+          <div>
+            <dt>Savings</dt>
+            <dd>{naira(you.savings)}</dd>
+          </div>
+          <div>
+            <dt>Loan</dt>
+            <dd>{naira(you.loan)}</dd>
+          </div>
+          <div>
+            <dt>Home</dt>
+            <dd>{housingName}</dd>
+          </div>
+        </dl>
+        <Button
+          size="md"
+          variant="accent"
+          onClick={() => setLedgerOpen(true)}
+          className="eko-me__ledger"
+        >
+          💰 Money history
+        </Button>
+      </Card>
+
+      <Card className="eko-me__card">
+        <dl className="eko-me__rows">
+          <div>
+            <dt>Account type</dt>
+            <dd>{you.guest ? "🧭 Guest" : "🧑 Full account"}</dd>
+          </div>
+          {you.is_admin && (
+            <div>
+              <dt>Role</dt>
+              <dd>🛡️ Admin</dd>
+            </div>
+          )}
+        </dl>
+        {you.guest && (
+          <>
+            <p className="eko-me__tip">
+              Guest progress lives on this device. Create a full account to
+              keep your character, money, and home on any device.
+            </p>
+            <Button
+              size="md"
+              variant="accent"
+              onClick={onUpgrade}
+              className="eko-me__ledger"
+            >
+              🎒 Create full account — keep my progress
+            </Button>
+          </>
+        )}
+        {you.is_admin && (
+          <Button
+            size="md"
+            variant="accent"
+            onClick={onOpenAdmin}
+            className="eko-me__ledger"
+          >
+            🛡️ Open admin dashboard
+          </Button>
+        )}
+        <details className="eko-howto">
+          <summary>Delete my data</summary>
+          <p className="eko-me__tip">
+            In-game account deletion isn't built yet — it's on the roadmap. To
+            request deletion today, email the support team:{" "}
+            <a href="mailto:support@eko-life.example">support@eko-life.example</a>{" "}
+            <em>(placeholder address — the account API is still being built, so
+            this link doesn't reach anyone real yet).</em>
+          </p>
+        </details>
+      </Card>
+
+      <div className="eko-me__actions">
+        <Button size="lg" onClick={onSleep} className="eko-me__btn">
+          😴 Sleep
+        </Button>
+        <Button size="lg" variant="accent" onClick={onRest} className="eko-me__btn">
+          🛋️ Rest
+        </Button>
+      </div>
+      <p className="eko-me__tip">
+        Sleep restores the most energy — but the day keeps moving while you do.
+      </p>
+
+      <LeaderboardCard token={token} you={you} />
+
+      <details className="eko-howto">
+        <summary>How to play</summary>
+        <ul>
+          <li>
+            <strong>Work</strong> at the right location to earn naira. Each
+            shift costs energy and needs a breather before the next one.
+          </li>
+          <li>
+            <strong>Eat</strong> to keep hunger up — an empty stomach drains
+            your health.
+          </li>
+          <li>
+            <strong>Travel</strong> around the city by tapping location pins.
+          </li>
+          <li>
+            <strong>Rest or sleep</strong> when your energy runs low.
+          </li>
+          <li>One game day lasts 5 real minutes. Survive and thrive.</li>
+        </ul>
+      </details>
+
+      <Button variant="ghost" onClick={onSignOut} className="eko-me__signout">
+        Sign out
+      </Button>
+
+      <Card className="eko-me__card">
+        <h2 className="eko-tabh" style={{ marginTop: 0 }}>
+          ⚙️ Settings
+        </h2>
+        <Button
+          size="md"
+          variant="ghost"
+          onClick={onReplayWalkthrough}
+          className="eko-me__ledger"
+        >
+          🎬 Replay walkthrough
+        </Button>
+        <ThemePicker />
+        {/* Sound effects — lives here in the Me panel (it was removed from
+            the top header in v3.6; the CharacterPanel copy stays too). */}
+        <div className="eko-me__notifprefs">
+          <h3 className="eko-me__notifprefs-title">🔊 Sound</h3>
+          <label className="eko-me__notifpref">
+            <span className="eko-me__notifpref-text">
+              <strong>Sound effects</strong>
+              <small>Tap and success sounds</small>
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={soundOn}
+              aria-label="Sound effects"
+              className={`eko-switch${soundOn ? " eko-switch--on" : ""}`}
+              onClick={toggleSound}
+            >
+              <span className="eko-switch__knob" aria-hidden="true" />
+            </button>
+          </label>
+        </div>
+        {/* M21: notification preferences */}
+        <div className="eko-me__notifprefs">
+          <h3 className="eko-me__notifprefs-title">🔔 Notifications</h3>
+          {(Object.keys(NOTIFICATION_PREF_LABELS) as Array<keyof NotificationPrefs>).map(
+            (key) => {
+              const label = NOTIFICATION_PREF_LABELS[key];
+              const on = notifPrefs ? notifPrefs[key] !== false : true;
+              return (
+                <label key={key} className="eko-me__notifpref">
+                  <span className="eko-me__notifpref-text">
+                    <strong>{label.title}</strong>
+                    <small>{label.hint}</small>
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={on}
+                    aria-label={label.title}
+                    className={`eko-switch${on ? " eko-switch--on" : ""}`}
+                    onClick={() => onNotifPrefs({ [key]: !on })}
+                  >
+                    <span className="eko-switch__knob" aria-hidden="true" />
+                  </button>
+                </label>
+              );
+            }
+          )}
+        </div>
+      </Card>
+
+      <LedgerSheet token={token} open={ledgerOpen} onClose={() => setLedgerOpen(false)} />
+    </div>
   );
 }
 
@@ -1045,7 +1201,6 @@ export function Game({
                 notifPrefs={sock.notifPrefs}
                 onNotifPrefs={sock.updateNotifPrefs}
                 sendAct={sock.sendAct}
-                onEditProfile={() => openCharacterPanel("profile")}
               />
               {config && (
                 <HomeTab
@@ -1109,7 +1264,7 @@ export function Game({
 
   return (
     <div className={cleanMode ? "eko-game eko-game--clean" : "eko-game"}>
-      {tab !== "home" && tab !== "buy" && (
+      {tab !== "home" && (
       <Hud
         you={you}
         status={sock.status}
@@ -1158,6 +1313,7 @@ export function Game({
           cleanMode={cleanMode}
           onToggleClean={() => setCleanMode((c) => !c)}
           onOpenApp={openPhoneApp}
+          onOpenShortcuts={() => setShortcutsOpen(true)}
           onOpenCharacter={openCharacterPanel}
         />
       )}
@@ -1186,19 +1342,15 @@ export function Game({
         onEarn={() => openPhoneApp("jobs")}
       />
 
-      <LazyView message="Loading…">
-        <ElectionSheet
-          open={electionOpen}
-          onClose={() => setElectionOpen(false)}
-          sock={sock}
-          you={you}
-        />
-      </LazyView>
+      <ElectionSheet
+        open={electionOpen}
+        onClose={() => setElectionOpen(false)}
+        sock={sock}
+        you={you}
+      />
 
       {adminOpen && you.is_admin ? (
-        <LazyView message="Loading admin…">
-          <AdminView token={token} onBack={() => setAdminOpen(false)} />
-        </LazyView>
+        <AdminView token={token} onBack={() => setAdminOpen(false)} />
       ) : (
         <>
           <main className="eko-main">
@@ -1210,7 +1362,7 @@ export function Game({
             sock={sock}
             sendAct={sock.sendAct}
             onOpenApp={openPhoneApp}
-            onTab={(t) => (t === "phone" ? setPhoneOpen(true) : setTab(t))}
+            onTab={(t) => { if (t === "phone") setPhoneOpen(true); else { setPhoneOpen(false); setTab(t); } }}
             onOpenNotifications={() => {
               setNotifOpen(true);
               sock.openNotifications();
@@ -1231,15 +1383,12 @@ export function Game({
           />
         )}
         {tab === "buy" && config && (
-          <LazyView message="Loading shop…">
-            <BuyView
-              you={you}
-              sendAct={sock.sendAct}
-              day={sock.day}
-              onTopUp={() => setTopUpOpen(true)}
-              onBuySheetOpen={setBuySheetOpen}
-            />
-          </LazyView>
+          <BuyView
+            you={you}
+            config={config}
+            sendAct={sock.sendAct}
+            onBuySheetOpen={setBuySheetOpen}
+          />
         )}
         {tab === "map" && (
           <CityTab
@@ -1268,14 +1417,12 @@ export function Game({
             <p className="eko-pin__blurb">{pinSheet.blurb}</p>
 
             {!isSpawnPin && config && pinLoc && (
-              <LazyView message="Loading…">
-                <VenueExtras
-                  locationId={pinLoc.id}
-                  you={you}
-                  config={config}
-                  sendAct={(a, p) => sock.sendAct(a, p)}
-                />
-              </LazyView>
+              <VenueExtras
+                locationId={pinLoc.id}
+                you={you}
+                config={config}
+                sendAct={(a, p) => sock.sendAct(a, p)}
+              />
             )}
 
             {isSpawnPin && spawn && (
@@ -1329,14 +1476,12 @@ export function Game({
       </Sheet>
 
       {/* Phase 5: "Things to do" (T) — every venue, one teaser each. */}
-      <LazyView message="Loading…">
-        <ThingsToDoDialog
-          open={thingsOpen}
-          onClose={() => setThingsOpen(false)}
-          config={config}
-          onSelect={openVenueFromList}
-        />
-      </LazyView>
+      <ThingsToDoDialog
+        open={thingsOpen}
+        onClose={() => setThingsOpen(false)}
+        config={config}
+        onSelect={openVenueFromList}
+      />
 
       <Walkthrough
         open={walkthroughOpen}
@@ -1359,48 +1504,36 @@ export function Game({
 
       {/* Phase 2: tabbed character panel (avatar button in the top pill). */}
       {you && (
-        <LazyView message="Loading…">
-          <CharacterPanel
-            open={charPanel.open}
-            initialTab={charPanel.tab}
-            token={token}
-            you={you}
-            onClose={() => setCharPanel((p) => ({ ...p, open: false }))}
-            onOpenApp={openPhoneApp}
-            onReplayWalkthrough={replayWalkthrough}
-            onSignOut={onSignOut}
-            notifPrefs={sock.notifPrefs}
-            onNotifPrefs={sock.updateNotifPrefs}
-            onProfileChanged={(patch) => sock.patchYou(patch)}
-          />
-        </LazyView>
+        <CharacterPanel
+          open={charPanel.open}
+          initialTab={charPanel.tab}
+          token={token}
+          you={you}
+          onClose={() => setCharPanel((p) => ({ ...p, open: false }))}
+          onOpenApp={openPhoneApp}
+          onReplayWalkthrough={replayWalkthrough}
+          onSignOut={onSignOut}
+          notifPrefs={sock.notifPrefs}
+          onNotifPrefs={sock.updateNotifPrefs}
+          onProfileChanged={(patch) => sock.patchYou(patch)}
+        />
       )}
 
-      <LazyView message="Loading phone…">
-        <Phone
-          open={phoneOpen}
-          onClose={() => {
-            setPhoneOpen(false);
-            setPhoneApp(null);
-          }}
-          activeApp={phoneApp}
-          onSelectApp={setPhoneApp}
-          renderApp={renderPhoneApp}
-          token={token}
-          day={dayBanner}
-          coins={you.money}
-        />
-      </LazyView>
+      <Phone
+        open={phoneOpen}
+        onClose={() => {
+          setPhoneOpen(false);
+          setPhoneApp(null);
+        }}
+        activeApp={phoneApp}
+        onSelectApp={setPhoneApp}
+        renderApp={renderPhoneApp}
+        token={token}
+      />
 
       <TabBar
-        tab={phoneOpen ? "phone" : tab}
-        onTab={(t) => {
-          if (t === "phone") setPhoneOpen(true);
-          else {
-            setTab(t);
-            setPhoneOpen(false);
-          }
-        }}
+        tab={tab}
+        onTab={(t) => { if (t === "phone") setPhoneOpen(true); else { setPhoneOpen(false); setTab(t); } }}
         hasUnread={sock.unreadNotifications > 0}
       />
         </>
