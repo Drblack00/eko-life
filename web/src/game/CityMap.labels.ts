@@ -119,3 +119,42 @@ export const DISTRICT_WORLD_H: Record<DistrictLabel["size"], number> = {
   major: 4.4,
   minor: 3.6,
 };
+
+/**
+ * Home City V1: per-city district label packs. Same DistrictLabel shape as
+ * DISTRICT_LABELS (which stays the Lagos pack); the map picks the pack for
+ * the player's current city. Coordinates are world-space (x,z in [-86,86]).
+ */
+export const CITY_DISTRICT_LABELS: Record<string, DistrictLabel[]> = {
+  lagos: DISTRICT_LABELS,
+  benin: [
+    { name: "Ring Road", x: 0, z: 0, zone: "mainland", size: "major" },
+    { name: "Oba Market", x: -12, z: 14, zone: "mainland", size: "minor" },
+    { name: "UNIBEN", x: 26, z: -22, zone: "mainland", size: "major" },
+    { name: "Sakponba", x: -24, z: 6, zone: "mainland", size: "minor" },
+    { name: "GRA", x: 34, z: 18, zone: "mainland", size: "minor" },
+  ],
+  ph: [
+    { name: "Oil Mill", x: 0, z: 8, zone: "mainland", size: "major" },
+    { name: "GRA Phase 2", x: 38, z: -12, zone: "island", size: "major" },
+    { name: "Uniport", x: -22, z: -28, zone: "mainland", size: "minor" },
+    { name: "Creek Road", x: 10, z: 40, zone: "mainland", size: "minor" },
+    { name: "Aba Road", x: 18, z: 0, zone: "mainland", size: "minor" },
+  ],
+  abuja: [
+    { name: "Eagle Square", x: 0, z: 0, zone: "mainland", size: "major" },
+    { name: "Wuse", x: -10, z: 16, zone: "mainland", size: "major" },
+    { name: "Maitama", x: 22, z: -18, zone: "mainland", size: "minor" },
+    { name: "Nyanya", x: -26, z: 12, zone: "mainland", size: "minor" },
+    { name: "Garki", x: 8, z: -30, zone: "mainland", size: "minor" },
+  ],
+};
+
+/**
+ * District labels for a city. Unknown ids fall back to the Lagos pack —
+ * the map never renders without labels.
+ */
+export function districtLabelsForCity(cityId: string | undefined | null): DistrictLabel[] {
+  const cid = cityId || "lagos";
+  return CITY_DISTRICT_LABELS[cid] ?? DISTRICT_LABELS;
+}

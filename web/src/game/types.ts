@@ -33,6 +33,10 @@ export interface You {
   /** M3: one-time starter loan still claimable. */
   starter_loan_available?: boolean;
   locationId: string;
+  /** Home City V1: origin city id (server: home_city). */
+  homeCity?: string;
+  /** Home City V1: city the player is currently in (server: current_city). */
+  currentCity?: string;
   lat: number;
   lng: number;
   x?: number;

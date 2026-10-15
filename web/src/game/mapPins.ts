@@ -67,3 +67,15 @@ export function mapXYToWorld(mx: number, my: number): { x: number; z: number } {
     z: Math.max(-86, Math.min(86, (my / 100) * 172 - 86)),
   };
 }
+
+/**
+ * Home City V1: venues visible in a city. A venue with no `cities` array is
+ * available everywhere; otherwise it must list the city id.
+ */
+export function locationsForCity(
+  locs: ApiLocation[] | undefined | null,
+  cityId: string | undefined | null
+): ApiLocation[] {
+  const cid = cityId || "lagos";
+  return (locs || []).filter((l) => !l.cities || l.cities.includes(cid));
+}
