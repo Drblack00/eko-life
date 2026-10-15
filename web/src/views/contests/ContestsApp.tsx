@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   contestsApi,
   type ContestDesign,
@@ -15,8 +15,9 @@ import "./ContestsApp.css";
  *
  * Three views: a live ranked leaderboard with vote bars, head-to-head
  * duel voting (tap the winner, streaks), and a snap-first 2-tap entry
- * submit. Entry "designs" are emoji + color-pair + blurb cards — no
- * image upload, kept light. All state comes from /api/contests.
+ * submit. Entry "designs" are emoji + color-pair + blurb cards, with an
+ * optional player-snapped photo (camera/gallery, downscaled client-side).
+ * All state comes from /api/contests.
  */
 
 type View = "board" | "duel" | "submit";
@@ -52,8 +53,18 @@ function weekdayOf(iso: string): string {
     : d.toLocaleDateString("en-NG", { weekday: "long" });
 }
 
-/** Emoji swatch on the design's gradient — the entry's "art". */
+/** Entry art: the player's photo when present, else the emoji swatch. */
 function Swatch({ entry, big }: { entry: ContestEntry; big?: boolean }) {
+  if (entry.photo) {
+    return (
+      <img
+        src={entry.photo}
+        alt=""
+        aria-hidden
+        className={big ? "eko-ct__art eko-ct__art--img" : "eko-ct__sw eko-ct__sw--img"}
+      />
+    );
+  }
   const [c1, c2] = entry.design.colors;
   return (
     <span
@@ -64,6 +75,48 @@ function Swatch({ entry, big }: { entry: ContestEntry; big?: boolean }) {
       {entry.design.emoji}
     </span>
   );
+}
+
+/** Longest edge (px) for client-side photo downscale. */
+const PHOTO_MAX_EDGE = 1024;
+/** JPEG quality for the downscaled entry photo. */
+const PHOTO_QUALITY = 0.75;
+
+/**
+ * Downscale an image file client-side via canvas: max 1024px on the
+ * longest edge, JPEG 0.75. Returns a data URL, typically well under the
+ * server's 512KB cap.
+ */
+function downscalePhoto(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      const longest = Math.max(width, height);
+      if (longest > PHOTO_MAX_EDGE) {
+        const s = PHOTO_MAX_EDGE / longest;
+        width = Math.round(width * s);
+        height = Math.round(height * s);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("This device can't process photos."));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", PHOTO_QUALITY));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Couldn't read that image — try another."));
+    };
+    img.src = url;
+  });
 }
 
 export function ContestsApp({ token }: { token: string }) {
@@ -88,6 +141,40 @@ export function ContestsApp({ token }: { token: string }) {
   const [title, setTitle] = useState("");
   const [blurb, setBlurb] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // optional player-snapped photo (downscaled data URL, null = emoji design)
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+
+  const onPhotoFile = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = ""; // allow picking the same file again
+      if (!file) return;
+      if (!file.type.startsWith("image/")) {
+        setNotice("That file isn't an image — try another.");
+        return;
+      }
+      setPhotoBusy(true);
+      setNotice(null);
+      try {
+        setPhoto(await downscalePhoto(file));
+      } catch (err) {
+        setNotice(err instanceof Error ? err.message : "Couldn't read that image.");
+      } finally {
+        setPhotoBusy(false);
+      }
+    },
+    []
+  );
+
+  const resetSubmit = useCallback(() => {
+    setStep(1);
+    setTitle("");
+    setBlurb("");
+    setPhoto(null);
+  }, []);
 
   const loadDetail = useCallback(
     async (id: number) => {
@@ -195,11 +282,9 @@ export function ContestsApp({ token }: { token: string }) {
         colors,
         blurb: blurb.trim(),
       };
-      await contestsApi.enter(token, contestId, cleanTitle, design);
+      await contestsApi.enter(token, contestId, cleanTitle, design, photo);
       setNotice("🚀 You're in! Your design is live on the leaderboard.");
-      setStep(1);
-      setTitle("");
-      setBlurb("");
+      resetSubmit();
       setView("board");
       await loadDetail(contestId);
     } catch (e) {
@@ -207,7 +292,7 @@ export function ContestsApp({ token }: { token: string }) {
     } finally {
       setSubmitting(false);
     }
-  }, [token, contestId, submitting, title, emoji, colors, blurb, loadDetail]);
+  }, [token, contestId, submitting, title, emoji, colors, blurb, photo, resetSubmit, loadDetail]);
 
   if (loading && !detail) {
     return <div className="eko-ct"><p className="eko-ct__muted">Loading contests…</p></div>;
@@ -479,6 +564,54 @@ export function ContestsApp({ token }: { token: string }) {
                 maxLength={140}
                 aria-label="Design caption"
               />
+              <p className="eko-ct__lbl">Real photo 📷 (optional — shows instead of the emoji art)</p>
+              <div className="eko-ct__photobtns">
+                <button
+                  type="button"
+                  className="eko-ct__btn eko-ct__btn--ghost"
+                  onClick={() => cameraRef.current?.click()}
+                  disabled={photoBusy}
+                >
+                  {photoBusy ? "Processing…" : "📷 Take photo"}
+                </button>
+                <button
+                  type="button"
+                  className="eko-ct__btn eko-ct__btn--ghost"
+                  onClick={() => galleryRef.current?.click()}
+                  disabled={photoBusy}
+                >
+                  🖼️ Gallery
+                </button>
+              </div>
+              <input
+                ref={cameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                hidden
+                onChange={onPhotoFile}
+                aria-label="Take a photo with the camera"
+              />
+              <input
+                ref={galleryRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={onPhotoFile}
+                aria-label="Choose a photo from the gallery"
+              />
+              {photo && (
+                <div className="eko-ct__photoprev">
+                  <img src={photo} alt="Your entry photo" />
+                  <button
+                    type="button"
+                    className="eko-ct__photorm"
+                    onClick={() => setPhoto(null)}
+                  >
+                    ✕ Remove
+                  </button>
+                </div>
+              )}
               <div className="eko-ct__cta">
                 <button
                   className="eko-ct__btn"
@@ -501,15 +634,19 @@ export function ContestsApp({ token }: { token: string }) {
             <>
               <p className="eko-ct__lbl">Tap 2 · confirm your entry</p>
               <div className="eko-ct__snap">
-                <span
-                  className="eko-ct__big"
-                  style={{
-                    background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})`,
-                  }}
-                  aria-hidden
-                >
-                  {emoji}
-                </span>
+                {photo ? (
+                  <img src={photo} className="eko-ct__bigphoto" alt="Your entry photo" />
+                ) : (
+                  <span
+                    className="eko-ct__big"
+                    style={{
+                      background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})`,
+                    }}
+                    aria-hidden
+                  >
+                    {emoji}
+                  </span>
+                )}
                 <div className="eko-ct__cap">
                   ✏️ “{title.trim()}
                   {blurb.trim() ? ` — ${blurb.trim()}` : ""}”
