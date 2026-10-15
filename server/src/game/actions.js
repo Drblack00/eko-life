@@ -12,6 +12,7 @@ import {
   BANK, STARTER_LOAN_AMOUNT, TRAVEL_FARES, STUDY_COST, COLLECT_RADIUS,
   cleanText, WALLS, FLOORS,
 } from './data.js';
+import { findVenue } from './cities.js';
 import { clamp, chargeRent, applyDayEconomy, furnitureEffects, distUnits } from './sim.js';
 import {
   RUN_FEE, GOV_BROADCAST_COOLDOWN_MS,
@@ -95,8 +96,8 @@ function placedFurnitureEffects(conn) {
 // Travel fare between two locations: ₦0 within a region,
 // ₦200 mainland↔island ("danfo fare"), ₦500 for any boat crossing.
 export function travelFare(fromId, toId) {
-  const from = LOCATIONS.find(x => x.id === fromId);
-  const to = LOCATIONS.find(x => x.id === toId);
+  const from = findVenue(fromId, LOCATIONS);
+  const to = findVenue(toId, LOCATIONS);
   if (!from || !to) return TRAVEL_FARES.crossRegion;
   if (from.region === to.region) return TRAVEL_FARES.sameRegion;
   if (from.region === 'lagoon' || to.region === 'lagoon') return TRAVEL_FARES.boat;
@@ -236,7 +237,7 @@ export async function handleAct(ctx, msg) {
 
   // ---------- travel (fares: same-region free, cross-region ₦200, boat ₦500) ----------
   if (a === 'travel') {
-    const loc = LOCATIONS.find(x => x.id === String(msg.locationId));
+    const loc = findVenue(String(msg.locationId), LOCATIONS);
     if (!loc) { err('Unknown location.'); return; }
     if (c.location_id === loc.id) { err('You are already there.'); return; }
     if (Number(c.energy) < 5) { err('Too tired to travel. Rest first.'); return; }
