@@ -1,0 +1,325 @@
+/* UGC Design Contests — Duel style (contests-option-b mockup).
+   Theme tokens ONLY (see web/src/styles/tokens.css). No hardcoded colors. */
+
+.eko-ct {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  color: var(--text);
+}
+
+.eko-ct__muted {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin: var(--space-4) 0;
+}
+
+.eko-ct__lbl {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.eko-ct__center { text-align: center; }
+
+/* contest picker chips */
+.eko-ct__chips {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+}
+.eko-ct__chip {
+  flex: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--text-muted);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.eko-ct__chip--on {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+/* header */
+.eko-ct__head { padding: var(--space-1) 0; }
+.eko-ct__head b { font-size: 1.15rem; }
+.eko-ct__sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.eko-ct__pills {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.eko-ct__pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.eko-ct__notice {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text);
+  margin: 0;
+}
+
+/* ---- ranked leaderboard ---- */
+.eko-ct__ranks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.eko-ct__card {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.eko-ct__rk {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+}
+.eko-ct__pos {
+  font-size: 1rem;
+  font-weight: 800;
+  width: 1.75rem;
+  text-align: center;
+  color: var(--text-muted);
+  flex: none;
+}
+.eko-ct__pos--top { color: var(--accent); }
+.eko-ct__sw {
+  width: 2.875rem;
+  height: 2.875rem;
+  border-radius: var(--space-3);
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+.eko-ct__inf { flex: 1; min-width: 0; }
+.eko-ct__inf b {
+  font-size: 0.8rem;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.eko-ct__mine { color: var(--accent); font-weight: 800; }
+.eko-ct__vbar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  margin-top: 5px;
+  overflow: hidden;
+  display: block;
+}
+.eko-ct__vbar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--primary));
+  border-radius: var(--radius-pill);
+  transition: width 0.4s ease;
+}
+
+/* ---- duel ---- */
+.eko-ct__duel-hd { text-align: center; padding-top: var(--space-2); }
+.eko-ct__duel-hd b { font-size: 1rem; }
+.eko-ct__vs {
+  display: flex;
+  gap: var(--space-3);
+  align-items: stretch;
+  margin-top: var(--space-3);
+}
+.eko-ct__fighter {
+  flex: 1;
+  min-width: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 2px solid var(--surface-2);
+  background: var(--surface);
+  padding: 0;
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+}
+.eko-ct__fighter:disabled { cursor: default; }
+.eko-ct__fighter--win {
+  border-color: var(--success);
+  box-shadow: 0 0 18px var(--surface-2);
+}
+.eko-ct__art {
+  height: 11.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4.5rem;
+}
+.eko-ct__finf { padding: var(--space-2); text-align: center; display: block; }
+.eko-ct__finf b { font-size: 0.72rem; display: block; }
+.eko-ct__vsbadge {
+  align-self: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--neutral-900);
+  background: var(--accent);
+  width: 2.125rem;
+  height: 2.125rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.eko-ct__ok {
+  text-align: center;
+  margin-top: var(--space-3);
+  color: var(--success);
+  font-weight: 800;
+  font-size: 0.8rem;
+}
+.eko-ct__duel-cta { margin: var(--space-4) 0 var(--space-2); text-align: center; }
+.eko-ct__skip {
+  display: block;
+  margin: var(--space-2) auto 0;
+  background: none;
+  border: none;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ---- quick submit ---- */
+.eko-ct__egrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-3);
+}
+.eko-ct__emoji {
+  font-size: 1.6rem;
+  padding: var(--space-2) 0;
+  border-radius: var(--radius-sm);
+  border: 2px solid transparent;
+  background: var(--surface);
+  cursor: pointer;
+}
+.eko-ct__emoji--on { border-color: var(--accent); }
+.eko-ct__cgrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-3);
+}
+.eko-ct__swbtn {
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.eko-ct__swbtn--on { border-color: var(--accent); }
+.eko-ct__input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.eko-ct__input::placeholder { color: var(--text-muted); }
+.eko-ct__snap {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--surface-2);
+  position: relative;
+  margin-top: var(--space-2);
+}
+.eko-ct__big {
+  height: 18rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 6rem;
+}
+.eko-ct__cap {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: var(--space-3);
+  background: var(--neutral-900);
+  color: var(--neutral-0);
+  font-size: 0.75rem;
+  font-weight: 700;
+  opacity: 0.92;
+}
+.eko-ct__snapbtns {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.eko-ct__snapbtns .eko-ct__btn { flex: 1; }
+.eko-ct__foot { margin-top: var(--space-3); }
+
+/* ---- shared ---- */
+.eko-ct__cta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.eko-ct__btn {
+  background: var(--accent);
+  color: var(--neutral-900);
+  font-weight: 800;
+  font-size: 0.85rem;
+  font-family: inherit;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+}
+.eko-ct__btn:disabled { opacity: 0.5; cursor: default; }
+.eko-ct__btn--ghost {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.eko-ct__empty {
+  text-align: center;
+  padding: var(--space-6) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: center;
+}
+.eko-ct__empty-emoji { font-size: 3rem; }
+.eko-ct__empty p { color: var(--text-muted); font-size: 0.85rem; margin: 0; }
