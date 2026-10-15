@@ -26,6 +26,22 @@ const BLURB_MAX = 140;
 const EMOJI_RE = /^.{1,12}$/u;
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 const DEFAULT_DESIGN = { emoji: '🎨', colors: ['#0ea5e9', '#22c55e'], blurb: '' };
+/** Max photo payload: 512KB data URL (client downscales to ~1024px JPEG first). */
+const PHOTO_MAX_LEN = 512 * 1024;
+const PHOTO_PREFIX = 'data:image/';
+
+/**
+ * Validate the optional entry photo. Returns the photo string, null when
+ * absent, or { error } when invalid. Gameplay only — photos are player
+ * snaps, never real money.
+ */
+function parsePhoto(raw) {
+  if (raw == null || raw === '') return { photo: null };
+  if (typeof raw !== 'string') return { error: 'Photo must be an image data URL.' };
+  if (!raw.startsWith(PHOTO_PREFIX)) return { error: 'Photo must be an image data URL.' };
+  if (raw.length > PHOTO_MAX_LEN) return { error: 'Photo is too large (max 512KB).' };
+  return { photo: raw };
+}
 
 function parseDesign(raw) {
   let d = DEFAULT_DESIGN;
@@ -119,11 +135,13 @@ async function voteStreak(voterId) {
 /** Ranked leaderboard rows for a contest. */
 async function leaderboard(contestId, viewerId) {
   const rows = await dbAll(
-    `SELECT e.id, e.title, e.design_json AS designJson, e.user_id AS userId, u.username,
+    `SELECT e.id, e.title, e.design_json AS designJson, e.photo AS photo,
+            e.user_id AS userId, u.username,
             (SELECT COUNT(*) FROM contest_votes v WHERE v.entry_id = e.id) AS votes
      FROM contest_entries e JOIN users u ON u.id = e.user_id
      WHERE e.contest_id = ? ORDER BY votes DESC, e.id ASC`,
-    pg(`SELECT e.id, e.title, e.design_json AS "designJson", e.user_id AS "userId", u.username,
+    pg(`SELECT e.id, e.title, e.design_json AS "designJson", e.photo AS "photo",
+               e.user_id AS "userId", u.username,
                (SELECT COUNT(*) FROM contest_votes v WHERE v.entry_id = e.id) AS votes
         FROM contest_entries e JOIN users u ON u.id = e.user_id
         WHERE e.contest_id = ? ORDER BY votes DESC, e.id ASC`),
@@ -134,6 +152,7 @@ async function leaderboard(contestId, viewerId) {
     id: Number(r.id),
     title: r.title,
     design: parseDesign(r.designJson),
+    photo: r.photo || null,
     username: r.username,
     votes: Number(r.votes) || 0,
     share: max > 0 ? (Number(r.votes) || 0) / max : 0,
@@ -219,12 +238,14 @@ export function createContestsRouter() {
     if (!c) return res.status(404).json({ error: 'Contest not found.' });
     if (c.status !== 'active') return res.status(400).json({ error: 'This contest has ended.' });
     const rows = await dbAll(
-      `SELECT e.id, e.title, e.design_json AS designJson, e.user_id AS userId, u.username
+      `SELECT e.id, e.title, e.design_json AS designJson, e.photo AS photo,
+              e.user_id AS userId, u.username
        FROM contest_entries e JOIN users u ON u.id = e.user_id
        WHERE e.contest_id = ? AND e.user_id != ?
          AND NOT EXISTS (SELECT 1 FROM contest_votes v WHERE v.entry_id = e.id AND v.voter_id = ?)
        ORDER BY RANDOM() LIMIT 2`,
-      pg(`SELECT e.id, e.title, e.design_json AS "designJson", e.user_id AS "userId", u.username
+      pg(`SELECT e.id, e.title, e.design_json AS "designJson", e.photo AS "photo",
+                 e.user_id AS "userId", u.username
           FROM contest_entries e JOIN users u ON u.id = e.user_id
           WHERE e.contest_id = ? AND e.user_id != ?
             AND NOT EXISTS (SELECT 1 FROM contest_votes v WHERE v.entry_id = e.id AND v.voter_id = ?)
@@ -256,6 +277,7 @@ export function createContestsRouter() {
       id: Number(r.id),
       title: r.title,
       design: parseDesign(r.designJson),
+      photo: r.photo || null,
       username: r.username,
     }));
     res.json({ pair, reason: null, duelNo: (Number(mine.n) || 0) + 1, votesLeft, streak });
@@ -307,7 +329,7 @@ export function createContestsRouter() {
     });
   });
 
-  // ---- entries: 2-tap submit (title + emoji/colors/blurb design) ----
+  // ---- entries: 2-tap submit (title + emoji/colors/blurb design, optional photo) ----
   router.post('/:id/entries', async (req, res) => {
     const user = await authedUser(req, res);
     if (!user) return;
@@ -320,16 +342,18 @@ export function createContestsRouter() {
       return res.status(400).json({ error: 'Unknown contest category.' });
     }
     const design = parseDesign((req.body && req.body.design) || {});
+    const { photo, error: photoError } = parsePhoto(req.body && req.body.photo);
+    if (photoError) return res.status(400).json({ error: photoError });
     const now = new Date().toISOString();
     const id = await insertReturningId(
-      `INSERT INTO contest_entries (contest_id, user_id, title, design_json, created_at)
-       VALUES (?,?,?,?,?)`,
-      [c.id, user.id, title, JSON.stringify(design), now],
+      `INSERT INTO contest_entries (contest_id, user_id, title, design_json, photo, created_at)
+       VALUES (?,?,?,?,?,?)`,
+      [c.id, user.id, title, JSON.stringify(design), photo, now],
     );
     res.json({
       ok: true,
       entry: {
-        id, title, design, username: user.username, votes: 0, share: 0, isMine: true,
+        id, title, design, photo, username: user.username, votes: 0, share: 0, isMine: true,
       },
     });
   });
