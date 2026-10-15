@@ -1,16 +1,78 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Button, Loading, ToastProvider } from "./components";
 import { Landing, type AuthEntry } from "./views/Landing";
-import { Auth } from "./views/Auth";
-import { CreateCharacter } from "./views/CreateCharacter";
+// Perf: Auth + CreateCharacter only render after a user action — keep them
+// out of the initial bundle. Landing + Game stay eager (critical path).
+const Auth = lazy(() =>
+  import("./views/Auth").then((m) => ({ default: m.Auth }))
+);
+const CreateCharacter = lazy(() =>
+  import("./views/CreateCharacter").then((m) => ({ default: m.CreateCharacter }))
+);
 import { Game } from "./views/Game";
 import { api, ApiError, type Me } from "./lib/api";
 import { clearSession, getToken, getUsername } from "./lib/auth";
-import "./views/Auth.css"; // shared .eko-input / .eko-check / .eko-field styles
+import {
+  startCloudSaveSync,
+  stopCloudSaveSync,
+  type CloudSavePayload,
+} from "./lib/cloudSave";
+import { WALKTHROUGH_KEY } from "./views/Walkthrough";
 
 type View = "landing" | "auth" | "gate" | "create" | "game";
 
 const VIEW_KEY = "eko_view";
+
+/** localStorage key mirrored by the cloud save (see lib/cloudSave.ts). */
+const BLOCK_KEY = "eko:blocked:v1";
+
+/** Read the ancillary local state that the cloud save mirrors. */
+function readCloudPayload(username: string): CloudSavePayload {
+  let blocked: Record<string, string> | undefined;
+  try {
+    const raw = window.localStorage.getItem(BLOCK_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") blocked = parsed;
+    }
+  } catch {
+    /* ignore — payload just omits it */
+  }
+  let walkthroughDone = false;
+  try {
+    walkthroughDone = window.localStorage.getItem(WALKTHROUGH_KEY) === "1";
+  } catch {
+    /* ignore */
+  }
+  let charDone = false;
+  try {
+    charDone = window.localStorage.getItem(`eko_char_done:${username}`) === "1";
+  } catch {
+    /* ignore */
+  }
+  return { v: 1, blocked, walkthroughDone, charDone };
+}
+
+/**
+ * Apply a server cloud-save payload over local state, then notify the
+ * game socket hook so in-memory state (blocked map) refreshes too.
+ */
+function applyCloudPayload(username: string, p: CloudSavePayload): void {
+  try {
+    if (p.blocked !== undefined)
+      window.localStorage.setItem(BLOCK_KEY, JSON.stringify(p.blocked));
+    if (p.walkthroughDone !== undefined)
+      window.localStorage.setItem(WALKTHROUGH_KEY, p.walkthroughDone ? "1" : "0");
+    if (p.charDone !== undefined) {
+      const k = `eko_char_done:${username}`;
+      if (p.charDone) window.localStorage.setItem(k, "1");
+      else window.localStorage.removeItem(k);
+    }
+  } catch {
+    /* private mode — nothing persisted */
+  }
+  window.dispatchEvent(new Event("eko:cloud-save-applied"));
+}
 
 /**
  * Tiny view router — no react-router needed for v1.
@@ -45,6 +107,7 @@ export function App() {
   };
 
   const signOut = () => {
+    stopCloudSaveSync();
     clearSession();
     setToken(null);
     setUsername("");
@@ -81,6 +144,17 @@ export function App() {
       .then((me) => {
         if (!live) return;
         setUsername(me.username);
+        // Cloud saves: sync ancillary local state for full accounts.
+        // Guests stay local-only (server 403s their cloud-save calls).
+        if (me.is_guest) {
+          stopCloudSaveSync();
+        } else {
+          const uname = me.username;
+          startCloudSaveSync(
+            () => readCloudPayload(uname),
+            (p) => applyCloudPayload(uname, p)
+          );
+        }
         go(needsCreation(me) ? "create" : "game");
       })
       .catch((err) => {
@@ -114,7 +188,8 @@ export function App() {
         />
       )}
       {view === "auth" && (
-        <Auth
+        <Suspense fallback={<Loading message="Loading…" />}>
+          <Auth
           initialTab={authTab}
           guestToken={upgradeToken}
           referralCode={referralCode}
@@ -128,7 +203,8 @@ export function App() {
             setUpgradeToken(null);
             go("gate");
           }}
-        />
+          />
+        </Suspense>
       )}
       {view === "gate" && (
         <div className="eko-game__boot">
@@ -148,12 +224,14 @@ export function App() {
         </div>
       )}
       {view === "create" && token && (
-        <CreateCharacter
-          token={token}
-          username={username}
-          onDone={() => go("game")}
-          onSignOut={signOut}
-        />
+        <Suspense fallback={<Loading message="Loading…" />}>
+          <CreateCharacter
+            token={token}
+            username={username}
+            onDone={() => go("game")}
+            onSignOut={signOut}
+          />
+        </Suspense>
       )}
       {view === "game" && token && (
         <Game token={token} onSignOut={signOut} onUpgrade={upgradeToAccount} />
