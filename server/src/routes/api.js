@@ -29,6 +29,11 @@ import {
   AVATAR_TOP_COLORS, AVATAR_BOTTOM_COLORS, DEFAULT_AVATAR, sanitizeAvatar,
   WALLS, FLOORS,
 } from '../game/data.js';
+// Home City V1: Nigerian city packs (venues, jobs, travel fares).
+import {
+  CITIES, cityIds, getCity, citySummary,
+  allCityVenues, allCityJobs, cityTravelFare, citySpawnVenue,
+} from '../game/cities.js';
 // M6: versioned appearance persistence (validator + persist + catalog).
 import {
   AppearanceValidationError,
@@ -136,6 +141,10 @@ function characterBody(user, c, day) {
     day,
     is_admin: !!Number(user.is_admin),
     guest: !!Number(user.is_guest),
+    // Home City V1: home city (origin) + current city (where the player is).
+    homeCity: c.home_city || 'lagos',
+    currentCity: c.current_city || 'lagos',
+    city: citySummary(c.current_city || 'lagos'),
     // Character panel: masked account email (null when the account has none).
     email_masked: maskEmail(user.email),
   };
@@ -233,8 +242,11 @@ export function createApiRouter({ hub, getDay }) {
   router.get('/config', (req, res) => {
     res.json({
       classes: CLASSES,
-      locations: LOCATIONS,
-      jobs: JOBS,
+      // Home City V1: city summaries + city-scoped venues/jobs merged in.
+      // Entries carry an optional `cities` array; absent = available everywhere.
+      cities: cityIds().map(citySummary),
+      locations: [...LOCATIONS, ...allCityVenues()],
+      jobs: [...JOBS, ...allCityJobs()],
       food: FOOD,
       fun: FUN,
       housing: HOUSING,
@@ -466,6 +478,15 @@ export function createApiRouter({ hub, getDay }) {
       avatarLook = JSON.stringify(res15.avatar);
     }
 
+    // Home City V1: optional home city choice (defaults to Lagos).
+    // Sets home + current city, spawn venue, and adds the city's starting cash.
+    const cityId = String(req.body.city || 'lagos').toLowerCase();
+    if (!CITIES[cityId]) {
+      return res.status(400).json({ error: 'Unknown city. Pick one of: ' + cityIds().join(', ') + '.' });
+    }
+    const city = getCity(cityId);
+    const spawn = citySpawnVenue(cityId, LOCATIONS);
+
     const pkg = CLASSES[classId];
     c.name = name;
     c.class = pkg.id;
@@ -474,7 +495,14 @@ export function createApiRouter({ hub, getDay }) {
     c.avatar_look = avatarLook; // M15: null unless a valid look was provided
     c.customized = 1;
     c.rent_misses = 0;
-    c.money = pkg.startMoney;
+    c.money = pkg.startMoney + city.starting_cash;
+    c.home_city = cityId;
+    c.current_city = cityId;
+    if (spawn) {
+      c.location_id = spawn.id;
+      c.x = spawn.x;
+      c.y = spawn.y;
+    }
     c.housing = pkg.housing;
     c.happiness = Math.min(100, Number(c.happiness) + (pkg.happinessBonus || 0));
     c.starter_loan_available = classId === 'street_smart' ? 1 : 0;
@@ -482,6 +510,53 @@ export function createApiRouter({ hub, getDay }) {
     await addTransaction(user.id, 'class_package', c.money, c.money, { class: classId });
     console.log(`[characters] ${user.username} created character "${name}" (${classId})`);
     res.json({ ok: true, character: characterBody(user, c, getDay().day) });
+  });
+
+  // ---- Home City V1: inter-city travel ----
+  // POST /api/travel/city { city, mode } — bus (cheap) or flight (fast).
+  // Fare is deducted from gameplay coins; sets current city + spawn venue.
+  router.post('/travel/city', authMiddleware, async (req, res) => {
+    const user = await getUserById(req.userId);
+    if (!user) return res.status(401).json({ error: 'Account not found.' });
+    if (Number(user.banned)) return res.status(403).json({ error: 'This account is banned.' });
+    const cityId = String(req.body.city || '').toLowerCase();
+    const mode = String(req.body.mode || 'bus').toLowerCase();
+    if (!CITIES[cityId]) {
+      return res.status(400).json({ error: 'Unknown city. Pick one of: ' + cityIds().join(', ') + '.' });
+    }
+    if (mode !== 'bus' && mode !== 'flight') {
+      return res.status(400).json({ error: "Mode must be 'bus' or 'flight'." });
+    }
+    const c = await ensureCharacter(user.id, user.username);
+    const fromId = c.current_city || 'lagos';
+    if (fromId === cityId) {
+      return res.status(400).json({ error: `You are already in ${getCity(cityId).name}.` });
+    }
+    const fare = cityTravelFare(fromId, cityId, mode);
+    if (Number(c.money) < fare) {
+      return res.status(400).json({ error: `You need ₦${fare.toLocaleString('en-NG')} for this trip.` });
+    }
+    const spawn = citySpawnVenue(cityId, LOCATIONS);
+    c.money = Number(c.money) - fare;
+    c.current_city = cityId;
+    if (spawn) {
+      c.location_id = spawn.id;
+      c.x = spawn.x;
+      c.y = spawn.y;
+    }
+    await saveCharacter(c);
+    const after = Number(c.money);
+    await addTransaction(user.id, 'city_travel', -fare, after, {
+      from: fromId, to: cityId, mode, fare,
+    });
+    console.log(`[travel] ${user.username} ${mode} ${fromId} → ${cityId} (fare ${fare})`);
+    res.json({
+      ok: true,
+      fare,
+      mode,
+      city: citySummary(cityId),
+      character: characterBody(user, c, getDay().day),
+    });
   });
 
   // ---- M6: versioned appearance persistence ----
