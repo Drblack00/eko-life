@@ -54,10 +54,15 @@
 
 .citypick-card__nm {
   font-family: var(--font-display);
-  font-size: 1.05rem;
-  font-weight: 800;
+  /* BOLD state names (user request, city-flow-b mockup): 900 weight +
+   * stronger double shadow so they never wash out on the photos. */
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
   color: #fff;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.85),
+    0 1px 3px rgba(0, 0, 0, 0.9);
 }
 
 .citypick-card__tag {

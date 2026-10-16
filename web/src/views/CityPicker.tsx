@@ -56,7 +56,8 @@ export function CityPicker({
   onSelect,
 }: {
   cities: CityInfo[];
-  selectedId: string;
+  /** Null = nothing selected yet (page 2 starts unselected). */
+  selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
   return (

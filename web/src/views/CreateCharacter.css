@@ -35,10 +35,45 @@
   width: 100%;
   max-width: 560px;
   margin: 0 auto;
-  padding: 0 var(--space-4) calc(var(--space-8) + var(--sab));
+  padding: 0 var(--space-4) var(--space-6);
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+  flex: 1;
+}
+
+/* 3-page creation flow: the form fills the column so the sticky CTA
+ * footer pins to the viewport bottom while pages scroll above it. */
+.eko-create__form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.eko-create__cta {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-4) calc(var(--space-3) + var(--sab));
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--bg) 45%
+  );
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-create__hint {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0;
 }
 
 .eko-create__title {
@@ -214,7 +249,7 @@
   font-weight: 600;
 }
 /* #dc2626 fails on dark surfaces — lighten at night. */
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-create__error {
+[data-theme="night"] .eko-create__error {
   color: #f87171;
 }
 

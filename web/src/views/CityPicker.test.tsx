@@ -97,6 +97,19 @@ describe("CityPicker", () => {
     expect(cards[2].classList.contains("citypick-card--sel")).toBe(false);
   });
 
+  it("starts with nothing selected when selectedId is null", () => {
+    render(<CityPicker cities={CITIES} selectedId={null} onSelect={() => {}} />);
+    const radios = screen.getAllByRole("radio");
+    expect(radios).toHaveLength(4);
+    for (const r of radios) {
+      expect(r.getAttribute("aria-checked")).toBe("false");
+    }
+    const cards = document.querySelectorAll(".citypick-card");
+    for (const card of cards) {
+      expect(card.classList.contains("citypick-card--sel")).toBe(false);
+    }
+  });
+
   it("cityPhotoSrc maps city ids to /cities/*.jpg", () => {
     expect(cityPhotoSrc("lagos")).toBe("/cities/lagos.jpg");
     expect(cityPhotoSrc("benin")).toBe("/cities/benin.jpg");

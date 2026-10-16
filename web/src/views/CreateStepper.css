@@ -1,0 +1,96 @@
+/* CreateStepper — labeled creation stepper.
+ * Approved design: ~/workspace/eko-life-mockups/city-flow-b-stepper.html
+ * (reproduce exactly). Theme tokens only: --accent (amber), --success
+ * (green checks), --text-muted (upcoming steps). */
+
+.cc-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0 2px;
+}
+
+.cc-back {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--surface-2);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 2px;
+}
+
+.cc-back--ghost {
+  visibility: hidden;
+}
+
+.cc-stepper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.cc-stp {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.cc-stp i {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--surface-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 800;
+  flex: none;
+}
+
+.cc-stp--done {
+  color: var(--success);
+}
+
+.cc-stp--done i {
+  background: var(--success);
+  border-color: var(--success);
+  color: #06281a;
+}
+
+.cc-stp--now {
+  color: var(--text);
+}
+
+.cc-stp--now i {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a1206;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.7);
+}
+
+.cc-sep {
+  width: 14px;
+  height: 1.5px;
+  background: var(--surface-2);
+  flex: none;
+}
+
+.cc-sep--done {
+  background: var(--success);
+}
