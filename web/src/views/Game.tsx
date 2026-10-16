@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useGameSocket } from "../hooks/useGameSocket";
 import {
@@ -89,6 +89,10 @@ import { blip, isSoundEnabled, setSoundEnabled } from "../lib/sound";
 import { ThingsToDoDialog, VenueExtras } from "./VenuePanel";
 import "./VenuePanel.css";
 import { parseVenueHash } from "../game/venues";
+// Inter-city travel: 3D Nigeria map + travel sheet (lazy — heavy Three.js).
+const TravelView = lazy(() =>
+  import("./TravelView").then((m) => ({ default: m.TravelView }))
+);
 // V2 milestones: shifts (M7), needs (M8), daily (M9), economy (M10),
 // governance (M11), skills/academy (M12).
 import { Clock, JobsTab } from "./v2/m7";
@@ -275,12 +279,14 @@ function CityTab({
   spawns,
   onPinSelect,
   onOpenThings,
+  onOpenTravel,
 }: {
   you: You;
   config: GameConfig | null;
   spawns: StreetSpawn[];
   onPinSelect: (p: PinLocation) => void;
   onOpenThings: () => void;
+  onOpenTravel: () => void;
 }) {
   const pins = useMemo<PinLocation[]>(() => {
     if (!config) return [];
@@ -353,6 +359,15 @@ function CityTab({
       </div>
       <div className="eko-city__mapwrap">
         <LagosMap pins={pins} onPinSelect={onPinSelect} />
+        <button
+          type="button"
+          className="eko-city__travel"
+          onClick={onOpenTravel}
+          aria-label="Travel to another state"
+          title="Travel to another state"
+        >
+          🚌 Travel
+        </button>
       </div>
       <p className="eko-city__tip">
         Tap a pin to see what's there — travelling costs 5 energy, so choose
@@ -817,6 +832,8 @@ export function Game({
   const [pinSheet, setPinSheet] = useState<PinLocation | null>(null);
   // Phase 5: "Things to do" (T) dialog.
   const [thingsOpen, setThingsOpen] = useState(false);
+  // Inter-city travel overlay (3D Nigeria map).
+  const [travelOpen, setTravelOpen] = useState(false);
   const [dayBanner, setDayBanner] = useState<number | null>(null);
   const [electionOpen, setElectionOpen] = useState(false);
   // M21: notification panel visibility.
@@ -1397,6 +1414,7 @@ export function Game({
             spawns={sock.spawns}
             onPinSelect={handlePinSelect}
             onOpenThings={() => setThingsOpen(true)}
+            onOpenTravel={() => setTravelOpen(true)}
           />
         )}
       </main>
@@ -1482,6 +1500,26 @@ export function Game({
         config={config}
         onSelect={openVenueFromList}
       />
+
+      {/* Inter-city travel: 3D Nigeria map + booking sheet. */}
+      {travelOpen && (
+        <Suspense fallback={null}>
+          <TravelView
+            you={you}
+            config={config}
+            token={token}
+            onClose={() => setTravelOpen(false)}
+            onTravelled={(character) => {
+              sock.patchYou({
+                currentCity: character.currentCity,
+                money: character.money,
+                locationId: character.locationId,
+              });
+              setTravelOpen(false);
+            }}
+          />
+        </Suspense>
+      )}
 
       <Walkthrough
         open={walkthroughOpen}
