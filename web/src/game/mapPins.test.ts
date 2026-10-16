@@ -1,1 +1,157 @@
-LyoqCiAqIENsaWVudCB1bml0IHRlc3RzIOKAlCBnYW1lL21hcFBpbnMudHMgYHRvUGluYCBtYXBwZXIgKCsgbWFwVG9Xb3JsZCBoZWxwZXJzKS4KICogUHVyZSBjb29yZGluYXRlIG1hdGggb25seTsgbm8gRE9NIC8gbm8gVGhyZWUuanMuCiAqLwppbXBvcnQgeyBkZXNjcmliZSwgZXhwZWN0LCBpdCB9IGZyb20gInZpdGVzdCI7CmltcG9ydCB7IGRlY2x1dHRlclBpbnMsIG1hcFRvV29ybGQsIG1hcFhZVG9Xb3JsZCwgdG9QaW4gfSBmcm9tICIuL21hcFBpbnMiOwoKZGVzY3JpYmUoInRvUGluIOKAlCBzZXJ2ZXIgc2hhcGUge3JlZ2lvbixpY29uLHg6MC4uMTAwLHk6MC4uMTAwfSIsICgpID0+IHsKICBpdCgibWFwcyBzZXJ2ZXIgMC4uMTAwIGNvb3JkcyBpbnRvIHdvcmxkIHNwYWNlICgtODYuLjg2KSIsICgpID0+IHsKICAgIGNvbnN0IHBpbiA9IHRvUGluKAogICAgICB7IGlkOiAibDEiLCBuYW1lOiAiU3VucmlzZSBNYXJrZXQiLCByZWdpb246ICJtYWlubGFuZCIsIGljb246ICLwn6e6IiwgeDogMCwgeTogMCB9LAogICAgICAwLAogICAgICAxMAogICAgKTsKICAgIGV4cGVjdChwaW4ueCkudG9CZUNsb3NlVG8oLTg2LCA2KTsKICAgIGV4cGVjdChwaW4ueikudG9CZUNsb3NlVG8oLTg2LCA2KTsKICAgIGV4cGVjdChwaW4uem9uZSkudG9CZSgibWFpbmxhbmQiKTsKICAgIGV4cGVjdChwaW4uZW1vamkpLnRvQmUoIvCfp7oiKTsKICAgIGV4cGVjdChwaW4ubmFtZSkudG9CZSgiU3VucmlzZSBNYXJrZXQiKTsKICB9KTsKCiAgaXQoIm1hcHMgdGhlIG9wcG9zaXRlIGNvcm5lciBhbmQgdGhlIG1pZHBvaW50IiwgKCkgPT4gewogICAgY29uc3QgY29ybmVyID0gdG9QaW4oeyBpZDogImEiLCBuYW1lOiAiQSIsIHg6IDEwMCwgeTogMTAwIH0sIDAsIDEpOwogICAgZXhwZWN0KGNvcm5lci54KS50b0JlQ2xvc2VUbyg4NiwgNik7CiAgICBleHBlY3QoY29ybmVyLnopLnRvQmVDbG9zZVRvKDg2LCA2KTsKICAgIGNvbnN0IG1pZCA9IHRvUGluKHsgaWQ6ICJiIiwgbmFtZTogIkIiLCB4OiA1MCwgeTogNTAgfSwgMCwgMSk7CiAgICBleHBlY3QobWlkLngpLnRvQmVDbG9zZVRvKDAsIDYpOwogICAgZXhwZWN0KG1pZC56KS50b0JlQ2xvc2VUbygwLCA2KTsKICB9KTsKCiAgaXQoImNsYW1wcyBvdXQtb2YtcmFuZ2Ugc2VydmVyIGNvb3JkcyB0byDCsTg2IiwgKCkgPT4gewogICAgY29uc3QgcGluID0gdG9QaW4oeyBpZDogImEiLCBuYW1lOiAiQSIsIHg6IC00MCwgeTogMjIwIH0sIDAsIDEpOwogICAgZXhwZWN0KHBpbi54KS50b0JlKC04Nik7CiAgICBleHBlY3QocGluLnopLnRvQmUoODYpOwogIH0pOwoKICBpdCgicHJlZmVycyB0aGUgZXhwbGljaXQgem9uZSBmaWVsZCwgZmFsbHMgYmFjayB0byByZWdpb24iLCAoKSA9PiB7CiAgICBjb25zdCB6ID0gdG9QaW4oCiAgICAgIHsgaWQ6ICJhIiwgbmFtZTogIkEiLCB6b25lOiAiaXNsYW5kIiwgcmVnaW9uOiAibWFpbmxhbmQiLCB4OiAxMCwgeTogMTAgfSwKICAgICAgMCwKICAgICAgMQogICAgKTsKICAgIGV4cGVjdCh6LnpvbmUpLnRvQmUoImlzbGFuZCIpOwogICAgY29uc3QgciA9IHRvUGluKHsgaWQ6ICJhIiwgbmFtZTogIkEiLCByZWdpb246ICJsYWdvb24iLCB4OiAxMCwgeTogMTAgfSwgMCwgMSk7CiAgICBleHBlY3Qoci56b25lKS50b0JlKCJsYWdvb24iKTsKICB9KTsKfSk7CgpkZXNjcmliZSgidG9QaW4g4oCUIGZhbGxiYWNrIHNoYXBlcyIsICgpID0+IHsKICBpdCgidXNlcyByYXcgeC96IHdvcmxkIGNvb3JkcyBkaXJlY3RseSB3aGVuIHByZXNlbnQgKGNsYW1wZWQpIiwgKCkgPT4gewogICAgY29uc3QgcGluID0gdG9QaW4oeyBpZDogImEiLCBuYW1lOiAiQSIsIHg6IDQyLjUsIHo6IC0xNy4yNSB9LCAwLCAxKTsKICAgIGV4cGVjdChwaW4ueCkudG9CZUNsb3NlVG8oNDIuNSwgNik7CiAgICBleHBlY3QocGluLnopLnRvQmVDbG9zZVRvKC0xNy4yNSwgNik7CiAgICBjb25zdCBvdmVyID0gdG9QaW4oeyBpZDogImIiLCBuYW1lOiAiQiIsIHg6IDk5OSwgejogLTk5OSB9LCAwLCAxKTsKICAgIGV4cGVjdChvdmVyLngpLnRvQmUoODYpOwogICAgZXhwZWN0KG92ZXIueikudG9CZSgtODYpOwogIH0pOwoKICBpdCgic3ByZWFkcyBsYXQvbG5nIGFjcm9zcyB0aGUgbWFwIGFuZCBzdGF5cyBvdXQgb2YgdGhlIGxhZ29vbiBjaGFubmVsIiwgKCkgPT4gewogICAgY29uc3QgcGluID0gdG9QaW4oeyBpZDogImEiLCBuYW1lOiAiQSIsIGxhdDogNi40NSwgbG5nOiAzLjM5IH0sIDAsIDEpOwogICAgZXhwZWN0KHBpbi54KS50b0JlR3JlYXRlclRoYW5PckVxdWFsKC04Nik7CiAgICBleHBlY3QocGluLngpLnRvQmVMZXNzVGhhbk9yRXF1YWwoODYpOwogICAgZXhwZWN0KHBpbi56KS50b0JlR3JlYXRlclRoYW5PckVxdWFsKC04Nik7CiAgICBleHBlY3QocGluLnopLnRvQmVMZXNzVGhhbk9yRXF1YWwoODYpOwogICAgZXhwZWN0KE1hdGguYWJzKHBpbi54KSkudG9CZUdyZWF0ZXJUaGFuT3JFcXVhbCgyMCk7CiAgfSk7CgogIGl0KCJkZXRlcm1pbmlzdGljYWxseSBzY2F0dGVycyBjb29yZC1sZXNzIHBpbnMgdG8gYSByZWdpb24gbWFzcyBieSBpbmRleCIsICgpID0+IHsKICAgIGNvbnN0IGEgPSB0b1Bpbih7IGlkOiAiYSIsIG5hbWU6ICJBIiwgcmVnaW9uOiAiaXNsYW5kIiB9LCAzLCAyNCk7CiAgICBjb25zdCBiID0gdG9QaW4oeyBpZDogImEiLCBuYW1lOiAiQSIsIHJlZ2lvbjogImlzbGFuZCIgfSwgMywgMjQpOwogICAgZXhwZWN0KGEueCkudG9CZShiLngpOwogICAgZXhwZWN0KGEueikudG9CZShiLnopOwogICAgZXhwZWN0KGEueCkudG9CZUdyZWF0ZXJUaGFuKDApOyAvLyBpc2xhbmQgbWFzcyDihpIgcG9zaXRpdmUgeAogICAgZXhwZWN0KGEuem9uZSkudG9CZSgiaXNsYW5kIik7CgogICAgY29uc3QgbWFpbmxhbmQgPSB0b1Bpbih7IGlkOiAiYyIsIG5hbWU6ICJDIiwgcmVnaW9uOiAibWFpbmxhbmQiIH0sIDUsIDI0KTsKICAgIGV4cGVjdChtYWlubGFuZC54KS50b0JlTGVzc1RoYW4oMCk7CgogICAgY29uc3Qgb3RoZXIgPSB0b1Bpbih7IGlkOiAiZCIsIG5hbWU6ICJEIiB9LCA3LCAyNCk7CiAgICBleHBlY3Qob3RoZXIueCkudG9CZUdyZWF0ZXJUaGFuT3JFcXVhbCgtODYpOwogICAgZXhwZWN0KG90aGVyLnopLnRvQmVHcmVhdGVyVGhhbk9yRXF1YWwoLTg2KTsKICB9KTsKfSk7CgpkZXNjcmliZSgidG9QaW4g4oCUIGRlZmVuc2l2ZSBpZGVudGl0eSBmaWVsZHMiLCAoKSA9PiB7CiAgaXQoImRlZmF1bHRzIGlkLCBuYW1lLCBlbW9qaSBhbmQgYmx1cmIgd2hlbiBtaXNzaW5nIiwgKCkgPT4gewogICAgY29uc3QgcGluID0gdG9QaW4oe30gYXMgbmV2ZXIsIDQsIDEwKTsKICAgIGV4cGVjdChwaW4uaWQpLnRvQmUoImxvYy00Iik7CiAgICBleHBlY3QocGluLm5hbWUpLnRvQmUoIk15c3Rlcnkgc3BvdCIpOwogICAgZXhwZWN0KHBpbi5lbW9qaSkudG9CZSgi8J+TjSIpOwogICAgZXhwZWN0KHBpbi5ibHVyYikudG9Db250YWluKCJDcmVhdGUgYSBjaGFyYWN0ZXIiKTsKICB9KTsKCiAgaXQoInByZWZlcnMgZW1vamkgb3ZlciBpY29uIGFuZCBibHVyYiBvdmVyIGRlc2MiLCAoKSA9PiB7CiAgICBjb25zdCBwaW4gPSB0b1BpbigKICAgICAgeyBpZDogImEiLCBuYW1lOiAiQSIsIGVtb2ppOiAi8J+Plu+4jyIsIGljb246ICLwn4yKIiwgYmx1cmI6ICJiZWFjaCIsIGRlc2M6ICJvbGQiIH0gYXMgbmV2ZXIsCiAgICAgIDAsCiAgICAgIDEKICAgICk7CiAgICBleHBlY3QocGluLmVtb2ppKS50b0JlKCLwn4+W77iPIik7CiAgICBleHBlY3QocGluLmJsdXJiKS50b0JlKCJiZWFjaCIpOwogIH0pOwp9KTsKCmRlc2NyaWJlKCJtYXBUb1dvcmxkIC8gbWFwWFlUb1dvcmxkIiwgKCkgPT4gewogIGl0KCJtYXBUb1dvcmxkIGNvbnZlcnRzIHtsYXQsbG5nfSBtYXAgY29vcmRzIGxpa2UgdGhlIHNlcnZlciBzaGFwZSIsICgpID0+IHsKICAgIGNvbnN0IHcgPSBtYXBUb1dvcmxkKDAsIDEwMCk7CiAgICBleHBlY3Qody54KS50b0JlQ2xvc2VUbyg4NiwgNik7CiAgICBleHBlY3Qody56KS50b0JlQ2xvc2VUbygtODYsIDYpOwogIH0pOwoKICBpdCgibWFwWFlUb1dvcmxkIGNvbnZlcnRzIHt4LHl9IG1hcCBjb29yZHMgYW5kIGNsYW1wcyIsICgpID0+IHsKICAgIGNvbnN0IHcgPSBtYXBYWVRvV29ybGQoNTAsIDUwKTsKICAgIGV4cGVjdCh3LngpLnRvQmVDbG9zZVRvKDAsIDYpOwogICAgZXhwZWN0KHcueikudG9CZUNsb3NlVG8oMCwgNik7CiAgICBjb25zdCBvID0gbWFwWFlUb1dvcmxkKC0xMCwgMTIwKTsKICAgIGV4cGVjdChvLngpLnRvQmUoLTg2KTsKICAgIGV4cGVjdChvLnopLnRvQmUoODYpOwogIH0pOwp9KTsKCmRlc2NyaWJlKCJkZWNsdXR0ZXJQaW5zIiwgKCkgPT4gewogIGNvbnN0IG1rID0gKHg6IG51bWJlciwgejogbnVtYmVyLCBpZDogc3RyaW5nKSA9PiAoewogICAgaWQsIG5hbWU6IGlkLCBlbW9qaTogIvCfk40iLCBibHVyYjogIiIsIHgsIHosIHpvbmU6ICJtYWlubGFuZCIgYXMgY29uc3QsCiAgfSk7CgogIGl0KCJzZXBhcmF0ZXMgZXhhY3RseS1zdGFja2VkIHBpbnMiLCAoKSA9PiB7CiAgICBjb25zdCBvdXQgPSBkZWNsdXR0ZXJQaW5zKFttaygwLCAwLCAiYSIpLCBtaygwLCAwLCAiYiIpLCBtaygwLCAwLCAiYyIpXSk7CiAgICBleHBlY3Qob3V0KS50b0hhdmVMZW5ndGgoMyk7CiAgICBmb3IgKGxldCBpID0gMDsgaSA8IG91dC5sZW5ndGg7IGkrKykKICAgICAgZm9yIChsZXQgaiA9IGkgKyAxOyBqIDwgb3V0Lmxlbmd0aDsgaisrKQogICAgICAgIGV4cGVjdChNYXRoLmh5cG90KG91dFtpXS54IC0gb3V0W2pdLngsIG91dFtpXS56IC0gb3V0W2pdLnopKS50b0JlR3JlYXRlclRoYW5PckVxdWFsKDYuOSk7CiAgfSk7CgogIGl0KCJsZWF2ZXMgYWxyZWFkeS1zcHJlYWQgcGlucyB1bnRvdWNoZWQiLCAoKSA9PiB7CiAgICBjb25zdCBwaW5zID0gW21rKC04MCwgLTgwLCAiYSIpLCBtayg4MCwgODAsICJiIiksIG1rKDAsIDAsICJjIildOwogICAgY29uc3Qgb3V0ID0gZGVjbHV0dGVyUGlucyhwaW5zKTsKICAgIGV4cGVjdChvdXRbMF0ueCkudG9CZUNsb3NlVG8oLTgwLCA2KTsKICAgIGV4cGVjdChvdXRbMl0ueikudG9CZUNsb3NlVG8oMCwgNik7CiAgfSk7CgogIGl0KCJrZWVwcyBldmVyeSBwaW4gaW5zaWRlIHRoZSBtYXAgYm91bmRzIiwgKCkgPT4gewogICAgY29uc3QgcGlucyA9IEFycmF5LmZyb20oeyBsZW5ndGg6IDIwIH0sIChfLCBpKSA9PiBtayg4NCwgODQsIGBwJHtpfWApKTsKICAgIGNvbnN0IG91dCA9IGRlY2x1dHRlclBpbnMocGlucyk7CiAgICBmb3IgKGNvbnN0IHAgb2Ygb3V0KSB7CiAgICAgIGV4cGVjdChNYXRoLmFicyhwLngpKS50b0JlTGVzc1RoYW5PckVxdWFsKDg0KTsKICAgICAgZXhwZWN0KE1hdGguYWJzKHAueikpLnRvQmVMZXNzVGhhbk9yRXF1YWwoODQpOwogICAgfQogIH0pOwoKICBpdCgiaXMgZGV0ZXJtaW5pc3RpYyIsICgpID0+IHsKICAgIGNvbnN0IHBpbnMgPSBbbWsoMTAsIDEwLCAiYSIpLCBtaygxMSwgMTAsICJiIiksIG1rKDEwLCAxMSwgImMiKV07CiAgICBjb25zdCBhID0gZGVjbHV0dGVyUGlucyhwaW5zKTsKICAgIGNvbnN0IGIgPSBkZWNsdXR0ZXJQaW5zKHBpbnMpOwogICAgZXhwZWN0KGEpLnRvRXF1YWwoYik7CiAgfSk7Cn0pOwo=
+/**
+ * Client unit tests — game/mapPins.ts `toPin` mapper (+ mapToWorld helpers).
+ * Pure coordinate math only; no DOM / no Three.js.
+ */
+import { describe, expect, it } from "vitest";
+import { declutterPins, mapToWorld, mapXYToWorld, toPin } from "./mapPins";
+
+describe("toPin — server shape {region,icon,x:0..100,y:0..100}", () => {
+  it("maps server 0..100 coords into world space (-86..86)", () => {
+    const pin = toPin(
+      { id: "l1", name: "Sunrise Market", region: "mainland", icon: "🧺", x: 0, y: 0 },
+      0,
+      10
+    );
+    expect(pin.x).toBeCloseTo(-86, 6);
+    expect(pin.z).toBeCloseTo(-86, 6);
+    expect(pin.zone).toBe("mainland");
+    expect(pin.emoji).toBe("🧺");
+    expect(pin.name).toBe("Sunrise Market");
+  });
+
+  it("maps the opposite corner and the midpoint", () => {
+    const corner = toPin({ id: "a", name: "A", x: 100, y: 100 }, 0, 1);
+    expect(corner.x).toBeCloseTo(86, 6);
+    expect(corner.z).toBeCloseTo(86, 6);
+    const mid = toPin({ id: "b", name: "B", x: 50, y: 50 }, 0, 1);
+    expect(mid.x).toBeCloseTo(0, 6);
+    expect(mid.z).toBeCloseTo(0, 6);
+  });
+
+  it("clamps out-of-range server coords to ±86", () => {
+    const pin = toPin({ id: "a", name: "A", x: -40, y: 220 }, 0, 1);
+    expect(pin.x).toBe(-86);
+    expect(pin.z).toBe(86);
+  });
+
+  it("prefers the explicit zone field, falls back to region", () => {
+    const z = toPin(
+      { id: "a", name: "A", zone: "island", region: "mainland", x: 10, y: 10 },
+      0,
+      1
+    );
+    expect(z.zone).toBe("island");
+    const r = toPin({ id: "a", name: "A", region: "lagoon", x: 10, y: 10 }, 0, 1);
+    expect(r.zone).toBe("lagoon");
+  });
+});
+
+describe("toPin — fallback shapes", () => {
+  it("uses raw x/z world coords directly when present (clamped)", () => {
+    const pin = toPin({ id: "a", name: "A", x: 42.5, z: -17.25 }, 0, 1);
+    expect(pin.x).toBeCloseTo(42.5, 6);
+    expect(pin.z).toBeCloseTo(-17.25, 6);
+    const over = toPin({ id: "b", name: "B", x: 999, z: -999 }, 0, 1);
+    expect(over.x).toBe(86);
+    expect(over.z).toBe(-86);
+  });
+
+  it("spreads lat/lng across the map and stays out of the lagoon channel", () => {
+    const pin = toPin({ id: "a", name: "A", lat: 6.45, lng: 3.39 }, 0, 1);
+    expect(pin.x).toBeGreaterThanOrEqual(-86);
+    expect(pin.x).toBeLessThanOrEqual(86);
+    expect(pin.z).toBeGreaterThanOrEqual(-86);
+    expect(pin.z).toBeLessThanOrEqual(86);
+    expect(Math.abs(pin.x)).toBeGreaterThanOrEqual(20);
+  });
+
+  it("deterministically scatters coord-less pins to a region mass by index", () => {
+    const a = toPin({ id: "a", name: "A", region: "island" }, 3, 24);
+    const b = toPin({ id: "a", name: "A", region: "island" }, 3, 24);
+    expect(a.x).toBe(b.x);
+    expect(a.z).toBe(b.z);
+    expect(a.x).toBeGreaterThan(0); // island mass → positive x
+    expect(a.zone).toBe("island");
+
+    const mainland = toPin({ id: "c", name: "C", region: "mainland" }, 5, 24);
+    expect(mainland.x).toBeLessThan(0);
+
+    const other = toPin({ id: "d", name: "D" }, 7, 24);
+    expect(other.x).toBeGreaterThanOrEqual(-86);
+    expect(other.z).toBeGreaterThanOrEqual(-86);
+  });
+});
+
+describe("toPin — defensive identity fields", () => {
+  it("defaults id, name, emoji and blurb when missing", () => {
+    const pin = toPin({} as never, 4, 10);
+    expect(pin.id).toBe("loc-4");
+    expect(pin.name).toBe("Mystery spot");
+    expect(pin.emoji).toBe("📍");
+    expect(pin.blurb).toContain("Create a character");
+  });
+
+  it("prefers emoji over icon and blurb over desc", () => {
+    const pin = toPin(
+      { id: "a", name: "A", emoji: "🏖️", icon: "🌊", blurb: "beach", desc: "old" } as never,
+      0,
+      1
+    );
+    expect(pin.emoji).toBe("🏖️");
+    expect(pin.blurb).toBe("beach");
+  });
+});
+
+describe("mapToWorld / mapXYToWorld", () => {
+  it("mapToWorld converts {lat,lng} map coords like the server shape", () => {
+    const w = mapToWorld(0, 100);
+    expect(w.x).toBeCloseTo(86, 6);
+    expect(w.z).toBeCloseTo(-86, 6);
+  });
+
+  it("mapXYToWorld converts {x,y} map coords and clamps", () => {
+    const w = mapXYToWorld(50, 50);
+    expect(w.x).toBeCloseTo(0, 6);
+    expect(w.z).toBeCloseTo(0, 6);
+    const o = mapXYToWorld(-10, 120);
+    expect(o.x).toBe(-86);
+    expect(o.z).toBe(86);
+  });
+});
+
+describe("declutterPins", () => {
+  const mk = (x: number, z: number, id: string) => ({
+    id, name: id, emoji: "📍", blurb: "", x, z, zone: "mainland" as const,
+  });
+
+  it("separates exactly-stacked pins", () => {
+    const out = declutterPins([mk(0, 0, "a"), mk(0, 0, "b"), mk(0, 0, "c")]);
+    expect(out).toHaveLength(3);
+    for (let i = 0; i < out.length; i++)
+      for (let j = i + 1; j < out.length; j++)
+        expect(Math.hypot(out[i].x - out[j].x, out[i].z - out[j].z)).toBeGreaterThanOrEqual(6.9);
+  });
+
+  it("leaves already-spread pins untouched", () => {
+    const pins = [mk(-80, -80, "a"), mk(80, 80, "b"), mk(0, 0, "c")];
+    const out = declutterPins(pins);
+    expect(out[0].x).toBeCloseTo(-80, 6);
+    expect(out[2].z).toBeCloseTo(0, 6);
+  });
+
+  it("keeps every pin inside the map bounds", () => {
+    const pins = Array.from({ length: 20 }, (_, i) => mk(84, 84, `p${i}`));
+    const out = declutterPins(pins);
+    for (const p of out) {
+      expect(Math.abs(p.x)).toBeLessThanOrEqual(84);
+      expect(Math.abs(p.z)).toBeLessThanOrEqual(84);
+    }
+  });
+
+  it("is deterministic", () => {
+    const pins = [mk(10, 10, "a"), mk(11, 10, "b"), mk(10, 11, "c")];
+    const a = declutterPins(pins);
+    const b = declutterPins(pins);
+    expect(a).toEqual(b);
+  });
+});
