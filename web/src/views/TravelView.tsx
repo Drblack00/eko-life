@@ -13,8 +13,8 @@ import {
 } from "../game/nigeriaGeo";
 import "./TravelView.css";
 
-const NigeriaMap = lazy(() =>
-  import("../game/NigeriaMap").then((m) => ({ default: m.NigeriaMap }))
+const GlobeMap = lazy(() =>
+  import("../game/GlobeMap").then((m) => ({ default: m.GlobeMap }))
 );
 
 interface TravelViewProps {
@@ -31,8 +31,9 @@ function cityName(cities: CityInfo[], id: string): string {
 }
 
 /**
- * Inter-city travel: 3D Nigeria map (real roads, states, rivers) +
- * the approved option-A bottom sheet with full-bleed destination cards.
+ * Inter-city travel: 3D Earth globe with a seamless dive to Nigeria
+ * (real roads, states, rivers) + the approved option-A bottom sheet
+ * with full-bleed destination cards.
  */
 export function TravelView({ you, config, token, onClose, onTravelled }: TravelViewProps) {
   const currentCityId = you.currentCity || you.homeCity || "lagos";
@@ -121,10 +122,10 @@ export function TravelView({ you, config, token, onClose, onTravelled }: TravelV
         {geo && !geoFailed ? (
           <Suspense
             fallback={
-              <div className="travelview__loading">Loading 3D Nigeria…</div>
+              <div className="travelview__loading">Loading 3D globe…</div>
             }
           >
-            <NigeriaMap
+            <GlobeMap
               currentCityId={currentCityId}
               selectedCityId={selDest}
               onSelectCity={(id) => {
