@@ -124,7 +124,7 @@
 }
 .travelview__photo {
   position: relative;
-  height: 92px;
+  height: 104px;
   background-size: cover;
   background-position: center;
 }
@@ -134,11 +134,19 @@
   inset: 0;
   background: linear-gradient(180deg, rgba(4, 8, 14, 0.05) 30%, rgba(4, 8, 14, 0.85));
 }
-.travelview__nm {
+/* Caption block: name + tagline stacked in normal flow so they can
+   never overlap, anchored to the bottom-left clear of the tick. */
+.travelview__cap {
   position: absolute;
   left: 10px;
-  bottom: 24px;
+  right: 44px;
+  bottom: 8px;
   z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.travelview__nm {
   font-size: 18px;
   font-weight: 900;
   color: #fff;
@@ -146,14 +154,14 @@
   letter-spacing: 0.2px;
 }
 .travelview__tg {
-  position: absolute;
-  left: 10px;
-  bottom: 8px;
-  z-index: 2;
   font-size: 11px;
   color: #ffd9a0;
   font-weight: 600;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .travelview__tick {
   position: absolute;
@@ -299,7 +307,7 @@
     border-radius: 18px 18px 0 0;
   }
   .travelview__photo {
-    height: 110px;
+    height: 120px;
   }
 }
 

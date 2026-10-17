@@ -188,8 +188,10 @@ export function TravelView({ you, config, token, onClose, onTravelled }: TravelV
                 className="travelview__photo"
                 style={{ backgroundImage: `url('${cityPhotoSrc(c.id)}')` }}
               >
-                <div className="travelview__nm">{c.name}</div>
-                <div className="travelview__tg">{c.tagline}</div>
+                <div className="travelview__cap">
+                  <div className="travelview__nm">{c.name}</div>
+                  <div className="travelview__tg">{c.tagline}</div>
+                </div>
                 <div className="travelview__tick" aria-hidden="true">
                   ✓
                 </div>
