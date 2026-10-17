@@ -1674,6 +1674,8 @@ export function Game({
         onSelectApp={setPhoneApp}
         renderApp={renderPhoneApp}
         token={token}
+        money={you.money}
+        isAdmin={!!you.is_admin}
       />
 
       <TabBar

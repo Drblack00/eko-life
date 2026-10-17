@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import "./Phone.css";
 import { useGemHunt, GemDialog, gemCountdown } from "../home/GemHunt";
 import { naira } from "../../game/types";
+import { authGet } from "../../lib/api";
 import { blip } from "../../lib/sound";
 
 export interface PhoneApp {
@@ -58,6 +59,18 @@ export const PHONE_APPS: PhoneApp[] = [
 /** Dock holds the four most-used apps. */
 const DOCK_APPS = ["jobs", "gist", "bank", "me"] as const;
 
+/** Direction E (picked 2026-10-17): the widgets home shows these 8. */
+const MOST_USED = [
+  "jobs",
+  "bank",
+  "chat",
+  "games",
+  "daily",
+  "market",
+  "gist",
+  "hustle",
+] as const;
+
 export interface PhoneProps {
   /** Slide-over visible. */
   open: boolean;
@@ -69,6 +82,10 @@ export interface PhoneProps {
   renderApp: (id: string) => ReactNode;
   /** Auth token — the Gem Hunt widget loads the live clue with it. */
   token: string;
+  /** Player's coin balance for the Wallet widget. */
+  money: number;
+  /** Admin god-mode shows ∞ instead of a number. */
+  isAdmin: boolean;
 }
 
 /** Live device clock for the iPhone status bar ("7:18" style). */
@@ -212,6 +229,93 @@ function AppIcon({ app }: { app: PhoneApp }) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Direction E widgets home (picked 2026-10-17): live wallet + daily  */
+/* at a glance. All reads go through authGet with the phone's token.  */
+/* ------------------------------------------------------------------ */
+
+interface HomeWidgets {
+  missionsDone: number;
+  missionsTotal: number;
+  streak: number;
+  claimedToday: boolean;
+  /** Net coin change this Lagos day, null until loaded. */
+  todayNet: number | null;
+  loading: boolean;
+}
+
+const HOME_WIDGETS_INIT: HomeWidgets = {
+  missionsDone: 0,
+  missionsTotal: 3,
+  streak: 0,
+  claimedToday: false,
+  todayNet: null,
+  loading: true,
+};
+
+function useHomeWidgets(token: string, active: boolean): HomeWidgets {
+  const [state, setState] = useState<HomeWidgets>(HOME_WIDGETS_INIT);
+  useEffect(() => {
+    if (!active || !token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [hustle, streak, tx] = await Promise.all([
+          authGet<{ missions?: { done?: boolean; claimed?: boolean }[] }>(
+            "/api/v2/m9/hustle",
+            token
+          ).catch(() => null),
+          authGet<{ count?: number; claimedToday?: boolean }>(
+            "/api/vitality/streak",
+            token
+          ).catch(() => null),
+          authGet<{ transactions?: { amount?: number; created_at?: number; ts?: number }[] }>(
+            "/api/transactions?limit=50",
+            token
+          ).catch(() => null),
+        ]);
+        if (cancelled) return;
+        const missions = Array.isArray(hustle?.missions) ? hustle.missions : [];
+        const done = missions.filter((m) => m.done || m.claimed).length;
+        const dayKey = new Date().toLocaleDateString("en-CA", {
+          timeZone: "Africa/Lagos",
+        });
+        let net = 0;
+        for (const t of tx?.transactions ?? []) {
+          const ms = t.ts ?? t.created_at ?? 0;
+          if (!ms) continue;
+          const k = new Date(ms).toLocaleDateString("en-CA", {
+            timeZone: "Africa/Lagos",
+          });
+          if (k === dayKey) net += Number(t.amount) || 0;
+        }
+        setState({
+          missionsDone: done,
+          missionsTotal: missions.length || 3,
+          streak: Math.max(0, Math.floor(Number(streak?.count) || 0)),
+          claimedToday: !!streak?.claimedToday,
+          todayNet: net,
+          loading: false,
+        });
+      } catch {
+        if (!cancelled) setState((s) => ({ ...s, loading: false }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [active, token]);
+  return state;
+}
+
+/** Time-of-day greeting for the widgets home. */
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 /**
  * Phone — the in-game iPhone.
  *
@@ -231,12 +335,19 @@ export function Phone({
   onSelectApp,
   renderApp,
   token,
+  money,
+  isAdmin,
 }: PhoneProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const clock = useClock();
+  /** Direction E: widgets home vs the full app grid. */
+  const [showAll, setShowAll] = useState(false);
+  const widgets = useHomeWidgets(token, open && activeApp === null);
 
   useEffect(() => {
     if (!open) return;
+    // Direction E: every open starts on the widgets home.
+    setShowAll(false);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -262,12 +373,25 @@ export function Phone({
 
   const goGrid = () => {
     blip("tap");
+    setShowAll(false);
     onSelectApp(null);
   };
   const openApp = (id: string) => () => {
     blip("tap");
     onSelectApp(id);
   };
+
+  /* Direction E widget values (live data, never invented). */
+  const net = widgets.todayNet;
+  const netUp = (net ?? 0) >= 0;
+  const netLabel =
+    widgets.loading || net === null
+      ? "…"
+      : `${netUp ? "+" : "-"}${naira(Math.abs(net))}`;
+  const missionPct =
+    widgets.missionsTotal > 0
+      ? Math.min(100, Math.round((widgets.missionsDone / widgets.missionsTotal) * 100))
+      : 0;
 
   return (
     <div className="eko-phone__scrim" onClick={onClose}>
@@ -318,20 +442,103 @@ export function Phone({
               </>
             ) : (
               <>
-                <nav className="eko-iphone__grid" aria-label="Phone apps">
-                  {PHONE_APPS.map((app) => (
-                    <button
-                      key={app.id}
-                      type="button"
-                      className="eko-iphone__appbtn"
-                      onClick={openApp(app.id)}
-                      aria-label={`Open ${app.label}`}
+                {showAll ? (
+                  <nav className="eko-iphone__grid" aria-label="All phone apps">
+                    {PHONE_APPS.map((app) => (
+                      <button
+                        key={app.id}
+                        type="button"
+                        className="eko-iphone__appbtn"
+                        onClick={openApp(app.id)}
+                        aria-label={`Open ${app.label}`}
+                      >
+                        <AppIcon app={app} />
+                        <span className="eko-iphone__label">{app.label}</span>
+                      </button>
+                    ))}
+                  </nav>
+                ) : (
+                  <div className="eko-iphone__home">
+                    <div className="eko-iphone__greet">
+                      <div className="eko-iphone__greet-hi">{greeting()}</div>
+                      <div className="eko-iphone__greet-sub">
+                        Your day at a glance
+                      </div>
+                    </div>
+                    <div className="eko-iphone__widgets">
+                      <button
+                        type="button"
+                        className="eko-iphone__widget"
+                        onClick={openApp("bank")}
+                        aria-label="Open Èkó Reserve"
+                      >
+                        <span className="eko-iphone__widget-k">💰 Wallet</span>
+                        <span className="eko-iphone__widget-big">
+                          {isAdmin ? "∞" : naira(money)}
+                        </span>
+                        <span
+                          className={`eko-iphone__widget-delta eko-iphone__widget-delta--${
+                            netUp ? "up" : "down"
+                          }`}
+                        >
+                          {netLabel} today
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className="eko-iphone__widget"
+                        onClick={openApp("daily")}
+                        aria-label="Open Daily"
+                      >
+                        <span className="eko-iphone__widget-k">🎯 Daily</span>
+                        <span className="eko-iphone__widget-big">
+                          {widgets.loading
+                            ? "…"
+                            : `${widgets.missionsDone}/${widgets.missionsTotal}`}
+                        </span>
+                        <span className="eko-iphone__widget-sub">
+                          🔥 {widgets.streak} day streak
+                        </span>
+                        <span className="eko-iphone__pbar" aria-hidden="true">
+                          <span style={{ width: `${missionPct}%` }} />
+                        </span>
+                      </button>
+                    </div>
+                    <div className="eko-iphone__mu-h">Most used</div>
+                    <nav
+                      className="eko-iphone__grid eko-iphone__grid--mu"
+                      aria-label="Most used apps"
                     >
-                      <AppIcon app={app} />
-                      <span className="eko-iphone__label">{app.label}</span>
+                      {MOST_USED.map((id) => {
+                        const app = PHONE_APPS.find((a) => a.id === id);
+                        if (!app) return null;
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            className="eko-iphone__appbtn"
+                            onClick={openApp(id)}
+                            aria-label={`Open ${app.label}`}
+                          >
+                            <AppIcon app={app} />
+                            <span className="eko-iphone__label">{app.label}</span>
+                          </button>
+                        );
+                      })}
+                    </nav>
+                    <button
+                      type="button"
+                      className="eko-iphone__allapps"
+                      onClick={() => {
+                        blip("tap");
+                        setShowAll(true);
+                      }}
+                    >
+                      All {PHONE_APPS.length} apps{" "}
+                      <span aria-hidden="true">→</span>
                     </button>
-                  ))}
-                </nav>
+                  </div>
+                )}
                 <div className="eko-iphone__dock" role="group" aria-label="Dock">
                   {DOCK_APPS.map((id) => {
                     const app = PHONE_APPS.find((a) => a.id === id);

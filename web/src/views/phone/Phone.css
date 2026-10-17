@@ -607,6 +607,124 @@
   min-height: 56px;
 }
 
+/* ---- Widgets home (direction E, picked 2026-10-17) ---- */
+.eko-iphone__home {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-content: start;
+  background-color: transparent;
+}
+.eko-iphone__greet-hi {
+  font-size: 28px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.2px;
+  text-shadow: 0 2px 8px rgb(0 0 0 / 0.4);
+}
+.eko-iphone__greet-sub {
+  font-size: 13px;
+  color: rgb(255 255 255 / 0.55);
+  margin-top: 2px;
+}
+.eko-iphone__widgets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.eko-iphone__widget {
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  background: rgb(255 255 255 / 0.04);
+  border: 1px solid rgb(245 166 35 / 0.35);
+  border-radius: 20px;
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow:
+    0 6px 18px rgb(0 0 0 / 0.35),
+    inset 0 1px 1px rgb(255 255 255 / 0.08);
+}
+.eko-iphone__widget:active {
+  transform: scale(0.97);
+}
+.eko-iphone__widget-k {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: #f5a623;
+}
+.eko-iphone__widget-big {
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+}
+.eko-iphone__widget-delta {
+  font-size: 12px;
+  font-weight: 700;
+}
+.eko-iphone__widget-delta--up {
+  color: #4ade80;
+}
+.eko-iphone__widget-delta--down {
+  color: #f87171;
+}
+.eko-iphone__widget-sub {
+  font-size: 12px;
+  color: rgb(255 255 255 / 0.6);
+  font-weight: 600;
+}
+.eko-iphone__pbar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.12);
+  overflow: hidden;
+  margin-top: 4px;
+}
+.eko-iphone__pbar > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #f5a623, #fb923c);
+}
+.eko-iphone__mu-h {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  color: rgb(255 255 255 / 0.5);
+}
+.eko-iphone__grid--mu {
+  flex: none;
+  overflow: visible;
+  padding: 0;
+}
+.eko-iphone__allapps {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: 999px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #1a1206;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  box-shadow:
+    0 6px 18px rgb(245 166 35 / 0.35),
+    inset 0 1px 1px rgb(255 255 255 / 0.4);
+}
+.eko-iphone__allapps:active {
+  transform: scale(0.98);
+  filter: brightness(0.94);
+}
+
 /* ---- iOS nav bar (inside an open app) ---- */
 .eko-iphone__navbar {
   flex: none;
