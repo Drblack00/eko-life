@@ -53,26 +53,21 @@ export function chargeRent(char, housingDefs, isAdmin = false) {
 }
 
 // ---- Day economy (M3) ----
-// Business income, savings interest (+2%/day, floored), loan interest
-// (+10%/day, ceiled), owned-property happiness and placed-generator
-// happiness. Pure: mutates a plain character object, no DB/IO.
+// Business income, loan interest (+10%/day, ceiled), owned-property
+// happiness and placed-generator happiness. Pure: mutates a plain
+// character object, no DB/IO.
+// PORT-P2: savings interest moved to game/v2/p2money.js — 0.5% per game
+// week, accruing per real minute and credited on the day tick (only the
+// first ₦1bn earns). It is NOT part of this pure tick anymore.
 // Returns the deltas so callers can write ledger rows / notifications.
 export function applyDayEconomy(char, { bizDef = null, propDef = null, placed = [] } = {}) {
-  const res = { income: 0, savingsInterest: 0, loanInterest: 0, happyGain: 0, dirty: false };
+  const res = { income: 0, loanInterest: 0, happyGain: 0, dirty: false };
 
   // business income (paid to online players with a note, DB-credited to
   // offline players — the caller decides the side effects)
   if (bizDef && Number(bizDef.income) > 0) {
     res.income = Math.floor(Number(bizDef.income));
     char.money = Math.max(0, Math.floor(Number(char.money) || 0)) + res.income;
-    res.dirty = true;
-  }
-
-  // savings grow 2%/day
-  const savings = Math.max(0, Math.floor(Number(char.savings) || 0));
-  if (savings > 0) {
-    res.savingsInterest = Math.floor(savings * 0.02);
-    char.savings = savings + res.savingsInterest;
     res.dirty = true;
   }
 

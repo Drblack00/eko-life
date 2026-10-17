@@ -6,10 +6,12 @@ import {
   bankApi,
   type BankBond,
   type BankOverview,
+  type TermNote,
   type TransactionInfo,
 } from "../../lib/api";
 import { naira, type ActName, type You } from "../../game/types";
 import { kindLabel } from "../home/LedgerSheet";
+import { TopUpPacks } from "./TopUpPacks";
 import "./BankApp.css";
 
 /**
@@ -97,6 +99,19 @@ export function BankApp({
   const [bondError, setBondError] = useState<string | null>(null);
   const [bondOk, setBondOk] = useState<string | null>(null);
   const [svAmt, setSvAmt] = useState("");
+  // PORT-P2: money — term notes / credit / housing state.
+  const [noteAmt, setNoteAmt] = useState("");
+  const [noteBusy, setNoteBusy] = useState(false);
+  const [noteError, setNoteError] = useState<string | null>(null);
+  const [noteOk, setNoteOk] = useState<string | null>(null);
+  const [payAmt, setPayAmt] = useState("");
+  const [creditBusy, setCreditBusy] = useState(false);
+  const [creditError, setCreditError] = useState<string | null>(null);
+  const [creditOk, setCreditOk] = useState<string | null>(null);
+  const [houseBusy, setHouseBusy] = useState<string | null>(null);
+  const [houseError, setHouseError] = useState<string | null>(null);
+  const [houseOk, setHouseOk] = useState<string | null>(null);
+  const [debtAmt, setDebtAmt] = useState("");
 
   const refresh = useCallback(async () => {
     try {
@@ -166,11 +181,92 @@ export function BankApp({
 
   const svAmount = Math.max(0, Math.floor(Number(svAmt) || 0));
   const depOk = svAmount > 0 && (you.is_admin || svAmount <= you.money);
-  const wdOk = svAmount > 0 && svAmount <= you.savings;
+  // PORT-P2: minimum withdrawal ₦1,000.
+  const minWd = ov?.savingsTerms.minWithdraw ?? 1000;
+  const wdOk = svAmount >= minWd && svAmount <= you.savings;
   const doSv = (op: "deposit" | "withdraw") => {
     sendAct("bank", { op, amount: svAmount });
     setSvAmt("");
   };
+
+  // PORT-P2: money — term note / credit / housing actions.
+  const doBuyNote = useCallback(async () => {
+    const amt = Math.floor(Number(noteAmt) || 0);
+    setNoteError(null);
+    setNoteOk(null);
+    if (!ov) return;
+    if (!(amt > 0)) { setNoteError("Enter an amount first."); return; }
+    if (amt < ov.termNotes.min) { setNoteError(`Term notes start at ${naira(ov.termNotes.min)}.`); return; }
+    if (amt > ov.termNotes.max) { setNoteError(`One note caps at ${naira(ov.termNotes.max)}.`); return; }
+    if (!you.is_admin && amt > you.money) { setNoteError("You don't have that much cash."); return; }
+    setNoteBusy(true);
+    try {
+      const res = await bankApi.buyNote(token, amt);
+      setNoteAmt("");
+      setNoteOk(
+        `Note #${res.note.id} bought: ${naira(amt)} locked for ${ov.termNotes.termDays} days → ${naira(res.note.payout)} (${naira(res.note.interest)} interest). Withdraw early and the interest is forfeited.`
+      );
+      await refresh();
+    } catch (e) {
+      setNoteError(e instanceof ApiError ? e.message : "Couldn't buy that note.");
+    } finally {
+      setNoteBusy(false);
+    }
+  }, [noteAmt, ov, refresh, token, you.is_admin, you.money]);
+
+  const doEarlyWithdraw = useCallback(async (id: number) => {
+    setNoteError(null);
+    setNoteOk(null);
+    setNoteBusy(true);
+    try {
+      const res = await bankApi.withdrawNoteEarly(token, id);
+      setNoteOk(
+        `Note #${id} withdrawn early: ${naira(res.principal)} back, ${naira(res.interestForfeited)} interest forfeited.`
+      );
+      await refresh();
+    } catch (e) {
+      setNoteError(e instanceof ApiError ? e.message : "Couldn't withdraw that note.");
+    } finally {
+      setNoteBusy(false);
+    }
+  }, [refresh, token]);
+
+  const doCreditPay = useCallback(async (all: boolean) => {
+    const amt = Math.floor(Number(payAmt) || 0);
+    setCreditError(null);
+    setCreditOk(null);
+    if (!all && !(amt > 0)) { setCreditError("Enter an amount first."); return; }
+    setCreditBusy(true);
+    try {
+      const res = all ? await bankApi.creditPayAll(token) : await bankApi.creditPay(token, amt);
+      setPayAmt("");
+      setCreditOk(
+        res.cleared
+          ? `Paid ${naira(res.paid)} — credit facility fully cleared. Well done.`
+          : `Paid ${naira(res.paid)} — ${naira(res.balance)} left.`
+      );
+      await refresh();
+    } catch (e) {
+      setCreditError(e instanceof ApiError ? e.message : "Couldn't take that payment.");
+    } finally {
+      setCreditBusy(false);
+    }
+  }, [payAmt, refresh, token]);
+
+  const doHouse = useCallback(async (key: string, fn: () => Promise<{ okMsg: string }>) => {
+    setHouseBusy(key);
+    setHouseError(null);
+    setHouseOk(null);
+    try {
+      const r = await fn();
+      setHouseOk(r.okMsg);
+      await refresh();
+    } catch (e) {
+      setHouseError(e instanceof ApiError ? e.message : "Something went wrong.");
+    } finally {
+      setHouseBusy(null);
+    }
+  }, [refresh]);
 
   const terms = ov?.bonds.terms ?? {};
   const termKeys = Object.keys(terms)
@@ -266,7 +362,9 @@ export function BankApp({
               </div>
             </div>
             <p className="eko-bank__hint">
-              Savings earn 2% every game day, credited automatically.
+              Savings earn 0.5% every game week on the first{" "}
+              {naira(ov.savingsTerms.cap)}. Interest builds by the minute and
+              is credited daily. Minimum withdrawal {naira(minWd)}.
             </p>
             <label className="eko-bank__label" htmlFor="bank-sv-amount">
               Amount
@@ -391,6 +489,240 @@ export function BankApp({
             )}
           </Section>
 
+          {/* PORT-P2: term notes (2% / 7 days) */}
+          <Section id="bank-term-notes" emoji="🧾" title="Term notes">
+            <p className="eko-bank__hint">
+              Lock coins for 7 days at 2%. {naira(ov.termNotes.min)} minimum,{" "}
+              {naira(ov.termNotes.max)} maximum per note. Withdraw early and you
+              get the principal back — the interest is forfeited.
+            </p>
+            <div className="eko-bank__form">
+              <div className="eko-bank__field">
+                <label className="eko-bank__label" htmlFor="bank-note-amount">
+                  Amount ({naira(ov.termNotes.min)} – {naira(ov.termNotes.max)})
+                </label>
+                <input
+                  id="bank-note-amount"
+                  className="eko-bank__input"
+                  type="number"
+                  inputMode="numeric"
+                  min={ov.termNotes.min}
+                  max={ov.termNotes.max}
+                  placeholder={naira(ov.termNotes.min)}
+                  value={noteAmt}
+                  onChange={(e) => setNoteAmt(e.target.value)}
+                />
+              </div>
+              {Math.floor(Number(noteAmt) || 0) > 0 && (
+                <p className="eko-bank__hint">
+                  Matures to{" "}
+                  <strong>
+                    {naira(Math.floor(Number(noteAmt)) + Math.floor(Number(noteAmt) * ov.termNotes.rate))}
+                  </strong>{" "}
+                  ({naira(Math.floor(Number(noteAmt) * ov.termNotes.rate))} interest) in{" "}
+                  {ov.termNotes.termDays} days.
+                </p>
+              )}
+              <Button size="md" disabled={noteBusy} onClick={doBuyNote}>
+                {noteBusy ? "Buying…" : "Buy 7-day note"}
+              </Button>
+              {noteError && <p className="eko-bank__error-text">{noteError}</p>}
+              {noteOk && <p className="eko-bank__ok-text">{noteOk}</p>}
+            </div>
+            {ov.termNotes.active.length > 0 && (
+              <>
+                <h4 className="eko-bank__sub2">Active notes ({ov.termNotes.active.length})</h4>
+                <ol className="eko-bank__list">
+                  {ov.termNotes.active.map((n: TermNote) => (
+                    <li key={n.id} className="eko-bank__row">
+                      <div className="eko-bank__meta">
+                        <strong>
+                          Note #{n.id} · {naira(n.principal)}
+                        </strong>
+                        <span className="eko-bank__hint">
+                          Matures day {n.matures_day}
+                          {ov.day < n.matures_day
+                            ? ` (${n.matures_day - ov.day}d left)`
+                            : " (due — pays on the next day tick)"}{" "}
+                          → {naira(n.payout)}
+                        </span>
+                      </div>
+                      <div className="eko-bank__nums">
+                        <Button
+                          size="md"
+                          variant="ghost"
+                          disabled={noteBusy}
+                          onClick={() => doEarlyWithdraw(n.id)}
+                          title="Principal back now; the interest is forfeited."
+                        >
+                          Withdraw early
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </>
+            )}
+          </Section>
+
+          {/* PORT-P2: credit facility (LAPO repayment state, game coins only) */}
+          <Section id="bank-credit" emoji="💳" title="Credit facility">
+            {!ov.credit ? (
+              <p className="eko-bank__hint">
+                No credit balance. This facility is repayment-only — there is
+                no borrowing desk here.
+              </p>
+            ) : (
+              <>
+                <div className="eko-bank__cards">
+                  <div className="eko-bank__card">
+                    <span className="eko-bank__label">Balance left</span>
+                    <strong className="eko-bank__big eko-bank__out">{naira(ov.credit.balance)}</strong>
+                  </div>
+                  <div className="eko-bank__card">
+                    <span className="eko-bank__label">Auto-debit</span>
+                    <strong className="eko-bank__big">{naira(ov.credit.weeklyDue)}/wk</strong>
+                    <span className="eko-bank__hint">{ov.credit.weeksLeft} weeks left</span>
+                  </div>
+                </div>
+                <p className="eko-bank__hint">
+                  The weekly debit collects automatically. Miss a week and the
+                  balance carries over — no wahala, just pay.
+                </p>
+                <label className="eko-bank__label" htmlFor="bank-pay-amount">
+                  Pay now (amount)
+                </label>
+                <input
+                  id="bank-pay-amount"
+                  className="eko-bank__input"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  placeholder="₦0"
+                  value={payAmt}
+                  onChange={(e) => setPayAmt(e.target.value)}
+                />
+                <div className="eko-bank__btnrow">
+                  <Button size="md" disabled={creditBusy} onClick={() => doCreditPay(false)}>
+                    {creditBusy ? "Paying…" : "Pay now"}
+                  </Button>
+                  <Button size="md" variant="accent" disabled={creditBusy} onClick={() => doCreditPay(true)}>
+                    Pay it all ({naira(ov.credit.balance)})
+                  </Button>
+                </div>
+                {creditError && <p className="eko-bank__error-text">{creditError}</p>}
+                {creditOk && <p className="eko-bank__ok-text">{creditOk}</p>}
+              </>
+            )}
+          </Section>
+
+          {/* PORT-P2: housing ladder */}
+          <Section id="bank-housing" emoji="🏠" title="Housing ladder">
+            <p className="eko-bank__hint">
+              Rent a home by the week, or buy it outright and never pay rent
+              again. Rent is due every Saturday (day 7 of each game week) —
+              miss it and it becomes rent debt. No eviction, no lockout, ever.
+            </p>
+            {ov.housing.rentDebt > 0 && (
+              <>
+                <div className="eko-bank__cards">
+                  <div className="eko-bank__card">
+                    <span className="eko-bank__label">Rent debt</span>
+                    <strong className="eko-bank__big eko-bank__out">{naira(ov.housing.rentDebt)}</strong>
+                  </div>
+                </div>
+                <label className="eko-bank__label" htmlFor="bank-debt-amount">
+                  Clear rent debt (amount)
+                </label>
+                <input
+                  id="bank-debt-amount"
+                  className="eko-bank__input"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  placeholder="₦0"
+                  value={debtAmt}
+                  onChange={(e) => setDebtAmt(e.target.value)}
+                />
+                <div className="eko-bank__btnrow">
+                  <Button
+                    size="md"
+                    disabled={houseBusy !== null}
+                    onClick={() =>
+                      doHouse("debt", async () => {
+                        const amt = Math.floor(Number(debtAmt) || 0);
+                        const r = await bankApi.housingPayDebt(token, amt);
+                        setDebtAmt("");
+                        return { okMsg: `Paid ${naira(r.paid)} — ${naira(r.rentDebt)} rent debt left.` };
+                      })
+                    }
+                  >
+                    {houseBusy === "debt" ? "Paying…" : "Pay debt"}
+                  </Button>
+                </div>
+              </>
+            )}
+            <ol className="eko-bank__list">
+              {ov.housing.homes.map((h) => {
+                const owned = ov.housing.owned.includes(h.id);
+                const current = ov.housing.current === h.id;
+                return (
+                  <li key={h.id} className="eko-bank__row">
+                    <div className="eko-bank__meta">
+                      <strong>
+                        <span aria-hidden="true">{h.icon}</span> {h.name}
+                        {current && <span className="eko-bank__pill">Home</span>}
+                        {owned && <span className="eko-bank__pill">Owned</span>}
+                      </strong>
+                      <span className="eko-bank__hint">
+                        {owned ? "No rent — yours." : `${naira(h.weeklyRent)}/week rent`} ·{" "}
+                        {naira(h.buyPrice)} to buy
+                      </span>
+                    </div>
+                    <div className="eko-bank__btnrow">
+                      {!current && (
+                        <Button
+                          size="md"
+                          variant="ghost"
+                          disabled={houseBusy !== null}
+                          onClick={() =>
+                            doHouse(`move-${h.id}`, async () => {
+                              await bankApi.housingMove(token, h.id);
+                              return { okMsg: `Moved into ${h.name}. Rent starts next Saturday.` };
+                            })
+                          }
+                        >
+                          {houseBusy === `move-${h.id}` ? "…" : "Move in"}
+                        </Button>
+                      )}
+                      {!owned && (
+                        <Button
+                          size="md"
+                          disabled={houseBusy !== null || (!you.is_admin && h.buyPrice > you.money)}
+                          onClick={() =>
+                            doHouse(`buy-${h.id}`, async () => {
+                              await bankApi.housingBuy(token, h.id);
+                              return { okMsg: `${h.name} is yours — no more rent on it, ever.` };
+                            })
+                          }
+                        >
+                          {houseBusy === `buy-${h.id}` ? "…" : "Buy"}
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+            {houseError && <p className="eko-bank__error-text">{houseError}</p>}
+            {houseOk && <p className="eko-bank__ok-text">{houseOk}</p>}
+          </Section>
+
+          {/* PORT-P2: top-up packs (structure only, purchase stubbed) */}
+          <Section id="bank-topup" emoji="➕" title="Top up">
+            <TopUpPacks />
+          </Section>
+
           {/* ---------------- income tax ---------------- */}
           <Section id="bank-tax" emoji="🧾" title="Income tax">
             <p className="eko-bank__taxline">
@@ -402,7 +734,7 @@ export function BankApp({
               {ov.tax.bracket.label}
               {ov.tax.holiday
                 ? " — tax holiday is active, nothing is owed."
-                : " · first ₦1M/week tax-free, then 20% to ₦10M, 30% above."}{" "}
+                : ` · first ${naira(ov.tax.free)}/week tax-free, then ${(ov.tax.flatRate * 100).toFixed(1)}% flat on the rest.`}{" "}
               Collected automatically at the week boundary.
             </p>
           </Section>
@@ -435,6 +767,36 @@ export function BankApp({
                 lockouts — the next weekly tick pays what it can.
               </p>
             )}
+          </Section>
+
+          {/* PORT-P2: credibility score (record only) */}
+          <Section id="bank-credibility" emoji="🌱" title="Credibility">
+            <div className="eko-bank__cards">
+              <div className="eko-bank__card">
+                <span className="eko-bank__label">Score</span>
+                <strong className="eko-bank__big">{ov.credibility.total}/100</strong>
+              </div>
+            </div>
+            <ol className="eko-bank__list">
+              {ov.credibility.parts.map((p) => (
+                <li key={p.key} className="eko-bank__row">
+                  <div className="eko-bank__meta">
+                    <strong>{p.label}</strong>
+                    <span className="eko-bank__hint">{p.detail}</span>
+                  </div>
+                  <div className="eko-bank__nums">
+                    <span>
+                      {p.score}/{p.max}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <p className="eko-bank__hint">
+              This score is a record only — it never limits what you can send
+              or receive. Build it by trading with players, keeping streaks,
+              and running jobs or a business.
+            </p>
           </Section>
 
           {/* ---------------- money history ---------------- */}

@@ -72,10 +72,10 @@ test('xpForLevel: 100 xp for L0→1, 200 for L1→2', () => {
   assert.equal(m12.xpForLevel(4), 500);
 });
 
-test('nine skills, ids match the M7 contract exactly', () => {
+test('ten skills, ids match the M7 contract exactly', () => { // PORT-P1: fashion added
   assert.deepEqual(m12.SKILL_IDS, [
     'cooking', 'charisma', 'fitness', 'coding', 'music',
-    'hustle', 'dance', 'comedy', 'photography',
+    'hustle', 'dance', 'comedy', 'photography', 'fashion',
   ]);
 });
 
@@ -141,7 +141,7 @@ test('skills intent lists 9 skills with xp/level', async () => {
   await m12.INTENTS.skills(api, {});
   const msg = sent.find(m => m.t === 'skills');
   assert.ok(msg);
-  assert.equal(msg.skills.length, 9);
+  assert.equal(msg.skills.length, 10); // PORT-P1: fashion added
   const fit = msg.skills.find(s => s.id === 'fitness');
   assert.equal(fit.level, 0);
   assert.equal(fit.xp, 0);
@@ -368,7 +368,7 @@ test('skillLevel: cert adds +1 effective level for M7 gates (capped)', async () 
 test('effectiveSkillLevels: every skill resolved in one call', async () => {
   const { userId, character } = await newUser();
   const eff = m12.effectiveSkillLevels(character, await m12.getAcademyCerts(userId));
-  assert.equal(Object.keys(eff).length, 9);
+  assert.equal(Object.keys(eff).length, 10); // PORT-P1
   assert.ok(Object.values(eff).every(v => v === 0));
 });
 
@@ -398,7 +398,7 @@ test('m12YouSnapshot: skills + academy parts for the you snapshot', async () => 
   m12.addSkillXp(character, 'cooking', 120); // → level 1, xp 20
   const conn = { user: { id: userId }, character };
   const snap = await m12.m12YouSnapshot(conn);
-  assert.equal(snap.skills.length, 9);
+  assert.equal(snap.skills.length, 10); // PORT-P1
   const cooking = snap.skills.find(s => s.id === 'cooking');
   assert.equal(cooking.level, 1);
   assert.equal(cooking.xp, 20);

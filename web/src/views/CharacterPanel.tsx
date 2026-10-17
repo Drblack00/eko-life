@@ -13,7 +13,6 @@ import { buildAvatarLook } from "./avatar/avatarModel";
 import { ThemePicker } from "../theme/theme";
 import { blip, isSoundEnabled, setSoundEnabled } from "../lib/sound";
 import {
-  authGet,
   friendsApi,
   profileApi,
   type FriendEntry,
@@ -25,15 +24,35 @@ import {
   type NotificationPrefs,
   type You,
 } from "../game/types";
-import { SKILL_FALLBACK } from "./v2/m12";
 import type { ShiftTrackInfo } from "./v2/m7";
 import "./CharacterPanel.css";
+// PORT-P1: core loop — begin
+import {
+  SimNeedsTab,
+  SimMoodTab,
+  SimSkillsTab,
+  SimPerksTab,
+  SimGoalsTab,
+  SimQuestsTab,
+  type SimSend,
+} from "./vitality/SimTabs";
+// PORT-P1: core loop — end
+// PORT-P3: careers — begin
+import { careersApi, type CareerStatus } from "./careers/api";
+// PORT-P3: careers — end
 
 export type CharacterTabId =
   | "profile"
   | "needs"
+  // PORT-P1: core loop — begin
+  | "mood"
+  // PORT-P1: core loop — end
   | "goals"
   | "skills"
+  // PORT-P1: core loop — begin
+  | "perks"
+  | "quests"
+  // PORT-P1: core loop — end
   | "people"
   | "career"
   | "settings";
@@ -41,8 +60,15 @@ export type CharacterTabId =
 const TABS: Array<{ id: CharacterTabId; label: string; icon: string }> = [
   { id: "profile", label: "Profile", icon: "👤" },
   { id: "needs", label: "Needs", icon: "💚" },
+  // PORT-P1: core loop — begin
+  { id: "mood", label: "Mood", icon: "✨" },
+  // PORT-P1: core loop — end
   { id: "goals", label: "Goals", icon: "🎯" },
   { id: "skills", label: "Skills", icon: "💪" },
+  // PORT-P1: core loop — begin
+  { id: "perks", label: "Perks", icon: "💎" },
+  { id: "quests", label: "Quests", icon: "🗺️" },
+  // PORT-P1: core loop — end
   { id: "people", label: "People", icon: "👥" },
   { id: "career", label: "Career", icon: "💼" },
   { id: "settings", label: "Settings", icon: "⚙️" },
@@ -282,15 +308,6 @@ interface NeedDef {
   icon: string;
 }
 
-const NEED_DEFS: NeedDef[] = [
-  { id: "hunger", label: "Hunger", icon: "🍲" },
-  { id: "energy", label: "Energy", icon: "⚡" },
-  { id: "fun", label: "Fun", icon: "🎮" },
-  { id: "social", label: "Social", icon: "🗣️" },
-  { id: "hygiene", label: "Hygiene", icon: "🚿" },
-  { id: "bladder", label: "Bladder", icon: "🚻" },
-];
-
 /** Original wording: how the character feels, from the lowest need. */
 export function feelingsLine(lowest: NeedDef): string {
   switch (lowest.id) {
@@ -320,245 +337,6 @@ export function statusLine(money: number, happiness: number): string {
   if (money >= 20_000) return "Getting There — pocket is warming up.";
   if (money >= 5_000) return "Hustle Mode — every kobo counts.";
   return "Survival Mode — grind now, shine later.";
-}
-
-function NeedsTab({ you }: { you: You }) {
-  const values = NEED_DEFS.map((d) => ({
-    ...d,
-    value: Math.max(
-      0,
-      Math.min(100, Math.round(Number((you as unknown as Record<string, unknown>)[d.id]) || 0))
-    ),
-  }));
-  const lowest = values.reduce((a, b) => (a.value <= b.value ? a : b));
-  const allGood = lowest.value >= 70;
-  return (
-    <div>
-      <ul className="eko-char__needs">
-        {values.map((n) => (
-          <li key={n.id} className="eko-char__need">
-            <span className="eko-char__need-icon" aria-hidden="true">
-              {n.icon}
-            </span>
-            <span className="eko-char__need-label">{n.label}</span>
-            <span
-              className="eko-char__need-bar"
-              role="progressbar"
-              aria-valuenow={n.value}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label={`${n.label} ${n.value}%`}
-            >
-              <span
-                className={`eko-char__need-fill${n.value < 30 ? " eko-char__need-fill--low" : ""}`}
-                style={{ width: `${n.value}%` }}
-              />
-            </span>
-            <span className="eko-char__need-pct">{n.value}%</span>
-          </li>
-        ))}
-      </ul>
-      <Card className="eko-char__feelings">
-        <p>
-          <strong>Feelings:</strong>{" "}
-          {allGood
-            ? "You're feeling fresh and ready for anything."
-            : feelingsLine(lowest)}
-        </p>
-        <p>
-          <strong>Status:</strong> {statusLine(you.money, you.happiness)}
-        </p>
-      </Card>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Goals tab — Today's Hustle (M9) + perks (display only)              */
-/* ------------------------------------------------------------------ */
-
-interface Mission {
-  id: string;
-  label: string;
-  reward: number;
-  done: boolean;
-}
-
-interface Perk {
-  id: string;
-  name: string;
-  icon: string;
-  cost: number;
-  desc: string;
-}
-
-function GoalsTab({
-  token,
-  you,
-  onOpenDaily,
-}: {
-  token: string;
-  you: You;
-  onOpenDaily: () => void;
-}) {
-  const [missions, setMissions] = useState<Mission[] | null>(null);
-  const [stars, setStars] = useState<number>(you.perk_stars ?? 0);
-  const [perks, setPerks] = useState<{ owned: string[]; list: Perk[] } | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const h = (await authGet("/api/v2/m9/hustle", token)) as {
-          missions?: Mission[];
-          stars?: number;
-        };
-        if (!alive) return;
-        if (Array.isArray(h?.missions)) setMissions(h.missions);
-        if (typeof h?.stars === "number") setStars(h.stars);
-      } catch {
-        /* hustle stays hidden */
-      }
-      try {
-        const p = (await authGet("/api/v2/m9/perks", token)) as {
-          stars?: number;
-          owned?: string[];
-          perks?: Perk[];
-        };
-        if (!alive) return;
-        if (Array.isArray(p?.perks))
-          setPerks({ owned: p.owned ?? [], list: p.perks });
-        if (typeof p?.stars === "number") setStars(p.stars);
-      } catch {
-        /* perks stay hidden */
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [token]);
-
-  const done = missions?.filter((m) => m.done).length ?? 0;
-  const total = missions?.length ?? 0;
-
-  return (
-    <div>
-      <Card>
-        <h3 className="eko-char__h">🎯 Today's Hustle</h3>
-        {missions ? (
-          <>
-            <p className="eko-char__sub">
-              {done}/{total} missions · ⭐ {stars} perk stars
-            </p>
-            <ul className="eko-char__missions">
-              {missions.map((m) => (
-                <li key={m.id} className={m.done ? "eko-char__mission--done" : ""}>
-                  <span aria-hidden="true">{m.done ? "✅" : "⬜"}</span>
-                  <span>{m.label}</span>
-                  <span className="eko-char__reward">{naira(m.reward)}</span>
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <p className="eko-char__sub">Loading today's hustle…</p>
-        )}
-      </Card>
-      <Card>
-        <h3 className="eko-char__h">✨ Perks</h3>
-        {perks ? (
-          <>
-            <p className="eko-char__sub">
-              {perks.owned.length} unlocked · ⭐ {stars} stars — unlock more in
-              Daily.
-            </p>
-            <ul className="eko-char__perks">
-              {perks.list.map((p) => {
-                const owned = perks.owned.includes(p.id);
-                return (
-                  <li key={p.id} className={owned ? "eko-char__perk--owned" : ""}>
-                    <span aria-hidden="true">{p.icon}</span>
-                    <span>
-                      <strong>{p.name}</strong>
-                      <small>{p.desc}</small>
-                    </span>
-                    <span className="eko-char__perk-cost">
-                      {owned ? "✓" : `🔒 ${p.cost}✨`}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-            <Button size="md" variant="accent" onClick={onOpenDaily}>
-              Open Daily to unlock perks
-            </Button>
-          </>
-        ) : (
-          <p className="eko-char__sub">Loading perks…</p>
-        )}
-      </Card>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Skills tab — real levels from the `you` snapshot + academy certs     */
-/* ------------------------------------------------------------------ */
-
-function SkillsTab({ you }: { you: You }) {
-  const skills = you.skills ?? {};
-  const certs = you.academy?.certs ?? [];
-  return (
-    <div>
-      {certs.length > 0 && (
-        <Card>
-          <h3 className="eko-char__h">🎓 Certificates</h3>
-          <ul className="eko-char__certs">
-            {certs.map((c) => (
-              <li key={c}>🎓 {c}</li>
-            ))}
-          </ul>
-        </Card>
-      )}
-      <ul className="eko-char__skills">
-        {SKILL_FALLBACK.map((def) => {
-          const s = skills[def.id];
-          const level = typeof s?.level === "number" ? s.level : 0;
-          const xp = typeof s?.xp === "number" ? s.xp : 0;
-          const xpNext = 100 * (level + 1);
-          return (
-            <li key={def.id} className="eko-char__skill">
-              <span className="eko-char__skill-icon" aria-hidden="true">
-                {def.icon}
-              </span>
-              <span className="eko-char__skill-body">
-                <span className="eko-char__skill-head">
-                  <strong>{def.name}</strong>
-                  <span>Lv {level}</span>
-                </span>
-                <span
-                  className="eko-char__need-bar"
-                  role="progressbar"
-                  aria-valuenow={Math.min(100, Math.round((xp / xpNext) * 100))}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label={`${def.name} experience`}
-                >
-                  <span
-                    className="eko-char__need-fill"
-                    style={{ width: `${Math.min(100, (xp / xpNext) * 100)}%` }}
-                  />
-                </span>
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-      <p className="eko-char__tip">
-        Train skills at venues around the city — gyms, hubs, clubs and more.
-      </p>
-    </div>
-  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -614,6 +392,88 @@ function PeopleTab({ token }: { token: string }) {
 }
 
 /* ------------------------------------------------------------------ */
+// PORT-P3: careers — begin (compact P3 career card for the Sim-panel Career tab)
+function P3CareerCard({ token, onOpenJobs }: { token: string; onOpenJobs: () => void }) {
+  const [status, setStatus] = useState<CareerStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    careersApi
+      .me(token)
+      .then((st) => alive && setStatus(st))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+  if (!status || !status.employed) return null;
+  const st = status;
+  const promote = async () => {
+    setBusy(true);
+    try {
+      const r = await careersApi.promote(token);
+      setStatus(r.status);
+      setMsg(`🎉 Promoted to ${r.newTitle}!`);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Promotion failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card>
+      <h3 className="eko-char__h">
+        {st.careerIcon ?? "💼"} {st.careerName}
+      </h3>
+      <dl className="eko-char__rows">
+        <div>
+          <dt>Rank</dt>
+          <dd>
+            {st.rankTitle} · {st.rank} of {st.rankOf}
+          </dd>
+        </div>
+        <div>
+          <dt>Pay</dt>
+          <dd>{naira(st.payPerShift ?? 0)}/shift</dd>
+        </div>
+        <div>
+          <dt>Shifts at rank</dt>
+          <dd>
+            {st.shiftsAtRank}/{st.shiftsNeeded}
+          </dd>
+        </div>
+        {st.performance !== null && st.performance !== undefined && (
+          <div>
+            <dt>Performance</dt>
+            <dd>{st.performance}%</dd>
+          </div>
+        )}
+        {st.nextRank && (
+          <div>
+            <dt>Next</dt>
+            <dd>
+              {st.nextRank.title} · {naira(st.nextRank.payPerShift)}/shift
+            </dd>
+          </div>
+        )}
+      </dl>
+      {msg && <p className="eko-char__sub">{msg}</p>}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {st.promotionReady && (
+          <Button size="md" variant="accent" disabled={busy} onClick={() => void promote()}>
+            Promote
+          </Button>
+        )}
+        <Button size="md" variant="ghost" onClick={onOpenJobs}>
+          Open Careers
+        </Button>
+      </div>
+    </Card>
+  );
+}
+// PORT-P3: careers — end
+
 /* Career tab — active shift + career track ladder (real M7 data)       */
 /* ------------------------------------------------------------------ */
 
@@ -650,6 +510,9 @@ function CareerTab({
 
   return (
     <div>
+      {/* PORT-P3: careers — begin */}
+      <P3CareerCard token={token} onOpenJobs={onOpenJobs} />
+      {/* PORT-P3: careers — end */}
       <Card>
         <h3 className="eko-char__h">💼 Current work</h3>
         {shift ? (
@@ -819,6 +682,9 @@ export function CharacterPanel({
   notifPrefs,
   onNotifPrefs,
   onProfileChanged,
+  // PORT-P1: core loop — begin
+  send,
+  // PORT-P1: core loop — end
 }: {
   open: boolean;
   initialTab: CharacterTabId;
@@ -831,6 +697,9 @@ export function CharacterPanel({
   notifPrefs: NotificationPrefs | null;
   onNotifPrefs: (p: Partial<NotificationPrefs>) => void;
   onProfileChanged: (patch: { username?: string; name?: string }) => void;
+  // PORT-P1: core loop — begin
+  send?: SimSend;
+  // PORT-P1: core loop — end
 }) {
   const [tab, setTab] = useState<CharacterTabId>(initialTab);
 
@@ -881,11 +750,16 @@ export function CharacterPanel({
               onOpenStyle={() => goApp("style")}
             />
           )}
-          {tab === "needs" && <NeedsTab you={you} />}
-          {tab === "goals" && (
-            <GoalsTab token={token} you={you} onOpenDaily={() => goApp("daily")} />
-          )}
-          {tab === "skills" && <SkillsTab you={you} />}
+          {tab === "needs" && <SimNeedsTab token={token} />}
+          {/* PORT-P1: core loop — begin */}
+          {tab === "mood" && <SimMoodTab token={token} />}
+          {/* PORT-P1: core loop — end */}
+          {tab === "goals" && <SimGoalsTab token={token} />}
+          {tab === "skills" && <SimSkillsTab token={token} />}
+          {/* PORT-P1: core loop — begin */}
+          {tab === "perks" && <SimPerksTab token={token} send={send} />}
+          {tab === "quests" && <SimQuestsTab token={token} send={send} />}
+          {/* PORT-P1: core loop — end */}
           {tab === "people" && <PeopleTab token={token} />}
           {tab === "career" && (
             <CareerTab you={you} token={token} onOpenJobs={() => goApp("jobs")} />

@@ -49,6 +49,8 @@ export const SKILL_FALLBACK: SkillRow[] = [
   { id: "dance", name: "Dance", icon: "💃", xp: 0, level: 0, xpNext: 100, effective: 0, rust: 0, certified: false, trainFee: 500, trainAt: "beaches & clubs" },
   { id: "comedy", name: "Comedy", icon: "🎤", xp: 0, level: 0, xpNext: 100, effective: 0, rust: 0, certified: false, trainFee: 0, trainAt: "landmarks" },
   { id: "photography", name: "Photography", icon: "📸", xp: 0, level: 0, xpNext: 100, effective: 0, rust: 0, certified: false, trainFee: 1000, trainAt: "beaches & landmarks" },
+  // PORT-P1: 10th skill
+  { id: "fashion", name: "Fashion", icon: "👗", xp: 0, level: 0, xpNext: 100, effective: 0, rust: 0, certified: false, trainFee: 500, trainAt: "malls & markets" },
 ];
 
 export function SkillsPanel({ you, send, messages }: M12Props) {

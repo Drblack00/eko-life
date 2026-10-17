@@ -373,6 +373,11 @@ let D1, D2;
 test('DMs: send, unread, threads, history, read', async () => {
   D1 = await seedUser();
   D2 = await seedUser();
+  // PORT-P4: social — stranger DMs now land in the message-requests inbox,
+  // so the direct-DM flow is exercised between friends here.
+  send(D1.ws, { t: 'friend_add', username: D2.username });
+  send(D2.ws, { t: 'friend_add', username: D1.username });
+  await waitFor(D1.msgs, m => m.t === 'sys' && /now friends/.test(m.text));
   send(D1.ws, { t: 'dm', to: D2.userId, text: 'yo, hustle o' });
   const dm = await waitFor(D2.msgs, m => m.t === 'dm' && m.text === 'yo, hustle o');
   assert.equal(dm.from, D1.userId);
@@ -394,6 +399,48 @@ test('DMs: send, unread, threads, history, read', async () => {
   const cleared = await waitFor(D2.msgs, m => m.t === 'dm_unread' && m.n === 0);
   assert.ok(cleared);
 });
+
+// PORT-P4: social — begin (message-request gate over the realtime DM path)
+test('DMs: stranger first message becomes a request; approve delivers it', async () => {
+  const S1 = await seedUser();
+  const S2 = await seedUser();
+  send(S1.ws, { t: 'dm', to: S2.userId, text: 'hello stranger' });
+  const req = await waitFor(S2.msgs, m => m.t === 'dm_request' && m.text === 'hello stranger');
+  assert.equal(req.from, S1.userId);
+  // no direct DM was delivered
+  assert.ok(!S2.msgs.some(m => m.t === 'dm' && m.text === 'hello stranger'));
+  const sent = await waitFor(S1.msgs, m => m.t === 'dm_request_sent' && m.to === S2.userId);
+  assert.ok(sent);
+  // a second DM while the request is pending does NOT create another request
+  send(S1.ws, { t: 'dm', to: S2.userId, text: 'still waiting' });
+  const sys = await waitFor(S1.msgs, m => m.t === 'sys' && /still pending/.test(m.text));
+  assert.ok(sys);
+  // approve over REST → the held message lands as a real DM
+  const ap = await post(`/api/social/messages/requests/${req.id}/approve`, {}, S2.token);
+  assert.equal(ap.status, 200);
+  const dm = await waitFor(S2.msgs, m => m.t === 'dm' && m.text === 'hello stranger');
+  assert.equal(dm.from, S1.userId);
+  // thread now exists: follow-up DMs flow straight through
+  send(S1.ws, { t: 'dm', to: S2.userId, text: 'we chat now' });
+  const dm2 = await waitFor(S2.msgs, m => m.t === 'dm' && m.text === 'we chat now');
+  assert.ok(dm2);
+});
+
+test('DMs: friends-only policy turns strangers away', async () => {
+  const T1 = await seedUser();
+  const T2 = await seedUser();
+  const pr = await fetch(base + '/api/social/settings', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${T2.token}` },
+    body: JSON.stringify({ message_policy: 'friends' }),
+  });
+  assert.equal(pr.status, 200);
+  send(T1.ws, { t: 'dm', to: T2.userId, text: 'let me in' });
+  const err = await waitFor(T1.msgs, m => m.t === 'err' && /only accepts messages from friends/.test(m.text));
+  assert.ok(err);
+  assert.ok(!T2.msgs.some(m => m.t === 'dm_request'));
+});
+// PORT-P4: social — end
 
 // ---- blocks ----
 let K1, K2;
@@ -426,6 +473,11 @@ test('block: city chat hidden from blocker, DMs rejected both ways', async () =>
   send(K1.ws, { t: 'unblock', playerId: K2.userId });
   const un = await waitFor(K1.msgs, m => m.t === 'blocks' && m.blocks.length === 0);
   assert.ok(un);
+  // PORT-P4: social — post-unblock they are still strangers, so friend up
+  // first; otherwise the DM would (correctly) become a message request.
+  send(K1.ws, { t: 'friend_add', username: K2.username });
+  send(K2.ws, { t: 'friend_add', username: K1.username });
+  await waitFor(K1.msgs, m => m.t === 'sys' && /now friends/.test(m.text));
   send(K2.ws, { t: 'dm', to: K1.userId, text: 'we cool now' });
   const dm = await waitFor(K1.msgs, m => m.t === 'dm' && m.text === 'we cool now');
   assert.ok(dm);

@@ -33,9 +33,15 @@ import {
 } from "../components";
 import { EatTab } from "./EatTab";
 import { ChatTab } from "./chat/ChatTab";
+// PORT-P4: social — begin
+import { SocialSettingsBlock } from "./social/SocialSettings";
+// PORT-P4: social — end
 import { FriendsPage } from "./Friends";
 import { GistApp } from "./gist/GistApp";
 import { BankApp } from "./bank/BankApp";
+// PORT-P2: money — begin
+import { InvestApp } from "./invest/InvestApp";
+// PORT-P2: money — end
 import { BoutiqueApp } from "./boutique/BoutiqueApp";
 import { RichListApp } from "./richlist/RichListApp";
 import { GovApp } from "./gov/GovApp";
@@ -47,6 +53,21 @@ import { StoryApp } from "./story/StoryApp";
 import { EventsApp } from "./events/EventsApp";
 // UGC Design Contests — duel voting, 2-tap entries.
 import { ContestsApp } from "./contests/ContestsApp";
+// PORT-P6: games-hustle — begin
+// P6 — Table games hall + Hustle gig board (game coins only).
+import { GamesApp } from "./games/GamesApp";
+import { HustleApp } from "./hustle/HustleApp";
+// PORT-P6: games-hustle — end
+// PORT-P5: world — begin
+import { RideView } from "./world/RideView";
+import { HealthView } from "./world/HealthView";
+import { CoursesView } from "./world/CoursesView";
+import { TicketsView } from "./world/TicketsView";
+import { CharityView } from "./world/CharityView";
+import { AdsView } from "./world/AdsView";
+import { PromoView } from "./world/PromoView";
+import { CivicView } from "./world/CivicView";
+// PORT-P5: world — end
 import { StyleApp } from "./StyleApp";
 import { ElectionSheet } from "./election/ElectionSheet";
 import { HomeTab, type HomeFocus } from "./home/HomeTab";
@@ -95,8 +116,11 @@ const TravelView = lazy(() =>
 );
 // V2 milestones: shifts (M7), needs (M8), daily (M9), economy (M10),
 // governance (M11), skills/academy (M12).
-import { Clock, JobsTab } from "./v2/m7";
+import { Clock } from "./v2/m7";
 import type { ShiftTrackInfo } from "./v2/m7";
+// PORT-P3: careers — begin
+import { JobsApp } from "./careers/JobsApp";
+// PORT-P3: careers — end
 import "./v2/m7/m7.css";
 import { NeedsPanel } from "./v2/m8/NeedsPanel";
 import "./v2/m8/NeedsPanel.css";
@@ -104,7 +128,6 @@ import { DailyTab } from "./v2/m9";
 import "./v2/m9/DailyTab.css";
 import { EconomyTab } from "./v2/m10";
 import "./v2/m10/m10.css";
-import { SkillsPanel, AcademyView } from "./v2/m12";
 import "./v2/m12/m12.css";
 
 /**
@@ -785,6 +808,9 @@ function MeTab({
             }
           )}
         </div>
+        {/* PORT-P4: social — begin (read receipts, who-can-message, relationships visibility) */}
+        <SocialSettingsBlock token={token} />
+        {/* PORT-P4: social — end */}
       </Card>
 
       <LedgerSheet token={token} open={ledgerOpen} onClose={() => setLedgerOpen(false)} />
@@ -1063,22 +1089,24 @@ export function Game({
         sock.sendAct(a as ActName, params);
       switch (appId) {
         case "jobs":
+          // PORT-P3: careers — begin (JobsApp wraps the existing role list
+          // with sub-tabs: "Shifts" = the M7 role list below, "Careers" =
+          // the P3 27-career ladder + mini-game)
           return (
-            <div className="eko-tabpad">
-              <JobsTab
-                you={you}
-                send={(msg) => {
-                  const { a, ...rest } = msg as { t?: string; a: ActName } & Record<string, unknown>;
-                  sock.sendAct(a, rest);
-                }}
-                careerTracks={(config as unknown as { careerTracks?: ShiftTrackInfo[] } | null)?.careerTracks}
-                skillLabels={(config as unknown as { skillLabels?: Record<string, string> } | null)?.skillLabels}
-                locationName={(id: string) => asList(config?.locations).find((l) => l.id === id)?.name ?? id}
-              />
-              <SkillsPanel you={you} send={send} />
-              <AcademyView you={you} send={send} />
-            </div>
+            <JobsApp
+              you={you}
+              token={token}
+              sendMsg={(msg) => {
+                const { a, ...rest } = msg as { t?: string; a: ActName } & Record<string, unknown>;
+                sock.sendAct(a, rest);
+              }}
+              sendAct={send}
+              careerTracks={(config as unknown as { careerTracks?: ShiftTrackInfo[] } | null)?.careerTracks}
+              skillLabels={(config as unknown as { skillLabels?: Record<string, string> } | null)?.skillLabels}
+              locationName={(id: string) => asList(config?.locations).find((l) => l.id === id)?.name ?? id}
+            />
           );
+          // PORT-P3: careers — end
         case "needs":
           return (
             <div className="eko-tabpad">
@@ -1105,7 +1133,9 @@ export function Game({
         case "market":
           return <EconomyTab token={token} sock={sock} you={you} />;
         case "chat":
-          return <ChatTab sock={sock} you={you} />;
+          // PORT-P4: social — begin (token for group create + message requests)
+          return <ChatTab sock={sock} you={you} token={token} />;
+          // PORT-P4: social — end
         case "friends":
           return <FriendsPage token={token} />;
         case "gist":
@@ -1127,6 +1157,15 @@ export function Game({
               />
             </div>
           );
+        // PORT-P2: money — begin
+        case "invest":
+          // P2 — Invest: land, businesses, haulage (gameplay coins only).
+          return (
+            <div className="eko-tabpad">
+              <InvestApp token={token} you={you} />
+            </div>
+          );
+        // PORT-P2: money — end
         case "boutique":
           // Phase 6: Boutique — premium clothing shop (gameplay coins only).
           return (
@@ -1182,6 +1221,73 @@ export function Game({
               <ContestsApp token={token} />
             </div>
           );
+        // PORT-P6: games-hustle — begin
+        case "games":
+          // P6 — Table games: parlor lobby, stake escrow, hall of fame (game coins only).
+          return (
+            <div className="eko-tabpad">
+              <GamesApp token={token} />
+            </div>
+          );
+        case "hustle":
+          // P6 — Hustle: gig board with escrow + find-a-pro (game coins only).
+          return (
+            <div className="eko-tabpad">
+              <HustleApp token={token} />
+            </div>
+          );
+        // PORT-P6: games-hustle — end
+        // PORT-P5: world — begin
+        // P5 World Systems phone apps.
+        case "ride":
+          return (
+            <div className="eko-tabpad">
+              <RideView token={token} />
+            </div>
+          );
+        case "clinic":
+          return (
+            <div className="eko-tabpad">
+              <HealthView token={token} />
+            </div>
+          );
+        case "learn":
+          return (
+            <div className="eko-tabpad">
+              <CoursesView token={token} />
+            </div>
+          );
+        case "tickets":
+          return (
+            <div className="eko-tabpad">
+              <TicketsView token={token} />
+            </div>
+          );
+        case "give":
+          return (
+            <div className="eko-tabpad">
+              <CharityView token={token} />
+            </div>
+          );
+        case "myads":
+          return (
+            <div className="eko-tabpad">
+              <AdsView token={token} />
+            </div>
+          );
+        case "riseipo":
+          return (
+            <div className="eko-tabpad">
+              <PromoView token={token} />
+            </div>
+          );
+        case "civic":
+          return (
+            <div className="eko-tabpad">
+              <CivicView token={token} />
+            </div>
+          );
+        // PORT-P5: world — end
         case "style":
           return you.character_id != null ? (
             <StyleApp characterId={String(you.character_id)} />
@@ -1555,6 +1661,9 @@ export function Game({
           notifPrefs={sock.notifPrefs}
           onNotifPrefs={sock.updateNotifPrefs}
           onProfileChanged={(patch) => sock.patchYou(patch)}
+          // PORT-P1: core loop — begin
+          send={(a, params) => sock.sendAct(a as ActName, params)}
+          // PORT-P1: core loop — end
         />
       )}
 

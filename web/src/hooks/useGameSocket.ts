@@ -466,6 +466,10 @@ export interface GameSocket {
   dmUnreadFor: (peerId: number) => number;
   /** Total unread DMs (tab badge). */
   dmUnreadTotal: number;
+  // PORT-P4: social — begin
+  /** Pending message-request count (stranger DMs awaiting approval). */
+  dmRequestCount: number;
+  // PORT-P4: social — end
   setActiveDm: (peerId: number | null) => void;
   sendDm: (to: number, text: string) => void;
   requestDmThreads: () => void;
@@ -546,6 +550,10 @@ export function useGameSocket(token: string | null): GameSocket {
   const [dmUnread, setDmUnread] = useState<Record<string, number>>({});
   /** Server-authoritative total (`{t:'dm_unread', n}`) — null until first push. */
   const [dmTotal, setDmTotal] = useState<number | null>(null);
+  // PORT-P4: social — begin
+  /** Pending message requests (stranger DMs awaiting approval). */
+  const [dmRequestCount, setDmRequestCount] = useState(0);
+  // PORT-P4: social — end
   const [blocked, setBlocked] = useState<Record<number, string>>(loadBlocked);
 
   // Cloud saves: when the server wins a sync conflict (or a fresh login
@@ -1065,6 +1073,18 @@ export function useGameSocket(token: string | null): GameSocket {
           if (typeof msg.n === "number") setDmTotal(msg.n);
           break;
         }
+        // PORT-P4: social — begin
+        case "dm_request": {
+          // A stranger's first DM is held for approval — bump the inbox badge.
+          setDmRequestCount((c) => c + 1);
+          say(`📨 New message request from @${senderNameOf(msg, "?")}`, "info");
+          break;
+        }
+        case "dm_requests": {
+          if (typeof msg.n === "number") setDmRequestCount(msg.n);
+          break;
+        }
+        // PORT-P4: social — end
         case "mention": {
           // Server shape: {t:'mention', from:<name string>, where:'city'|'room:<id>',
           //   roomName?, text:<snippet>}.
@@ -1134,8 +1154,17 @@ export function useGameSocket(token: string | null): GameSocket {
 
       ws.onopen = () => {
         if (cancelled()) return;
-        attemptRef.current = 0;
-        setAttempts(0);
+        // Only reset the failure counter after a STABLE connection (30s).
+        // This prevents flapping (open → close → open) from resetting the
+        // counter and causing an infinite "Reconnecting..." loop.
+        const stableTimer = window.setTimeout(() => {
+          if (!cancelled() && wsRef.current === ws) {
+            attemptRef.current = 0;
+            setAttempts(0);
+          }
+        }, 30_000);
+        // Store timer so we can clear it on close
+        (ws as unknown as { __stableTimer?: number }).__stableTimer = stableTimer;
         setStatus("open");
         setLastError(null);
         // Flush queued acts in order.
@@ -1175,6 +1204,10 @@ export function useGameSocket(token: string | null): GameSocket {
 
       ws.onclose = (ev) => {
         if (cancelled()) return;
+        // Clear the stable-connection timer — a quick disconnect means
+        // the connection wasn't stable, so don't reset the failure counter.
+        const stableTimer = (ws as unknown as { __stableTimer?: number }).__stableTimer;
+        if (stableTimer) window.clearTimeout(stableTimer);
         wsRef.current = null;
         if (ev.code === 4401 || ev.code === 4403 || ev.code === 4409) {
           authFailure(ev.code); // won't heal by retrying
@@ -1593,6 +1626,9 @@ export function useGameSocket(token: string | null): GameSocket {
     dmMessages,
     dmUnreadFor,
     dmUnreadTotal,
+    // PORT-P4: social — begin
+    dmRequestCount,
+    // PORT-P4: social — end
     setActiveDm,
     sendDm,
     requestDmThreads,

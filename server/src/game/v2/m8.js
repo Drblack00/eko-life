@@ -329,6 +329,13 @@ export const MOODLET_TRIGGERS = {
     ttlMs: 10 * 60 * 1000,
     note: '🏦 Savings Smug — money in the bank, peace in the mind.',
   },
+  // PORT-P1: fired when a favorite home-cooked meal is finished.
+  belleful_joy: {
+    label: 'Belleful Joy',
+    effects: [{ type: 'decay_slow', need: 'fun', pct: 30 }],
+    ttlMs: 10 * 60 * 1000,
+    note: '🍲 Belleful Joy — nothing beats food from your own fire.',
+  },
 };
 
 /** Fire-and-forget trigger from an intent block. Returns the toast note or null. Never throws. */
@@ -352,18 +359,22 @@ export const NEED_META = [
   { id: 'bladder', label: 'Bladder', icon: '🚻' },
 ];
 
-// Per 60s tick, before mods. Tuned to be playable, not punishing:
-// bladder needs a check-in every ~25 min; hygiene/social/fun ~50 min;
-// energy drains slowly on its own (work/travel are the real costs).
-// hunger keeps the M2 rate (3) so the starvation cascade still bites.
+// PORT-P1: timestamp-based slow decay — begin
+// Points lost per 15 REAL minutes, per need (~1–2 pts / 15 min).
+// The 60s server tick feeds elapsed wall time into decayTick; fractional
+// points accumulate on the in-memory character (char.needs_frac) and only
+// whole points are subtracted, so slow rates survive integer storage.
+// Offline catch-up is capped at 1h; offline players are not ticked at all.
+export const DECAY_WINDOW_MS = 15 * 60 * 1000;
 export const DECAY_RATES = {
-  hunger: 3,
+  hunger: 2,
   energy: 1,
-  fun: 2,
-  social: 2,
-  hygiene: 2,
-  bladder: 4,
+  fun: 1,
+  social: 1,
+  hygiene: 1,
+  bladder: 2,
 };
+// PORT-P1: timestamp-based slow decay — end
 
 const BOOSTABLE_STATS = ['hunger', 'energy', 'fun', 'social', 'hygiene', 'bladder', 'happiness', 'health'];
 
@@ -407,16 +418,35 @@ function needVal(char, need) {
 
 /**
  * REPLACEMENT for sim.js decayTick (coordinator copies this verbatim).
- * New signature: decayTick(char, mods) where mods = { moodlets: [], perks: [] }.
+ * New signature: decayTick(char, mods, now) where mods = { moodlets: [], perks: [] }.
  * Mutates char, clamps 0–100. Returns cascade flags for tick notes.
+ *
+ * PORT-P1: decay is timestamp-based. Each call computes the real
+ * milliseconds since the previous call (char.needs_at) and drains
+ * DECAY_RATES (pts per 15 min) × elapsed/15min × perk/moodlet
+ * multipliers. Fractional points accumulate in char.needs_frac (plain
+ * object, in-memory only — sub-point remainders never hit the DB).
  */
-export function decayTick(char, mods) {
+export function decayTick(char, mods, now = Date.now()) {
   const effects = collectEffects(mods);
 
+  // PORT-P1: timestamp-based slow decay — begin
+  const last = Number(char.needs_at);
+  const elapsedMs = Number.isFinite(last) && last > 0
+    ? Math.min(Math.max(0, now - last), 60 * 60 * 1000)
+    : 60 * 1000; // first sighting: assume one normal tick elapsed
+  char.needs_at = now;
+  const frac = (char.needs_frac && typeof char.needs_frac === 'object') ? char.needs_frac : {};
   for (const need of NEEDS) {
-    const rate = DECAY_RATES[need] * decayMultiplier(need, effects);
-    char[need] = clamp(needVal(char, need) - rate, 0, 100);
+    const rate = DECAY_RATES[need] * decayMultiplier(need, effects); // pts per 15 min
+    frac[need] = (Number(frac[need]) || 0) + (rate * elapsedMs) / DECAY_WINDOW_MS;
+    const whole = Math.floor(frac[need]);
+    frac[need] -= whole;
+    // Always write back: normalizes missing (→100) and negative (→0) fields.
+    char[need] = clamp(needVal(char, need) - whole, 0, 100);
   }
+  char.needs_frac = frac;
+  // PORT-P1: timestamp-based slow decay — end
 
   // per-tick stat boosts / drains from moodlets (defensive: unknown stats ignored)
   for (const e of effects) {

@@ -1,0 +1,126 @@
+/* PORT-P4: social — house invites + closeness bonds (existing tokens only). */
+
+.eko-house__knocks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.eko-house__sub {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.eko-bond__badges {
+  margin-left: var(--space-1);
+}
+
+.eko-bond__rowbtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.eko-bond__detail {
+  margin: var(--space-3) 0;
+}
+
+.eko-bond__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.eko-bond__score {
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+
+.eko-bond__counts {
+  display: flex;
+  gap: var(--space-3);
+  font-size: 0.875rem;
+  margin-bottom: var(--space-2);
+}
+
+.eko-bond__bar {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+
+.eko-bond__bar-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.3s ease;
+}
+
+.eko-bond__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.eko-bond__shelf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-bond__gift {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  cursor: pointer;
+  color: var(--text);
+  text-align: left;
+  width: 100%;
+}
+
+.eko-bond__gift:hover {
+  border-color: var(--primary);
+}
+
+.eko-bond__gift-emoji {
+  font-size: 1.75rem;
+}
+
+.eko-bond__gift-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.eko-bond__gift-cost {
+  color: var(--text-dim);
+  font-size: 0.875rem;
+}
+
+/* Avatar dot for house/bond rows (Friends page doesn't load Chat.css). */
+.eko-social__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--lagoon-100);
+  color: var(--lagoon-700);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}

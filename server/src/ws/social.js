@@ -14,6 +14,11 @@ import {
   addDm, dmThreads, dmHistory, unreadDmCount, setDmReadTs,
   addBlock, removeBlock, isBlocked, isBlockedEither, listBlocks,
   addReport,
+  // PORT-P4: social — begin
+  areFriends, getSocialSettings,
+  hasDmThread, hasPendingDmRequest, createDmRequest, countPendingDmRequests,
+  bumpBond,
+  // PORT-P4: social — end
 } from '../db.js';
 import { cleanText } from '../game/data.js';
 
@@ -407,7 +412,31 @@ export function createSocial({ online, broadcast, getDay, isGovernor, notificati
       const text = cleanText(m.text, 200);
       if (!text) return true;
       const now = Date.now();
+      // PORT-P4: social — begin (message requests: stranger DMs are held
+      // for the recipient's approval; "friends-only" recipients reject).
+      const dmSettings = await getSocialSettings(toId).catch(() => ({ message_policy: 'everyone' }));
+      const dmFriends = await areFriends(id, toId).catch(() => false);
+      const dmThread = await hasDmThread(id, toId).catch(() => true);
+      if (!dmFriends && !dmThread) {
+        if (dmSettings.message_policy === 'friends') {
+          sendTo(id, { t: 'err', text: `@${target.username} only accepts messages from friends.` });
+          return true;
+        }
+        if (await hasPendingDmRequest(id, toId).catch(() => true)) {
+          sendTo(id, { t: 'sys', text: `Your message request to @${target.username} is still pending.` });
+          return true;
+        }
+        const reqId = await createDmRequest(id, toId, text);
+        sendTo(toId, { t: 'dm_request', id: reqId, from: id, fromName: conn.user.username, text, ts: now });
+        sendTo(toId, { t: 'dm_requests', n: await countPendingDmRequests(toId).catch(() => 0) });
+        sendTo(id, { t: 'dm_request_sent', to: toId });
+        return true;
+      }
+      // PORT-P4: social — end
       await addDm(id, toId, text, now);
+      // PORT-P4: social — begin (closeness grows with every exchanged DM)
+      bumpBond(id, toId, 'dms').catch(() => {});
+      // PORT-P4: social — end
       const to = online.get(toId);
       if (to) {
         sendTo(toId, { t: 'dm', from: id, fromName: conn.user.username, text, ts: now });

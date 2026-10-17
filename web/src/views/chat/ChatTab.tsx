@@ -113,7 +113,16 @@ function CityChat({
 /**
  * 💬 Chat tab (6th bottom tab): City chat, topic rooms, DMs, and friends.
  */
-export function ChatTab({ sock, you }: { sock: GameSocket; you: You }) {
+export function ChatTab({
+  sock,
+  you,
+  token,
+}: {
+  sock: GameSocket;
+  you: You;
+  // PORT-P4: social — REST token for group creation + message requests.
+  token: string;
+}) {
   const [seg, setSeg] = useState<Segment>("city");
   const [profile, setProfile] = useState<ProfileTarget | null>(null);
   const [dmStart, setDmStart] = useState<{ id: number; username: string } | null>(null);
@@ -172,11 +181,17 @@ export function ChatTab({ sock, you }: { sock: GameSocket; you: You }) {
 
       {seg === "city" && <CityChat sock={sock} onOpenProfile={openProfile} />}
       {seg === "rooms" && (
-        <RoomsView youId={you.id} sock={sock} onOpenProfile={openProfile} />
+        <RoomsView
+          youId={you.id}
+          sock={sock}
+          token={token}
+          onOpenProfile={openProfile}
+        />
       )}
       {seg === "dms" && (
         <DmsView
           sock={sock}
+          token={token}
           onOpenProfile={openProfile}
           startWith={dmStart}
           onStartWithConsumed={() => setDmStart(null)}

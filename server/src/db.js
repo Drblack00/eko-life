@@ -221,7 +221,8 @@ CREATE TABLE IF NOT EXISTS gists (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
   text TEXT NOT NULL,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  hidden INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_gists_user ON gists(user_id);
 CREATE INDEX IF NOT EXISTS idx_gists_created ON gists(created_at DESC);
@@ -250,6 +251,53 @@ CREATE TABLE IF NOT EXISTS gist_reports (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_gist_reports_gist ON gist_reports(gist_id);
+-- PORT-P4: social — message requests (stranger DMs held for approval)
+CREATE TABLE IF NOT EXISTS dm_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  from_id INTEGER NOT NULL,
+  to_id INTEGER NOT NULL,
+  text TEXT NOT NULL DEFAULT '',
+  ts INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_ts INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_dm_requests_to ON dm_requests(to_id, status);
+-- PORT-P4: social — per-player house-invite link + door knocks (5-guest cap)
+CREATE TABLE IF NOT EXISTS house_invites (
+  host_id INTEGER PRIMARY KEY,
+  token TEXT NOT NULL UNIQUE,
+  created_ts INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS house_knocks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  host_id INTEGER NOT NULL,
+  visitor_id INTEGER NOT NULL,
+  ts INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_ts INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_house_knocks_host ON house_knocks(host_id, status);
+-- PORT-P4: social — closeness bonds (family & dating unlocks)
+CREATE TABLE IF NOT EXISTS bonds (
+  a_id INTEGER NOT NULL,
+  b_id INTEGER NOT NULL,
+  dm_count INTEGER NOT NULL DEFAULT 0,
+  hangout_count INTEGER NOT NULL DEFAULT 0,
+  gift_count INTEGER NOT NULL DEFAULT 0,
+  family TEXT NOT NULL DEFAULT 'none',
+  family_by INTEGER NOT NULL DEFAULT 0,
+  dating TEXT NOT NULL DEFAULT 'none',
+  dating_by INTEGER NOT NULL DEFAULT 0,
+  updated_ts INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (a_id, b_id)
+);
+-- PORT-P4: social — per-user social preferences
+CREATE TABLE IF NOT EXISTS social_settings (
+  user_id INTEGER PRIMARY KEY,
+  read_receipts INTEGER NOT NULL DEFAULT 1,
+  message_policy TEXT NOT NULL DEFAULT 'everyone',
+  relationships_visible INTEGER NOT NULL DEFAULT 1
+);
 -- Phase 3 (News tab): headline-aggregator cache; dedupe by link.
 CREATE TABLE IF NOT EXISTS news_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -673,7 +721,8 @@ CREATE TABLE IF NOT EXISTS gists (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL,
   text TEXT NOT NULL,
-  created_at BIGINT NOT NULL
+  created_at BIGINT NOT NULL,
+  hidden INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_gists_user ON gists(user_id);
 CREATE INDEX IF NOT EXISTS idx_gists_created ON gists(created_at DESC);
@@ -702,6 +751,53 @@ CREATE TABLE IF NOT EXISTS gist_reports (
   created_at BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_gist_reports_gist ON gist_reports(gist_id);
+-- PORT-P4: social — message requests (stranger DMs held for approval)
+CREATE TABLE IF NOT EXISTS dm_requests (
+  id SERIAL PRIMARY KEY,
+  from_id INTEGER NOT NULL,
+  to_id INTEGER NOT NULL,
+  text TEXT NOT NULL DEFAULT '',
+  ts BIGINT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_ts BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_dm_requests_to ON dm_requests(to_id, status);
+-- PORT-P4: social — per-player house-invite link + door knocks (5-guest cap)
+CREATE TABLE IF NOT EXISTS house_invites (
+  host_id INTEGER PRIMARY KEY,
+  token TEXT NOT NULL UNIQUE,
+  created_ts BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS house_knocks (
+  id SERIAL PRIMARY KEY,
+  host_id INTEGER NOT NULL,
+  visitor_id INTEGER NOT NULL,
+  ts BIGINT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_ts BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_house_knocks_host ON house_knocks(host_id, status);
+-- PORT-P4: social — closeness bonds (family & dating unlocks)
+CREATE TABLE IF NOT EXISTS bonds (
+  a_id INTEGER NOT NULL,
+  b_id INTEGER NOT NULL,
+  dm_count INTEGER NOT NULL DEFAULT 0,
+  hangout_count INTEGER NOT NULL DEFAULT 0,
+  gift_count INTEGER NOT NULL DEFAULT 0,
+  family TEXT NOT NULL DEFAULT 'none',
+  family_by INTEGER NOT NULL DEFAULT 0,
+  dating TEXT NOT NULL DEFAULT 'none',
+  dating_by INTEGER NOT NULL DEFAULT 0,
+  updated_ts BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (a_id, b_id)
+);
+-- PORT-P4: social — per-user social preferences
+CREATE TABLE IF NOT EXISTS social_settings (
+  user_id INTEGER PRIMARY KEY,
+  read_receipts INTEGER NOT NULL DEFAULT 1,
+  message_policy TEXT NOT NULL DEFAULT 'everyone',
+  relationships_visible INTEGER NOT NULL DEFAULT 1
+);
 -- Phase 3 (News tab): headline-aggregator cache; dedupe by link.
 CREATE TABLE IF NOT EXISTS news_items (
   id SERIAL PRIMARY KEY,
@@ -1049,6 +1145,8 @@ export async function initDb() {
     await ensureColumn('characters', 'appearance_rev', 'INTEGER NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0');
     // W3: friends page — status-change timestamp on friendships (no-op on fresh DBs)
     await ensureColumn('friendships', 'updated_ts', 'INTEGER NOT NULL DEFAULT 0', 'BIGINT NOT NULL DEFAULT 0');
+    // PORT-P4: gist moderation — auto-hidden flag (3+ reports), no-op on fresh DBs
+    await ensureColumn('gists', 'hidden', 'INTEGER NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0');
     // Phase 4 (Èkó Reserve): unpaid weekly upkeep bills (no interest, no lockouts)
     await ensureColumn('characters', 'bill_arrears', 'INTEGER NOT NULL DEFAULT 0', 'INTEGER NOT NULL DEFAULT 0');
     // Home City V1: origin city + city the player is currently in
@@ -2178,12 +2276,13 @@ function shapeGist(row, viewerId) {
     comment_count: Number(row.comment_count || 0),
     liked: !!Number(row.liked || 0),
     mine: Number(row.user_id) === Number(viewerId),
+    hidden: !!Number(row.hidden || 0),
   };
 }
 
 // Shared FROM/JOIN: gists + author + like/comment counts + viewer's like flag.
 const GIST_SELECT_SQLITE = `
-  SELECT g.id, g.user_id, g.text, g.created_at,
+  SELECT g.id, g.user_id, g.text, g.created_at, g.hidden,
          u.username, u.created_at AS account_created,
          c.avatar, c.color,
          COALESCE(c.money,0)+COALESCE(c.savings,0) AS net_worth,
@@ -2194,7 +2293,7 @@ const GIST_SELECT_SQLITE = `
   JOIN users u ON u.id = g.user_id
   LEFT JOIN characters c ON c.user_id = u.id`;
 const GIST_SELECT_PG = `
-  SELECT g.id, g.user_id, g.text, g.created_at,
+  SELECT g.id, g.user_id, g.text, g.created_at, g.hidden,
          u.username, u.created_at AS account_created,
          c.avatar, c.color,
          COALESCE(c.money,0)+COALESCE(c.savings,0) AS net_worth,
@@ -2221,6 +2320,16 @@ export async function listGists({ viewerId, tab = 'latest', cursor = null, limit
   // params[0] is always the viewer id (liked-flag EXISTS in the SELECT).
   const conds = [];
   const LIKE_COUNT = '(SELECT COUNT(*) FROM gist_likes l WHERE l.gist_id = g.id)';
+
+  // PORT-P4: moderation — auto-hidden posts (3+ reports) are invisible to
+  // everyone except their author (who sees them flagged) pending review.
+  conds.push({ s: '(g.hidden = 0 OR g.user_id = ?)', p: '(g.hidden = 0 OR g.user_id = @1)', vals: [v] });
+  // PORT-P4: a post the viewer reported is hidden from the viewer immediately.
+  conds.push({
+    s: 'NOT EXISTS(SELECT 1 FROM gist_reports r WHERE r.gist_id = g.id AND r.reporter_id = ?)',
+    p: 'NOT EXISTS(SELECT 1 FROM gist_reports r WHERE r.gist_id = g.id AND r.reporter_id = @1)',
+    vals: [v],
+  });
 
   if (t === 'me') {
     conds.push({ s: 'g.user_id = ?', p: 'g.user_id = @1', vals: [v] });
@@ -2319,13 +2428,14 @@ export async function createGist(userId, text) {
     comment_count: 0,
     liked: false,
     mine: true,
+    hidden: false,
   };
 }
 
 export async function getGist(id) {
   return getOne(
-    'SELECT id, user_id, text, created_at FROM gists WHERE id = ?',
-    'SELECT id, user_id, text, created_at FROM gists WHERE id = $1',
+    'SELECT id, user_id, text, created_at, hidden FROM gists WHERE id = ?',
+    'SELECT id, user_id, text, created_at, hidden FROM gists WHERE id = $1',
     [Number(id)]);
 }
 
@@ -2786,4 +2896,371 @@ export async function dbTransaction(cb) {
   // still receives the original rejection via `run`.
   txChain = run.then(() => undefined, () => undefined);
   return run;
+}
+
+// ============================================================
+// PORT-P4: social — message requests, house invites, bonds,
+// social settings, gist moderation helpers.
+// ============================================================
+
+/** Latest gist timestamp for a user (ms) — drives the 5-minute post floor. */
+export async function lastGistTs(userId) {
+  const r = await getOne(
+    'SELECT MAX(created_at) AS m FROM gists WHERE user_id = ?',
+    'SELECT MAX(created_at) AS m FROM gists WHERE user_id = $1',
+    [Number(userId)]);
+  return r && r.m != null ? Number(r.m) : 0;
+}
+
+/** Gists posted by a user in the last `windowMs` — drives the 20/day cap. */
+export async function countGistsSince(userId, windowMs) {
+  const since = Date.now() - windowMs;
+  const r = await getOne(
+    'SELECT COUNT(*) AS n FROM gists WHERE user_id = ? AND created_at >= ?',
+    'SELECT COUNT(*) AS n FROM gists WHERE user_id = $1 AND created_at >= $2',
+    [Number(userId), since]);
+  return Number(r.n) || 0;
+}
+
+/** Auto-hide a gist globally (3+ distinct reports) pending admin review. */
+export async function hideGist(gistId) {
+  await runQ(
+    'UPDATE gists SET hidden = 1 WHERE id = ?',
+    'UPDATE gists SET hidden = 1 WHERE id = $1',
+    [Number(gistId)]);
+}
+
+/** Distinct reporters on a gist — the auto-hide threshold input. */
+export async function countDistinctGistReporters(gistId) {
+  const r = await getOne(
+    'SELECT COUNT(DISTINCT reporter_id) AS n FROM gist_reports WHERE gist_id = ?',
+    'SELECT COUNT(DISTINCT reporter_id) AS n FROM gist_reports WHERE gist_id = $1',
+    [Number(gistId)]);
+  return Number(r.n) || 0;
+}
+
+// ---- message requests ----
+
+/** Create a pending message request; returns the row id. */
+export async function createDmRequest(fromId, toId, text) {
+  const now = Date.now();
+  const r = await dbRunReturning(
+    'INSERT INTO dm_requests (from_id, to_id, text, ts, status, created_ts) VALUES (?,?,?,?,?,?)',
+    'INSERT INTO dm_requests (from_id, to_id, text, ts, status, created_ts) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
+    [Number(fromId), Number(toId), String(text).slice(0, 200), now, 'pending', now]);
+  if (pool) return Number(r.rows[0].id);
+  const id = await getOne('SELECT last_insert_rowid() AS id', 'SELECT 1', []);
+  return Number(id.id);
+}
+
+export async function getDmRequest(id) {
+  return getOne(
+    'SELECT * FROM dm_requests WHERE id = ?',
+    'SELECT * FROM dm_requests WHERE id = $1',
+    [Number(id)]);
+}
+
+export async function listPendingDmRequests(toId) {
+  const rows = await getAll(
+    `SELECT r.*, u.username AS from_username FROM dm_requests r
+     JOIN users u ON u.id = r.from_id
+     WHERE r.to_id = ? AND r.status = 'pending' ORDER BY r.id DESC`,
+    `SELECT r.*, u.username AS from_username FROM dm_requests r
+     JOIN users u ON u.id = r.from_id
+     WHERE r.to_id = $1 AND r.status = 'pending' ORDER BY r.id DESC`,
+    [Number(toId)]);
+  return rows.map(r => ({
+    id: Number(r.id),
+    from_id: Number(r.from_id),
+    from_username: r.from_username,
+    text: r.text,
+    ts: Number(r.ts),
+  }));
+}
+
+export async function countPendingDmRequests(toId) {
+  const r = await getOne(
+    `SELECT COUNT(*) AS n FROM dm_requests WHERE to_id = ? AND status = 'pending'`,
+    `SELECT COUNT(*) AS n FROM dm_requests WHERE to_id = $1 AND status = 'pending'`,
+    [Number(toId)]);
+  return Number(r.n) || 0;
+}
+
+/** Any pending request already in flight from A to B? */
+export async function hasPendingDmRequest(fromId, toId) {
+  const r = await getOne(
+    `SELECT COUNT(*) AS n FROM dm_requests WHERE from_id = ? AND to_id = ? AND status = 'pending'`,
+    `SELECT COUNT(*) AS n FROM dm_requests WHERE from_id = $1 AND to_id = $2 AND status = 'pending'`,
+    [Number(fromId), Number(toId)]);
+  return (Number(r.n) || 0) > 0;
+}
+
+/**
+ * True when a DM thread already exists between A and B (messages either
+ * way, or a previously approved request) — follow-up DMs skip the request gate.
+ */
+export async function hasDmThread(a, b) {
+  const r = await getOne(
+    `SELECT
+       (SELECT COUNT(*) FROM dms WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)) AS m,
+       (SELECT COUNT(*) FROM dm_requests
+         WHERE ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
+           AND status = 'approved') AS q`,
+    `SELECT
+       (SELECT COUNT(*) FROM dms WHERE (from_id = $1 AND to_id = $2) OR (from_id = $3 AND to_id = $4)) AS m,
+       (SELECT COUNT(*) FROM dm_requests
+         WHERE ((from_id = $5 AND to_id = $6) OR (from_id = $7 AND to_id = $8))
+           AND status = 'approved') AS q`,
+    [a, b, b, a, a, b, b, a].map(Number));
+  return (Number(r.m) || 0) > 0 || (Number(r.q) || 0) > 0;
+}
+
+export async function respondDmRequest(id, status) {
+  await runQ(
+    `UPDATE dm_requests SET status = ? WHERE id = ?`,
+    `UPDATE dm_requests SET status = $1 WHERE id = $2`,
+    [String(status), Number(id)]);
+}
+
+// ---- house invites ----
+
+function houseToken() {
+  const abc = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let t = '';
+  for (let i = 0; i < 12; i++) t += abc[Math.floor(Math.random() * abc.length)];
+  return t;
+}
+
+/** The host's persistent invite row (created lazily). */
+export async function getOrCreateHouseInvite(hostId) {
+  const hid = Number(hostId);
+  let row = await getOne(
+    'SELECT * FROM house_invites WHERE host_id = ?',
+    'SELECT * FROM house_invites WHERE host_id = $1',
+    [hid]);
+  if (!row) {
+    const token = houseToken();
+    const now = Date.now();
+    try {
+      await runQ(
+        'INSERT INTO house_invites (host_id, token, created_ts) VALUES (?,?,?)',
+        'INSERT INTO house_invites (host_id, token, created_ts) VALUES ($1,$2,$3)',
+        [hid, token, now]);
+      row = { host_id: hid, token, created_ts: now };
+    } catch (e) {
+      // Lost a token-uniqueness race — read the winner's row.
+      row = await getOne(
+        'SELECT * FROM house_invites WHERE host_id = ?',
+        'SELECT * FROM house_invites WHERE host_id = $1',
+        [hid]);
+    }
+  }
+  return row;
+}
+
+export async function getHouseInviteByToken(token) {
+  const row = await getOne(
+    `SELECT h.*, u.username AS host_username FROM house_invites h
+     JOIN users u ON u.id = h.host_id WHERE h.token = ?`,
+    `SELECT h.*, u.username AS host_username FROM house_invites h
+     JOIN users u ON u.id = h.host_id WHERE h.token = $1`,
+    [String(token)]);
+  return row || null;
+}
+
+export async function createKnock(hostId, visitorId) {
+  const now = Date.now();
+  const r = await dbRunReturning(
+    'INSERT INTO house_knocks (host_id, visitor_id, ts, status, created_ts) VALUES (?,?,?, ?,?)',
+    'INSERT INTO house_knocks (host_id, visitor_id, ts, status, created_ts) VALUES ($1,$2,$3,$4,$5) RETURNING id',
+    [Number(hostId), Number(visitorId), now, 'pending', now]);
+  if (pool) return Number(r.rows[0].id);
+  const id = await getOne('SELECT last_insert_rowid() AS id', 'SELECT 1', []);
+  return Number(id.id);
+}
+
+export async function getKnock(id) {
+  return getOne(
+    'SELECT * FROM house_knocks WHERE id = ?',
+    'SELECT * FROM house_knocks WHERE id = $1',
+    [Number(id)]);
+}
+
+export async function hasPendingKnock(hostId, visitorId) {
+  const r = await getOne(
+    `SELECT COUNT(*) AS n FROM house_knocks
+     WHERE host_id = ? AND visitor_id = ? AND status = 'pending'`,
+    `SELECT COUNT(*) AS n FROM house_knocks
+     WHERE host_id = $1 AND visitor_id = $2 AND status = 'pending'`,
+    [Number(hostId), Number(visitorId)]);
+  return (Number(r.n) || 0) > 0;
+}
+
+/** Approved (current) guests at a host's house — the 5-guest cap input. */
+export async function countApprovedGuests(hostId) {
+  const r = await getOne(
+    `SELECT COUNT(*) AS n FROM house_knocks WHERE host_id = ? AND status = 'approved'`,
+    `SELECT COUNT(*) AS n FROM house_knocks WHERE host_id = $1 AND status = 'approved'`,
+    [Number(hostId)]);
+  return Number(r.n) || 0;
+}
+
+export async function listKnocks(hostId, status) {
+  const rows = await getAll(
+    `SELECT k.*, u.username AS visitor_username FROM house_knocks k
+     JOIN users u ON u.id = k.visitor_id
+     WHERE k.host_id = ? AND k.status = ? ORDER BY k.id DESC`,
+    `SELECT k.*, u.username AS visitor_username FROM house_knocks k
+     JOIN users u ON u.id = k.visitor_id
+     WHERE k.host_id = $1 AND k.status = $2 ORDER BY k.id DESC`,
+    [Number(hostId), String(status)]);
+  return rows.map(r => ({
+    id: Number(r.id),
+    visitor_id: Number(r.visitor_id),
+    visitor_username: r.visitor_username,
+    ts: Number(r.ts),
+    status: r.status,
+  }));
+}
+
+export async function respondKnock(id, status) {
+  await runQ(
+    `UPDATE house_knocks SET status = ? WHERE id = ?`,
+    `UPDATE house_knocks SET status = $1 WHERE id = $2`,
+    [String(status), Number(id)]);
+}
+
+// ---- closeness bonds ----
+
+function bondPair(a, b) {
+  const x = Number(a), y = Number(b);
+  return x < y ? [x, y] : [y, x];
+}
+
+/** Get (creating) the symmetric bond row for a player pair. */
+export async function getBond(a, b) {
+  const [x, y] = bondPair(a, b);
+  let row = await getOne(
+    'SELECT * FROM bonds WHERE a_id = ? AND b_id = ?',
+    'SELECT * FROM bonds WHERE a_id = $1 AND b_id = $2',
+    [x, y]);
+  if (!row) {
+    const now = Date.now();
+    await runQ(
+      `INSERT INTO bonds (a_id, b_id, updated_ts) VALUES (?,?,?)
+       ON CONFLICT DO NOTHING`,
+      `INSERT INTO bonds (a_id, b_id, updated_ts) VALUES ($1,$2,$3)
+       ON CONFLICT DO NOTHING`,
+      [x, y, now]);
+    row = await getOne(
+      'SELECT * FROM bonds WHERE a_id = ? AND b_id = ?',
+      'SELECT * FROM bonds WHERE a_id = $1 AND b_id = $2',
+      [x, y]);
+  }
+  return row;
+}
+
+/** Bump one interaction counter on the pair's bond (dms|hangouts|gifts). */
+export async function bumpBond(a, b, field) {
+  const col = { dms: 'dm_count', hangouts: 'hangout_count', gifts: 'gift_count' }[field];
+  if (!col) throw new Error('bad bond field');
+  const [x, y] = bondPair(a, b);
+  await getBond(x, y); // ensure row
+  const now = Date.now();
+  await runQ(
+    `UPDATE bonds SET ${col} = ${col} + 1, updated_ts = ? WHERE a_id = ? AND b_id = ?`,
+    `UPDATE bonds SET ${col} = ${col} + 1, updated_ts = $1 WHERE a_id = $2 AND b_id = $3`,
+    [now, x, y]);
+}
+
+/** Closeness score from interaction counts. Exported for tests + UI copy. */
+export function bondScore(row) {
+  return (Number(row.dm_count) || 0) * 1
+       + (Number(row.hangout_count) || 0) * 15
+       + (Number(row.gift_count) || 0) * 10;
+}
+export const BOND_FAMILY_AT = 50;  // closeness unlocks "add as family"
+export const BOND_DATING_AT = 150; // closeness unlocks dating status
+
+/** Set family/dating status on a bond (status: none|pending|family|dating). */
+export async function setBondStatus(a, b, which, status, by = 0) {
+  const col = which === 'family' ? 'family' : 'dating';
+  const byCol = which === 'family' ? 'family_by' : 'dating_by';
+  const [x, y] = bondPair(a, b);
+  await getBond(x, y);
+  await runQ(
+    `UPDATE bonds SET ${col} = ?, ${byCol} = ?, updated_ts = ? WHERE a_id = ? AND b_id = ?`,
+    `UPDATE bonds SET ${col} = $1, ${byCol} = $2, updated_ts = $3 WHERE a_id = $4 AND b_id = $5`,
+    [String(status), Number(by), Date.now(), x, y]);
+}
+
+/** All bonds for a player with the other player's username + score. */
+export async function listBonds(userId) {
+  const rows = await getAll(
+    `SELECT b.*,
+            CASE WHEN b.a_id = ? THEN b.b_id ELSE b.a_id END AS other_id,
+            u.username AS other_username
+     FROM bonds b JOIN users u ON u.id = CASE WHEN b.a_id = ? THEN b.b_id ELSE b.a_id END
+     WHERE (b.a_id = ? OR b.b_id = ?) AND (b.dm_count + b.hangout_count + b.gift_count) > 0
+     ORDER BY b.updated_ts DESC LIMIT 100`,
+    `SELECT b.*,
+            CASE WHEN b.a_id = $1 THEN b.b_id ELSE b.a_id END AS other_id,
+            u.username AS other_username
+     FROM bonds b JOIN users u ON u.id = CASE WHEN b.a_id = $1 THEN b.b_id ELSE b.a_id END
+     WHERE (b.a_id = $1 OR b.b_id = $1) AND (b.dm_count + b.hangout_count + b.gift_count) > 0
+     ORDER BY b.updated_ts DESC LIMIT 100`,
+    [Number(userId), Number(userId), Number(userId), Number(userId)]);
+  return rows.map(r => ({
+    other_id: Number(r.other_id),
+    other_username: r.other_username,
+    dm_count: Number(r.dm_count) || 0,
+    hangout_count: Number(r.hangout_count) || 0,
+    gift_count: Number(r.gift_count) || 0,
+    score: bondScore(r),
+    family: r.family,
+    family_by: Number(r.family_by) || 0,
+    dating: r.dating,
+    dating_by: Number(r.dating_by) || 0,
+  }));
+}
+
+// ---- social settings ----
+
+const SOCIAL_DEFAULTS = { read_receipts: true, message_policy: 'everyone', relationships_visible: true };
+
+export async function getSocialSettings(userId) {
+  const r = await getOne(
+    'SELECT * FROM social_settings WHERE user_id = ?',
+    'SELECT * FROM social_settings WHERE user_id = $1',
+    [Number(userId)]);
+  if (!r) return { ...SOCIAL_DEFAULTS };
+  return {
+    read_receipts: !!Number(r.read_receipts),
+    message_policy: r.message_policy === 'friends' ? 'friends' : 'everyone',
+    relationships_visible: !!Number(r.relationships_visible),
+  };
+}
+
+export async function setSocialSettings(userId, patch) {
+  const cur = await getSocialSettings(userId);
+  const next = {
+    read_receipts: patch.read_receipts === undefined ? cur.read_receipts : !!patch.read_receipts,
+    message_policy: patch.message_policy === undefined
+      ? cur.message_policy
+      : (patch.message_policy === 'friends' ? 'friends' : 'everyone'),
+    relationships_visible: patch.relationships_visible === undefined ? cur.relationships_visible : !!patch.relationships_visible,
+  };
+  await runQ(
+    `INSERT INTO social_settings (user_id, read_receipts, message_policy, relationships_visible)
+     VALUES (?,?,?,?)
+     ON CONFLICT(user_id) DO UPDATE SET read_receipts = excluded.read_receipts,
+       message_policy = excluded.message_policy,
+       relationships_visible = excluded.relationships_visible`,
+    `INSERT INTO social_settings (user_id, read_receipts, message_policy, relationships_visible)
+     VALUES ($1,$2,$3,$4)
+     ON CONFLICT (user_id) DO UPDATE SET read_receipts = excluded.read_receipts,
+       message_policy = excluded.message_policy,
+       relationships_visible = excluded.relationships_visible`,
+    [Number(userId), next.read_receipts ? 1 : 0, next.message_policy, next.relationships_visible ? 1 : 0]);
+  return next;
 }

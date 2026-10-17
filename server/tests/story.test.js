@@ -62,8 +62,9 @@ test('GET /api/stories lists the seeded arc with unread badge', async () => {
   const r = await get('/api/stories', A.token);
   assert.equal(r.status, 200);
   assert.ok(Array.isArray(r.json.stories));
-  assert.equal(r.json.stories.length, 1);
-  const s = r.json.stories[0];
+  // PORT-P1: 6 arcs seeded (was 1)
+  assert.equal(r.json.stories.length, 6);
+  const s = r.json.stories.find((x) => x.id === 1);
   assert.equal(s.title, 'Danfo to Headline');
   assert.equal(s.coverEmoji, '🚌');
   assert.equal(s.chaptersCount, 9);
@@ -71,6 +72,11 @@ test('GET /api/stories lists the seeded arc with unread badge', async () => {
   assert.equal(s.completed, false);
   assert.equal(s.unread, 9);
   assert.ok(s.synopsis.length > 0);
+  assert.equal(s.locked, false);
+  // PORT-P1: final arc is net-worth locked
+  const sixth = r.json.stories.find((x) => x.id === 6);
+  assert.equal(sixth.locked, true);
+  assert.ok(sixth.netWorthReq > 0);
 });
 
 test('GET /api/stories/1 returns chapters + scenes up to progress', async () => {
@@ -124,7 +130,12 @@ test('advance through chapter 1; valid choice applies coin + xp rewards', async 
     const r = await post('/api/stories/1/advance', { chapter_no: 1, scene_no: sn }, A.token);
     assert.equal(r.status, 200, `scene ${sn}: ${JSON.stringify(r.json)}`);
     assert.equal(r.json.progress.sceneNo, sn + 1);
-    assert.deepEqual(r.json.reward, { coins: 0, xp: 0, leveledUp: false, skill: 'music', skillLevel: 0 });
+    // PORT-P1: reward object now carries rep/gem fields too
+    assert.deepEqual(
+      (({ coins, xp, leveledUp, skill, skillLevel }) => ({ coins, xp, leveledUp, skill, skillLevel }))(r.json.reward),
+      { coins: 0, xp: 0, leveledUp: false, skill: 'music', skillLevel: 0 });
+    assert.equal(typeof r.json.reward.rep, 'number');
+    assert.equal(typeof r.json.reward.gems, 'number');
   }
   // Decision scene 5: choice 1 is worth 0 coins + 25 xp.
   const d = await get('/api/stories/1', A.token);

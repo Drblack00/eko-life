@@ -13,6 +13,11 @@
 // ============================================================
 import { dbRun, dbGet, dbAll, getMeta, setMeta, getCharacter } from '../../db.js';
 import { LOCATIONS } from '../data.js';
+// PORT-P1: rep rewards on quest claims + Lagos-day helpers.
+// PORT-P3 one-line fix (flagged for P1): lagosDayKey is ALSO declared locally
+// below (identical Lagos YYYY-MM-DD behavior) — importing it too is a
+// SyntaxError. addRep + msUntilLagosMidnight still come from vitality.js.
+import { addRep, msUntilLagosMidnight } from '../vitality.js';
 
 // ---------------- constants ----------------
 export const HUNT_ROUND_MS = 21 * 3600 * 1000; // new riddle every 21h
@@ -88,6 +93,15 @@ export async function ensureSchema() {
       "ALTER TABLE characters ADD COLUMN perks TEXT DEFAULT '[]'",
       "ALTER TABLE characters ADD COLUMN perks TEXT DEFAULT '[]'");
   } catch { /* exists */ }
+  // PORT-P1: hustle swap + all-three bonus columns — begin
+  for (const ddl of [
+    'ALTER TABLE hustle_state ADD COLUMN swap_day TEXT DEFAULT \'\'',
+    'ALTER TABLE hustle_state ADD COLUMN swaps_used INTEGER DEFAULT 0',
+    'ALTER TABLE hustle_state ADD COLUMN bonus_claimed INTEGER DEFAULT 0',
+  ]) {
+    try { await dbRun(ddl, ddl); } catch { /* exists */ }
+  }
+  // PORT-P1: hustle swap + all-three bonus columns — end
 }
 
 // ---------------- wall-clock helpers (Africa/Lagos) ----------------
@@ -316,11 +330,13 @@ export async function getHustleState(userId, now = Date.now()) {
       `INSERT INTO hustle_state (user_id, day_key, missions_json, done_json, claimed_stars)
        VALUES (?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET
        day_key=excluded.day_key, missions_json=excluded.missions_json,
-       done_json=excluded.done_json, claimed_stars=0`,
+       done_json=excluded.done_json, claimed_stars=0,
+       swap_day='', swaps_used=0, bonus_claimed=0`,
       `INSERT INTO hustle_state (user_id, day_key, missions_json, done_json, claimed_stars)
        VALUES ($1,$2,$3,$4,$5) ON CONFLICT (user_id) DO UPDATE SET
        day_key=excluded.day_key, missions_json=excluded.missions_json,
-       done_json=excluded.done_json, claimed_stars=0`,
+       done_json=excluded.done_json, claimed_stars=0,
+       swap_day='', swaps_used=0, bonus_claimed=0`,
       [userId, key, JSON.stringify(missions), '[]', 0]);
     st = await dbGet(
       'SELECT * FROM hustle_state WHERE user_id=?',
@@ -333,6 +349,10 @@ export async function getHustleState(userId, now = Date.now()) {
     missions: JSON.parse(st.missions_json),
     done: JSON.parse(st.done_json),
     claimed_stars: Number(st.claimed_stars) || 0,
+    // PORT-P1: swap + bonus bookkeeping
+    swapDay: st.swap_day || '',
+    swapsUsed: Number(st.swaps_used) || 0,
+    bonusClaimed: Number(st.bonus_claimed) || 0,
   };
 }
 
@@ -347,6 +367,34 @@ async function markMissionDone(userId, missionId) {
   return { ...st, done, claimed_stars: st.claimed_stars + HUSTLE_STAR_REWARD };
 }
 
+// PORT-P1: daily quest reward tables — begin
+// Per-mission game-money + rep rewards by difficulty tier.
+export const HUSTLE_REWARDS = {
+  easy:   { money: 3000,  rep: 20 },
+  medium: { money: 6000,  rep: 35 },
+  hard:   { money: 10000, rep: 50 },
+};
+export const HUSTLE_DIFFICULTY = {
+  meals_2: 'easy', treat_1: 'easy', deposit_1: 'easy',
+  shift_1: 'medium', travel_2: 'medium', finds_3: 'medium',
+  study_1: 'medium', furniture_1: 'medium', repay_1: 'medium',
+  shift_3: 'hard', earn_10k: 'hard', save_5k: 'hard',
+};
+export function hustleRewardFor(missionId) {
+  const tier = HUSTLE_DIFFICULTY[missionId] || 'easy';
+  return { tier, ...HUSTLE_REWARDS[tier] };
+}
+// All-three-missions bonus (game money + gems + rep).
+export const HUSTLE_ALL_DONE_BONUS = { money: 15000, gems: 2, rep: 80 };
+
+async function markBonusClaimed(userId) {
+  await dbRun(
+    'UPDATE hustle_state SET bonus_claimed=1 WHERE user_id=?',
+    'UPDATE hustle_state SET bonus_claimed=1 WHERE user_id=$1',
+    [userId]);
+}
+// PORT-P1: daily quest reward tables — end
+
 // ---------------- perks ----------------
 // 14 original perks. EFFECT CONTRACT (shared with M7/M8/M12):
 //   {type:'decay_slow', need, pct}  — M8: this need's decay × (1 - pct/100)
@@ -354,6 +402,12 @@ async function markMissionDone(userId, missionId) {
 //   {type:'work_pay', pct}           — M7: shift payout × (1 + pct/100)
 //   {type:'discount', pct}           — shop/furniture buys × (1 - pct/100)
 //   {type:'xp_boost', pct}           — M12: academy/skill XP × (1 + pct/100)
+// PORT-P1 extended contract (consumed via game/perks.js getPerkEffects):
+//   {type:'social_success', pct} — social success rolls × (1 + pct/100)
+//   {type:'romance_success', pct} — romance/flirt rolls × (1 + pct/100)
+//   {type:'jail_shorten', pct}   — jail sentences × (1 - pct/100)
+//   {type:'mood_extend', pct}    — good-mood durations × (1 + pct/100)
+//   {type:'sleep_boost', pct}    — sleep energy restore × (1 + pct/100)
 // Multiplicative stacking when several of the same type are owned.
 export const PERKS = [
   { id: 'slow_burn',       name: 'Slow Burn',       icon: '🍚', cost: 8,  effect: { type: 'decay_slow', need: 'hunger', pct: 25 },    desc: 'Hunger drains 25% slower. Lagos no dey rush food.' },
@@ -503,6 +557,8 @@ export const INTENTS = {
         id: m.id,
         label: m.label,
         reward: HUSTLE_STAR_REWARD,
+        // PORT-P1: per-mission game-money + rep rewards
+        prize: hustleRewardFor(m.id),
         done: await m.check(mapi),
         claimed: st.done.includes(m.id),
       });
@@ -512,11 +568,16 @@ export const INTENTS = {
       dayKey: st.day_key,
       stars: starBalance(conn.character),
       missions,
+      // PORT-P1: reset countdown + swap budget
+      resetsInMs: msUntilLagosMidnight(),
+      swapLeft: st.swapDay === lagosDayKey() ? Math.max(0, 1 - st.swapsUsed) : 1,
+      allDoneBonus: HUSTLE_ALL_DONE_BONUS,
+      bonusClaimed: !!st.bonusClaimed,
     });
   },
 
   hustle_claim: async (api, msg) => {
-    const { conn, send, err, youSnapshot } = api;
+    const { conn, send, err, youSnapshot, commit } = api;
     const c = conn.character;
     const missionId = String((msg && msg.missionId) || '');
     const st = await getHustleState(conn.user.id);
@@ -528,14 +589,57 @@ export const INTENTS = {
     const m = missionById(missionId);
     const ok = await m.check(missionApi(conn.user.id, lagosDayStartMs()));
     if (!ok) { err('Mission not complete yet — check the requirements. 💪'); return; }
+    // PORT-P1: mission prize (game money + rep) on top of the 2 stars.
+    const prize = hustleRewardFor(missionId);
     c.perk_stars = starBalance(c) + HUSTLE_STAR_REWARD;
-    await markMissionDone(conn.user.id, missionId);
+    c.money = Math.max(0, Math.floor(Number(c.money) || 0)) + prize.money;
+    const repRes = await addRep(conn.user.id, prize.rep);
+    const after = await markMissionDone(conn.user.id, missionId);
     await persistPerks(c);
-    console.log(`[m9] ${conn.user.username} completed hustle ${missionId} → +${HUSTLE_STAR_REWARD}✨`);
+    // PORT-P1: all-three-missions bonus, once per day.
+    let bonusNote = '';
+    if (after.done.length >= HUSTLE_MISSIONS_PER_DAY && !after.bonusClaimed) {
+      await markBonusClaimed(conn.user.id);
+      c.money = Math.max(0, Math.floor(Number(c.money) || 0)) + HUSTLE_ALL_DONE_BONUS.money;
+      c.perk_stars = starBalance(c) + HUSTLE_ALL_DONE_BONUS.gems;
+      await addRep(conn.user.id, HUSTLE_ALL_DONE_BONUS.rep);
+      await persistPerks(c);
+      bonusNote = ` 🏆 ALL THREE DONE! Bonus +₦${HUSTLE_ALL_DONE_BONUS.money.toLocaleString('en-NG')} +${HUSTLE_ALL_DONE_BONUS.gems}✨ +${HUSTLE_ALL_DONE_BONUS.rep} rep!`;
+    }
+    console.log(`[m9] ${conn.user.username} completed hustle ${missionId} → +${HUSTLE_STAR_REWARD}✨ +₦${prize.money} +${prize.rep} rep${bonusNote ? ' +ALL-DONE BONUS' : ''}`);
+    await commit({
+      kind: 'hustle_reward',
+      amount: prize.money + (bonusNote ? HUSTLE_ALL_DONE_BONUS.money : 0),
+      meta: { mission: missionId, rep: prize.rep, bonus: !!bonusNote },
+      note: `✨ Hustle complete: ${m.label} — +${HUSTLE_STAR_REWARD}✨ +₦${prize.money.toLocaleString('en-NG')} +${prize.rep} rep!${bonusNote}`,
+    });
+    send(conn, { t: 'you', you: youSnapshot(conn) });
+  },
+
+  // PORT-P1: swap one of today's missions for a fresh one (1 free/day).
+  hustle_swap: async (api, msg) => {
+    const { conn, send, err, youSnapshot } = api;
+    const missionId = String((msg && msg.missionId) || '');
+    const st = await getHustleState(conn.user.id);
+    if (!st.missions.includes(missionId)) { err('That mission isn’t on today’s hustle list.'); return; }
+    if (st.done.includes(missionId)) { err('Already claimed — no swap needed. 🎉'); return; }
+    const today = lagosDayKey();
+    const used = st.swapDay === today ? st.swapsUsed : 0;
+    if (used >= 1) { err('Free swap used up — one per day. 🔄'); return; }
+    const taken = new Set(st.missions);
+    const replacement = MISSIONS.map(m => m.id).find(id => !taken.has(id));
+    if (!replacement) { err('Nothing left to swap to.'); return; }
+    const missions = st.missions.map(id => (id === missionId ? replacement : id));
+    await dbRun(
+      'UPDATE hustle_state SET missions_json=?, swap_day=?, swaps_used=? WHERE user_id=?',
+      'UPDATE hustle_state SET missions_json=$1, swap_day=$2, swaps_used=$3 WHERE user_id=$4',
+      [JSON.stringify(missions), today, used + 1, conn.user.id]);
+    const nm = missionById(replacement);
+    console.log(`[m9] ${conn.user.username} swapped hustle ${missionId} → ${replacement}`);
     send(conn, {
       t: 'you',
       you: youSnapshot(conn),
-      note: `✨ Hustle complete: ${m.label} — +${HUSTLE_STAR_REWARD} perk stars!`,
+      note: `🔄 Swapped! New mission: ${nm.label}`,
     });
   },
 
@@ -599,9 +703,16 @@ async function restHustle(req, res) {
   for (const id of st.missions) {
     const m = missionById(id);
     if (!m) continue;
-    missions.push({ id: m.id, label: m.label, reward: HUSTLE_STAR_REWARD, done: await m.check(mapi), claimed: st.done.includes(m.id) });
+    missions.push({ id: m.id, label: m.label, reward: HUSTLE_STAR_REWARD, prize: hustleRewardFor(m.id), done: await m.check(mapi), claimed: st.done.includes(m.id) });
   }
-  res.json({ dayKey: st.day_key, missions, stars: st.claimed_stars });
+  // PORT-P1: reset countdown + swap budget + all-done bonus info
+  res.json({
+    dayKey: st.day_key, missions, stars: st.claimed_stars,
+    resetsInMs: msUntilLagosMidnight(),
+    swapLeft: st.swapDay === lagosDayKey() ? Math.max(0, 1 - st.swapsUsed) : 1,
+    allDoneBonus: HUSTLE_ALL_DONE_BONUS,
+    bonusClaimed: !!st.bonusClaimed,
+  });
 }
 
 async function restPerks(req, res) {

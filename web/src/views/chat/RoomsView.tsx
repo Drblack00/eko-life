@@ -3,6 +3,9 @@ import { Button, Card, Dialog, EmptyState, useToast } from "../../components";
 import type { GameSocket, RoomMembersStatus } from "../../hooks/useGameSocket";
 import type { RoomEntry, RoomMember } from "../../game/types";
 import type { ProfileTarget } from "./ProfileSheet";
+// PORT-P4: social — begin (group creation + member lookup)
+import { ApiError, friendsApi, socialApi } from "../../lib/api";
+// PORT-P4: social — end
 
 /**
  * Pure member-list view state: the UI must never sit on an infinite spinner.
@@ -357,18 +360,201 @@ function CreateRoomDialog({
   );
 }
 
+// PORT-P4: social — begin (group icon picker: 16 emoji, mirrors server GROUP_ICONS)
+export const GROUP_ICONS = [
+  "💬", "🏠", "💼", "🎶", "⚽", "🍲", "📚", "🎮",
+  "🌊", "🔥", "🚗", "💰", "🎓", "🏋️", "🎬", "🌴",
+];
+
+/** Pure validation for the group-create form (unit-tested). */
+export function groupCreateValid(name: string, members: string[]): boolean {
+  return name.trim().length >= 2 && members.length >= 1;
+}
+
+/**
+ * Create-group dialog: name + 16-emoji icon picker + add members by
+ * username (exact lookup). Create stays disabled until the name and at
+ * least one valid member are set. Groups are private rooms — chat itself
+ * keeps flowing over the realtime socket after creation.
+ */
+function CreateGroupDialog({
+  open,
+  token,
+  sock,
+  onClose,
+}: {
+  open: boolean;
+  token: string;
+  sock: GameSocket;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+  const [icon, setIcon] = useState(GROUP_ICONS[0]);
+  const [memberInput, setMemberInput] = useState("");
+  const [members, setMembers] = useState<string[]>([]);
+  const [looking, setLooking] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  const canCreate = groupCreateValid(name, members) && !creating;
+
+  const addMember = async () => {
+    const uname = memberInput.trim().replace(/^@/, "");
+    if (!uname || looking) return;
+    if (members.some((m) => m.toLowerCase() === uname.toLowerCase())) {
+      toast("Already in the member list.", "error");
+      return;
+    }
+    setLooking(true);
+    try {
+      const found = await friendsApi.lookup(token, uname);
+      if (found.is_self) {
+        toast("That's you — you're in automatically.", "error");
+        return;
+      }
+      setMembers((prev) => [...prev, found.username]);
+      setMemberInput("");
+    } catch (err) {
+      toast(
+        err instanceof ApiError ? err.message : "No player found with that username.",
+        "error"
+      );
+    } finally {
+      setLooking(false);
+    }
+  };
+
+  const removeMember = (uname: string) =>
+    setMembers((prev) => prev.filter((m) => m !== uname));
+
+  const create = async () => {
+    if (!canCreate) return;
+    setCreating(true);
+    try {
+      const clean = name.trim();
+      await socialApi.createGroup(token, { name: clean, icon, members });
+      toast(`Group "${clean}" created — say hi.`, "success");
+      sock.sendSocial("rooms");
+      setName("");
+      setIcon(GROUP_ICONS[0]);
+      setMembers([]);
+      setMemberInput("");
+      onClose();
+    } catch (err) {
+      toast(
+        err instanceof ApiError ? err.message : "Couldn't create the group.",
+        "error"
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} title="Create a group">
+      <div className="eko-createroom">
+        <div
+          className="eko-createroom__icons"
+          role="radiogroup"
+          aria-label="Group icon"
+        >
+          {GROUP_ICONS.map((ic) => (
+            <button
+              key={ic}
+              type="button"
+              className={`eko-createroom__icon ${
+                icon === ic ? "eko-createroom__icon--active" : ""
+              }`}
+              onClick={() => setIcon(ic)}
+              aria-pressed={icon === ic}
+              aria-label={`Group icon ${ic}`}
+            >
+              {ic}
+            </button>
+          ))}
+        </div>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Group name (e.g. Owambe Gang)"
+          maxLength={32}
+          aria-label="Group name"
+        />
+        <div className="eko-createroom__memberadd">
+          <input
+            value={memberInput}
+            onChange={(e) => setMemberInput(e.target.value)}
+            placeholder="Add by username, e.g. @tobi"
+            maxLength={16}
+            aria-label="Add member by username"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void addMember();
+              }
+            }}
+          />
+          <Button
+            size="md"
+            variant="ghost"
+            onClick={() => void addMember()}
+            loading={looking}
+            disabled={!memberInput.trim()}
+          >
+            Add
+          </Button>
+        </div>
+        {members.length > 0 && (
+          <div className="eko-createroom__chips" aria-label="Members">
+            {members.map((m) => (
+              <span key={m} className="eko-createroom__chip">
+                @{m}
+                <button
+                  type="button"
+                  onClick={() => removeMember(m)}
+                  aria-label={`Remove @${m}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="eko-chat__hint">
+          Private to members. Create needs a name and at least one member.
+        </p>
+        <div className="eko-profile__dialog-actions">
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={() => void create()} disabled={!canCreate} loading={creating}>
+            Create group
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+// PORT-P4: social — end
+
 /** Rooms sub-view: list with unread badges → thread view. */
 export function RoomsView({
   youId,
   sock,
+  token,
   onOpenProfile,
 }: {
   youId: number;
   sock: GameSocket;
+  // PORT-P4: social — REST token for group creation.
+  token: string;
   onOpenProfile: (t: ProfileTarget) => void;
 }) {
   const [activeId, setActiveId] = useState<string | number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  // PORT-P4: social — begin
+  const [groupOpen, setGroupOpen] = useState(false);
+  // PORT-P4: social — end
 
   // M21: notification deep-link — open the tapped room, then clear the nav.
   useEffect(() => {
@@ -396,6 +582,10 @@ export function RoomsView({
       <div className="eko-rooms__actions">
         <Button size="md" variant="accent" onClick={() => setCreateOpen(true)}>
           ➕ Create room
+        </Button>
+        {/* PORT-P4: social — private groups with member invites */}
+        <Button size="md" variant="accent" onClick={() => setGroupOpen(true)}>
+          👯 New group
         </Button>
         <Button size="md" variant="ghost" onClick={() => sock.sendSocial("rooms")}>
           🔄 Refresh
@@ -456,6 +646,13 @@ export function RoomsView({
         })
       )}
       <CreateRoomDialog open={createOpen} sock={sock} onClose={() => setCreateOpen(false)} />
+      {/* PORT-P4: social — group creation (name + icon + members) */}
+      <CreateGroupDialog
+        open={groupOpen}
+        token={token}
+        sock={sock}
+        onClose={() => setGroupOpen(false)}
+      />
     </div>
   );
 }

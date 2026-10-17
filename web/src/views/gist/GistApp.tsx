@@ -246,6 +246,12 @@ function GistCard({
           <div className="eko-gist__who-line">
             <strong>@{gist.username}</strong>
             <span className={`eko-gist__badge ${badgeClass(gist.badge)}`}>{gist.badge}</span>
+            {/* PORT-P4: social — author's own auto-hidden post, flagged pending review */}
+            {gist.hidden && gist.mine && (
+              <span className="eko-gist__badge eko-gist__badge--review" title="Hidden from everyone else while our team reviews it">
+                🔍 Under review
+              </span>
+            )}
           </div>
           <span className="eko-gist__time">{formatTimeAgo(gist.created_at)}</span>
         </div>
@@ -597,8 +603,20 @@ export function GistApp({
       return;
     }
     try {
-      await gistsApi.report(token, id, clean);
-      toast("Thanks — our team will take a look.", "success");
+      const r = await gistsApi.report(token, id, clean);
+      // PORT-P4: social — the post vanishes from the reporter's feed at once.
+      if (r.globally_hidden) {
+        toast("Thanks — this post is now hidden while our team reviews it.", "success");
+      } else {
+        toast("Thanks — you won't see this post again.", "success");
+      }
+      if (mounted.current) {
+        setGists((prev) => {
+          const next = { ...prev };
+          for (const k of Object.keys(next)) next[k] = next[k].filter((g) => g.id !== id);
+          return next;
+        });
+      }
     } catch (err) {
       toast(errMsg(err, "Couldn't record your report."), "error");
     }

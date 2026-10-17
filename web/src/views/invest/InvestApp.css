@@ -1,0 +1,145 @@
+/* ---- PORT-P2: Invest phone app — same visual language as the bank app ---- */
+.eko-invest {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) calc(var(--space-4) + var(--sab));
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.eko-invest__head {
+  margin-top: var(--space-1);
+}
+
+.eko-invest__title {
+  font-size: 1.35rem;
+  margin: 0;
+  color: var(--text);
+}
+
+.eko-invest__sub {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.eko-invest__section {
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-invest__h {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.eko-invest__cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.eko-invest__card {
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  background: var(--surface);
+  min-width: 0;
+}
+
+.eko-invest__label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.eko-invest__big {
+  font-size: 1.25rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.eko-invest__hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.eko-invest__btnrow {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.eko-invest__in {
+  color: #4ade80;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.eko-invest__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.eko-invest__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--surface-2);
+}
+
+.eko-invest__row:last-child {
+  border-bottom: none;
+}
+
+.eko-invest__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.eko-invest__nums {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.eko-invest__error-text {
+  margin: 0;
+  color: #f87171;
+  font-size: 0.88rem;
+}
+
+.eko-invest__ok-text {
+  margin: 0;
+  color: #4ade80;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 420px) {
+  .eko-invest__cards {
+    grid-template-columns: 1fr;
+  }
+}

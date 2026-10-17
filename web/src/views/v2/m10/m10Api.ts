@@ -68,9 +68,7 @@ export interface TaxInfo {
   taxMult: number;
   holiday: boolean;
   free: number;
-  band2: number;
-  rate2: number;
-  rate3: number;
+  flatRate: number;
   bracket: { label: string; rate: number };
 }
 

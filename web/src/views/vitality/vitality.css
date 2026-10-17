@@ -1,0 +1,117 @@
+/* P1 — Sim-panel styles. Current Èkó Life visual language only:
+   tokens.css variables + the chunky rounded card / pill idiom. */
+
+.vit-stack { display: flex; flex-direction: column; gap: var(--space-4); }
+.vit-h { margin: 0 0 var(--space-3); font-family: var(--font-display); font-size: 1.05rem; }
+.vit-muted { color: var(--text-muted); }
+.vit-small { font-size: 0.82rem; }
+.vit-warn { color: var(--danger); }
+.vit-accent { color: var(--accent); }
+
+.vit-needs { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-2); }
+
+.vit-row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
+@media (max-width: 560px) { .vit-row3 { grid-template-columns: 1fr; } }
+
+.vit-action {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  align-items: flex-start;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+.vit-action__icon { font-size: 1.6rem; }
+
+.vit-timer {
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
+
+.vit-btnrow { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+
+.vit-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.vit-list__row {
+  display: flex; justify-content: space-between; align-items: center; gap: var(--space-3);
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+.vit-pill {
+  display: inline-block;
+  background: var(--lagoon-100);
+  color: var(--lagoon-700);
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin: 2px;
+}
+.vit-pill--warn { background: #fee2e2; color: #b91c1c; }
+
+.vit-traits { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+.vit-skill { flex-direction: column; align-items: stretch; }
+.vit-skill__head { display: flex; align-items: center; gap: var(--space-2); }
+.vit-skill__pips { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-1); }
+.vit-pips { display: inline-flex; gap: 3px; }
+.vit-pip {
+  width: 10px; height: 10px; border-radius: 999px;
+  background: var(--neutral-200);
+}
+.vit-pip--on { background: var(--primary); }
+
+.vit-recipes { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
+@media (max-width: 560px) { .vit-recipes { grid-template-columns: 1fr; } }
+.vit-recipe {
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-1);
+}
+.vit-recipe--locked { opacity: 0.92; }
+.vit-recipe__head { display: flex; align-items: center; gap: var(--space-2); }
+
+.vit-shop { display: flex; flex-direction: column; gap: var(--space-1); }
+.vit-shop__row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--neutral-100);
+}
+
+.vit-switchrow {
+  display: flex; justify-content: space-between; align-items: center; gap: var(--space-3);
+  background: var(--surface-2); border-radius: var(--radius-md); padding: var(--space-3);
+  cursor: pointer;
+}
+.vit-switchrow span { display: flex; flex-direction: column; gap: 2px; }
+
+.vit-perk { display: flex; gap: var(--space-3); align-items: flex-start; }
+.vit-perk__icon { font-size: 1.5rem; }
+
+.vit-goal { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.vit-progress {
+  height: 10px; border-radius: var(--radius-pill);
+  background: var(--neutral-200);
+  overflow: hidden; margin: var(--space-2) 0;
+}
+.vit-progress__fill {
+  height: 100%; border-radius: var(--radius-pill);
+  background: var(--primary);
+  transition: width 0.4s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vit-progress__fill { transition: none; }
+}
+
+.vit-select {
+  font: inherit; color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--neutral-200);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  max-width: 100%;
+}

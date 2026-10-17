@@ -49,8 +49,8 @@ export function TaxCard({ token, refreshKey }: Props) {
         </p>
       ) : (
         <p className="m10-card-sub">
-          First {naira(tax.free)}/week free · 20% on the next {naira(tax.band2)} ·
-          30% above {naira(tax.free + tax.band2)}. Auto-debited at the week boundary.
+          First {naira(tax.free)}/week free · {(tax.flatRate * 100).toFixed(1)}%
+          flat on the rest. Auto-debited at the week boundary.
         </p>
       )}
       <div className="m10-stat-row">

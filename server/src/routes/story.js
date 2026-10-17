@@ -18,6 +18,8 @@ import {
   dbRun,
 } from '../db.js';
 import { addSkillXp } from '../game/v2/m12.js';
+// PORT-P1: rep + gem rewards, net-worth gating.
+import { addRep, grantGems, netWorth } from '../game/vitality.js';
 
 const STORY_SKILL = 'music';
 
@@ -60,17 +62,21 @@ export function createStoryRouter() {
     const user = await authedUser(req, res);
     if (!user) return;
     const stories = await dbAll(
-      'SELECT id, title, synopsis, chapters_count, cover_emoji FROM stories ORDER BY id ASC',
-      'SELECT id, title, synopsis, chapters_count, cover_emoji FROM stories ORDER BY id ASC',
+      // PORT-P1: net-worth gate + completion rewards
+      'SELECT id, title, synopsis, chapters_count, cover_emoji, net_worth_req, reward_rep, reward_gems FROM stories ORDER BY id ASC',
+      'SELECT id, title, synopsis, chapters_count, cover_emoji, net_worth_req, reward_rep, reward_gems FROM stories ORDER BY id ASC',
       []);
     const progs = await dbAll(
       'SELECT story_id, chapter_no, scene_no, completed_at FROM story_progress WHERE user_id=?',
       'SELECT story_id, chapter_no, scene_no, completed_at FROM story_progress WHERE user_id=$1',
       [req.userId]);
     const byStory = new Map(progs.map((p) => [Number(p.story_id), p]));
+    const char = await ensureCharacter(req.userId);
+    const worth = netWorth(char);
     res.json({
       stories: stories.map((s) => {
         const p = byStory.get(Number(s.id)) || null;
+        const reqWorth = Math.max(0, Math.floor(Number(s.net_worth_req) || 0));
         return {
           id: Number(s.id),
           title: s.title,
@@ -82,6 +88,11 @@ export function createStoryRouter() {
           progress: p
             ? { chapterNo: Number(p.chapter_no), sceneNo: Number(p.scene_no) }
             : null,
+          // PORT-P1: net-worth lock + completion rewards
+          locked: reqWorth > 0 && worth < reqWorth,
+          netWorthReq: reqWorth,
+          rewardRep: Math.max(0, Math.floor(Number(s.reward_rep) || 0)),
+          rewardGems: Math.max(0, Math.floor(Number(s.reward_gems) || 0)),
         };
       }),
     });
@@ -94,10 +105,24 @@ export function createStoryRouter() {
     const storyId = storyIdOf(req, res);
     if (!storyId) return;
     const story = await dbGet(
-      'SELECT id, title, synopsis, chapters_count, cover_emoji FROM stories WHERE id=?',
-      'SELECT id, title, synopsis, chapters_count, cover_emoji FROM stories WHERE id=$1',
+      // PORT-P1: net-worth gate + completion rewards
+      'SELECT id, title, synopsis, chapters_count, cover_emoji, net_worth_req, reward_rep, reward_gems FROM stories WHERE id=?',
+      'SELECT id, title, synopsis, chapters_count, cover_emoji, net_worth_req, reward_rep, reward_gems FROM stories WHERE id=$1',
       [storyId]);
     if (!story) return res.status(404).json({ error: 'Story not found.' });
+
+    // PORT-P1: net-worth lock enforced on read + advance
+    const gateChar = await ensureCharacter(req.userId);
+    const gateReq = Math.max(0, Math.floor(Number(story.net_worth_req) || 0));
+    const gateLocked = gateReq > 0 && netWorth(gateChar) < gateReq;
+    if (gateLocked) {
+      return res.status(403).json({
+        error: 'This story is for big men only — build your net worth first. 🔒',
+        locked: true,
+        netWorthReq: gateReq,
+        netWorth: netWorth(gateChar),
+      });
+    }
 
     const progress = await getProgress(req.userId, storyId);
     const completed = !!(progress && progress.completed_at);
@@ -126,8 +151,9 @@ export function createStoryRouter() {
           [ch.id]);
         for (const sc of scenes) {
           const choices = await dbAll(
-            'SELECT id, label, consequence_hint, reward_coins, reward_xp FROM story_choices WHERE scene_id=? ORDER BY id ASC',
-            'SELECT id, label, consequence_hint, reward_coins, reward_xp FROM story_choices WHERE scene_id=$1 ORDER BY id ASC',
+            // PORT-P1: rep + gem rewards on choices
+            'SELECT id, label, consequence_hint, reward_coins, reward_xp, reward_rep, reward_gems FROM story_choices WHERE scene_id=? ORDER BY id ASC',
+            'SELECT id, label, consequence_hint, reward_coins, reward_xp, reward_rep, reward_gems FROM story_choices WHERE scene_id=$1 ORDER BY id ASC',
             [sc.id]);
           row.scenes.push({
             id: Number(sc.id),
@@ -141,6 +167,8 @@ export function createStoryRouter() {
               consequenceHint: c.consequence_hint || null,
               rewardCoins: Number(c.reward_coins) || 0,
               rewardXp: Number(c.reward_xp) || 0,
+              rewardRep: Math.max(0, Math.floor(Number(c.reward_rep) || 0)),
+              rewardGems: Math.max(0, Math.floor(Number(c.reward_gems) || 0)),
             })),
           });
         }
@@ -155,6 +183,11 @@ export function createStoryRouter() {
         synopsis: story.synopsis,
         chaptersCount: Number(story.chapters_count) || 0,
         coverEmoji: story.cover_emoji,
+        // PORT-P1
+        locked: false,
+        netWorthReq: gateReq,
+        rewardRep: Math.max(0, Math.floor(Number(story.reward_rep) || 0)),
+        rewardGems: Math.max(0, Math.floor(Number(story.reward_gems) || 0)),
       },
       completed,
       progress: progress
@@ -175,10 +208,19 @@ export function createStoryRouter() {
     const storyId = storyIdOf(req, res);
     if (!storyId) return;
     const story = await dbGet(
-      'SELECT id, title, chapters_count FROM stories WHERE id=?',
-      'SELECT id, title, chapters_count FROM stories WHERE id=$1',
+      // PORT-P1: net-worth gate + completion rewards
+      'SELECT id, title, chapters_count, net_worth_req, reward_rep, reward_gems FROM stories WHERE id=?',
+      'SELECT id, title, chapters_count, net_worth_req, reward_rep, reward_gems FROM stories WHERE id=$1',
       [storyId]);
     if (!story) return res.status(404).json({ error: 'Story not found.' });
+    // PORT-P1: net-worth lock enforced on advance too
+    {
+      const gateChar = await ensureCharacter(req.userId);
+      const gateReq = Math.max(0, Math.floor(Number(story.net_worth_req) || 0));
+      if (gateReq > 0 && netWorth(gateChar) < gateReq) {
+        return res.status(403).json({ error: 'This story is for big men only — build your net worth first. 🔒', locked: true });
+      }
+    }
 
     const bodyChapter = Math.floor(Number(req.body && req.body.chapter_no));
     const bodyScene = Math.floor(Number(req.body && req.body.scene_no));
@@ -206,8 +248,9 @@ export function createStoryRouter() {
     if (!scene) return res.status(400).json({ error: 'Out of sync — reload the story.' });
 
     const choices = await dbAll(
-      'SELECT id, label, next_scene_id, reward_coins, reward_xp FROM story_choices WHERE scene_id=? ORDER BY id ASC',
-      'SELECT id, label, next_scene_id, reward_coins, reward_xp FROM story_choices WHERE scene_id=$1 ORDER BY id ASC',
+      // PORT-P1: rep + gem rewards on choices
+      'SELECT id, label, next_scene_id, reward_coins, reward_xp, reward_rep, reward_gems FROM story_choices WHERE scene_id=? ORDER BY id ASC',
+      'SELECT id, label, next_scene_id, reward_coins, reward_xp, reward_rep, reward_gems FROM story_choices WHERE scene_id=$1 ORDER BY id ASC',
       [scene.id]);
 
     let picked = null;
@@ -223,16 +266,24 @@ export function createStoryRouter() {
       return res.status(400).json({ error: "That reply doesn't belong here." });
     }
 
-    // ---- apply rewards (gameplay coins + music skill XP) ----
-    const coins = picked ? Math.max(0, Math.floor(Number(picked.reward_coins) || 0)) : 0;
+    // ---- apply rewards (gameplay coins + music skill XP + rep + gems) ----
+    // PORT-P1: negative reward_coins = a choice cost (deducted, must afford).
+    const coins = picked ? Math.floor(Number(picked.reward_coins) || 0) : 0;
     const xp = picked ? Math.max(0, Math.floor(Number(picked.reward_xp) || 0)) : 0;
+    const repGain = picked ? Math.max(0, Math.floor(Number(picked.reward_rep) || 0)) : 0;
+    const gemGain = picked ? Math.max(0, Math.floor(Number(picked.reward_gems) || 0)) : 0;
     let leveledUp = false;
     let skillLevel = 0;
-    if (coins > 0 || xp > 0) {
+    let repRes = null;
+    if (coins !== 0 || xp > 0) {
       const c = await ensureCharacter(req.userId);
-      if (coins > 0) {
-        c.money = Math.floor(Number(c.money) || 0) + coins;
-        await addTransaction(req.userId, 'story_reward', coins, c.money, {
+      if (coins !== 0) {
+        const bal = Math.floor(Number(c.money) || 0);
+        if (coins < 0 && bal < -coins) {
+          return res.status(400).json({ error: 'You cannot afford that choice.' });
+        }
+        c.money = Math.max(0, bal + coins);
+        await addTransaction(req.userId, coins < 0 ? 'story_cost' : 'story_reward', coins, c.money, {
           story_id: storyId,
           chapter: curChapter,
           scene: curScene,
@@ -246,6 +297,9 @@ export function createStoryRouter() {
       }
       await saveCharacter(c);
     }
+    if (repGain > 0) repRes = await addRep(req.userId, repGain);
+    let gemBalance = null;
+    if (gemGain > 0) gemBalance = await grantGems(req.userId, gemGain);
 
     // ---- advance progress ----
     let next = null; // {chapterNo, sceneNo} or null = story complete
@@ -279,6 +333,18 @@ export function createStoryRouter() {
     const completed = !next;
     const finalChapter = next ? next.chapterNo : curChapter;
     const finalScene = next ? next.sceneNo : curScene;
+    // PORT-P1: story-completion rep + gem bonus (once — progress row is final)
+    let completionRep = 0;
+    let completionGems = 0;
+    if (completed) {
+      completionRep = Math.max(0, Math.floor(Number(story.reward_rep) || 0));
+      completionGems = Math.max(0, Math.floor(Number(story.reward_gems) || 0));
+      if (completionRep > 0) {
+        const cr = await addRep(req.userId, completionRep);
+        repRes = { rep: cr.rep, level: cr.level, title: cr.title, leveledUp: cr.leveledUp || (repRes && repRes.leveledUp) };
+      }
+      if (completionGems > 0) gemBalance = await grantGems(req.userId, completionGems);
+    }
     await dbRun(
       `INSERT INTO story_progress (user_id, story_id, chapter_no, scene_no, completed_at)
        VALUES (?,?,?,?,?)
@@ -294,7 +360,16 @@ export function createStoryRouter() {
       ok: true,
       completed,
       progress: { chapterNo: finalChapter, sceneNo: finalScene },
-      reward: { coins, xp, leveledUp, skill: STORY_SKILL, skillLevel },
+      reward: {
+        coins, xp, leveledUp, skill: STORY_SKILL, skillLevel,
+        // PORT-P1
+        rep: repGain + completionRep,
+        repLevel: repRes ? repRes.level : null,
+        repTitle: repRes ? repRes.title : null,
+        repLeveledUp: !!(repRes && repRes.leveledUp),
+        gems: gemGain + completionGems,
+        gemBalance,
+      },
     });
   });
 

@@ -354,5 +354,20 @@ export async function electionExtras(viewerId = null, governorId = 0) {
     getPolicyState(viewerId, governorId),
     listCommissioners(),
   ]);
-  return { policy, commissioners };
+  // PORT-P5: world — begin
+  const paused = await isElectionPaused();
+  return { policy, commissioners, paused };
+  // PORT-P5: world — end
 }
+
+// PORT-P5: world — begin
+// Election pause: when paused, no tally runs, no new candidacies, no
+// votes. The sitting governor keeps the seat until resume.
+export const ELECTION_PAUSED_META = 'gov_election_paused';
+export async function isElectionPaused() {
+  return (await getMeta(ELECTION_PAUSED_META)) === '1';
+}
+export async function setElectionPaused(paused) {
+  await setMeta(ELECTION_PAUSED_META, paused ? '1' : '0');
+}
+// PORT-P5: world — end

@@ -205,14 +205,16 @@ test('bank/loan/repay: math holds, validations reject junk', async () => {
 });
 
 // ---------------- day economy: interest + biz income (pure sim) ----------------
-test('day economy: interest tick math (2% savings / 10% loan)', async () => {
+// PORT-P2: savings interest left applyDayEconomy — it accrues per minute in
+// v2/p2money.js (0.5%/game-week on the first ₦1bn), credited on the day tick.
+test('day economy: interest tick math (10% loan; savings untouched)', async () => {
   const { applyDayEconomy } = await import('../src/game/sim.js');
   const c = { money: 9000, savings: 10000, loan: 10000, happiness: 50, energy: 100, health: 100, hunger: 100 };
   const res = applyDayEconomy(c, { bizDef: { income: 4000 } });
   assert.equal(res.income, 4000);
   assert.equal(c.money, 13000);
-  assert.equal(res.savingsInterest, 200);
-  assert.equal(c.savings, 10200);
+  assert.equal(res.savingsInterest, undefined);
+  assert.equal(c.savings, 10000);
   assert.equal(res.loanInterest, 1000);
   assert.equal(c.loan, 11000);
 });
@@ -431,13 +433,15 @@ test('full loop: work → buy biz → day tick charges rent + pays income + inte
   act(ws, { a: 'bank', op: 'deposit', amount: 5000 }); // savings → ₦15,000, money → ₦5,000
   await waitFor(msgs, m => m.t === 'you' && m.you.savings === 15000);
 
-  // day 1 rollover: rent ₦5,000 paid (money 5000→0), biz +₦4,000, savings +₦300
+  // day 1 rollover: rent ₦5,000 paid (money 5000→0), biz +₦4,000.
+  // PORT-P2: savings accrue per minute (0.5%/game-week) — a same-tick
+  // rollover accrues ~₦0, so savings stay flat here.
   await app.hub.dayRollover();
   const d1 = await waitFor(msgs, m => m.t === 'day');
   assert.ok(d1);
   let c = await db.getCharacter(A.userId);
   assert.equal(c.money, 4000, `money=${c.money}`);       // 5000 − 5000 rent + 4000 biz
-  assert.equal(c.savings, 15300);                          // 15000 + floor(15000*0.02)
+  assert.equal(c.savings, 15000);
   assert.equal(c.rent_misses, 0);
 
   // day 2: broke — rent missed (money 4000 < 5000), biz income still lands
@@ -449,20 +453,21 @@ test('full loop: work → buy biz → day tick charges rent + pays income + inte
   // ledger tells the whole story
   const tx = await db.listTransactions(A.userId);
   const kinds = tx.map(t => t.kind);
-  for (const k of ['buy_biz', 'deposit', 'rent', 'biz_income', 'savings_interest']) {
+  for (const k of ['buy_biz', 'deposit', 'rent', 'biz_income']) {
     assert.ok(kinds.includes(k), `ledger missing ${k}`);
   }
   ws.close();
 });
 
 // ---------------- offline players get day economy too ----------------
-test('offline day economy: biz income + savings interest credited in DB', async () => {
+test('offline day economy: biz income credited in DB (savings accrue per minute)', async () => {
   const A = await seedGuest('street_smart');
   await setChar(A.userId, { money: 1000, savings: 50000, biz: 'carwash', loan: 0, happiness: 50 });
   await app.hub.dayRollover(); // A is offline
   const c = await db.getCharacter(A.userId);
   assert.equal(c.money, 1000 + 6000);   // carwash income
-  assert.equal(c.savings, 51000);        // floor(50000*0.02) = 1000
+  // PORT-P2: per-minute accrual seeds the clock on first run — no windfall.
+  assert.equal(c.savings, 50000);
   const tx = await db.listTransactions(A.userId);
   assert.ok(tx.find(t => t.kind === 'biz_income'));
 });

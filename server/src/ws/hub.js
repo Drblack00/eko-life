@@ -38,6 +38,14 @@ import { activePerkEffects } from '../game/v2/m9.js';
 import * as m10 from '../game/v2/m10.js';
 // Phase 4: Èkó Reserve bank — bond maturities (daily) + weekly upkeep bills.
 import * as bank from '../game/v2/bank.js';
+// PORT-P2: money — begin
+import * as p2money from '../game/v2/p2money.js';
+import * as invest from '../game/invest.js';
+// PORT-P2: money — end
+// PORT-P5: world — begin
+import { worldDayTick } from '../game/world.js';
+import { isElectionPaused } from '../game/elections.js';
+// PORT-P5: world — end
 import { isCommissioner } from '../game/v2/m11.js';
 import { m12YouSnapshot } from '../game/v2/m12.js';
 import { VENUE_ACTIVITIES } from '../game/v2/venues.js'; // Phase 5: venue activities
@@ -442,9 +450,10 @@ export function createHub({ getDay }) {
     ws.on('error', () => { /* close handler does cleanup */ });
   }
 
-  // ---- M3: offline day economy — business income, savings/loan interest and
+  // ---- M3: offline day economy — business income, loan interest and
   // placed-furniture day-hook happiness are DB-credited for players who are offline.
   // Online players get the same treatment live via settleDayEconomy.
+  // (PORT-P2: savings interest accrues per minute via p2money, below.)
   async function settleOfflineEconomy() {
     let chars;
     try {
@@ -469,7 +478,6 @@ export function createHub({ getDay }) {
       if (!res.dirty) continue;
       try {
         if (res.income > 0) await addTransaction(userId, 'biz_income', res.income, ch.money, { biz: ch.biz });
-        if (res.savingsInterest > 0) await addTransaction(userId, 'savings_interest', res.savingsInterest, ch.savings, { balance: 'savings' });
         if (res.loanInterest > 0) await addTransaction(userId, 'loan_interest', res.loanInterest, ch.loan, { balance: 'loan' });
         await saveCharacter(ch);
       } catch (e) { console.error('[economy] offline credit:', e.message); }
@@ -499,21 +507,47 @@ export function createHub({ getDay }) {
       try { await m10.settleOnlinePlayer(ctx, conn); } catch (e) { console.error('[m10]', e.message); }
       // Phase 4: Èkó Reserve — bond maturities + weekly upkeep bills (online).
       try { await bank.settleOnlinePlayer(ctx, conn); } catch (e) { console.error('[bank]', e.message); }
+      // PORT-P2: money — savings accrual + term-note maturities + Saturday rent (online).
+      try {
+        const p2 = await p2money.settleP2Online(ctx, conn);
+        if (p2.dirty) {
+          await saveCharacter(conn.character);
+          ctx.send(conn, { t: 'you', you: ctx.youSnapshot(conn) });
+          for (const n of p2.notes) ctx.send(conn, { t: 'sys', text: n });
+        }
+      } catch (e) { console.error('[p2]', e.message); }
+      // PORT-P2: invest — yield accrual + land risk (online).
+      try {
+        const inv = await invest.settleInvestOnline(ctx, conn);
+        for (const n of inv.notes) ctx.send(conn, { t: 'sys', text: n });
+      } catch (e) { console.error('[invest]', e.message); }
     }
     try { await settleOfflineEconomy(); } catch (e) { console.error('[economy]', e.message); }
     // M10: LAPO auto-debits + weekly tax for offline players (DB-credited).
     try { await m10.settleOfflinePlayers(ctx, (id) => online.has(Number(id))); } catch (e) { console.error('[m10]', e.message); }
     // Phase 4: Èkó Reserve — bond maturities + weekly bills (offline, DB-credited).
     try { await bank.settleOfflinePlayers(ctx, (id) => online.has(Number(id))); } catch (e) { console.error('[bank]', e.message); }
+    // PORT-P2: money — savings + notes + rent (offline, DB-credited).
+    try { await p2money.settleP2Offline(ctx, (id) => online.has(Number(id)), saveCharacter); } catch (e) { console.error('[p2]', e.message); }
+    // PORT-P2: invest — yields + land risk (offline, DB-credited).
+    try { await invest.settleInvestOffline(ctx, (id) => online.has(Number(id))); } catch (e) { console.error('[invest]', e.message); }
     const { day } = getDay();
     try {
       let el = await currentElection();
       if (!el) el = await ensureElection(day); // safety net: never day without a cycle
-      if (el && day >= el.end_day) {
+      // PORT-P5: world — begin (paused elections don't tally)
+      const paused = await isElectionPaused().catch(() => false);
+      // PORT-P5: world — end
+      if (el && day >= el.end_day && !paused) {
         await settleElection();
       }
     } catch (e) { console.error('[election]', e.message); }
     try { await creditGovernorSalary(); } catch (e) { console.error('[gov salary]', e.message); }
+    // PORT-P5: world — begin
+    // P5 world systems: court hearings, assurance risk rolls, busco
+    // payouts, promo closes (daily/weekly settlement).
+    try { await worldDayTick({ day, hub: { pushYou, sendTo } }); } catch (e) { console.error('[world]', e.message); }
+    // PORT-P5: world — end
     broadcast({ t: 'day', day, endsIn: DAY_MS });
   }
 
@@ -589,12 +623,14 @@ export function createHub({ getDay }) {
   }
 
   // ---- M2: 60s needs-decay tick — mutate, persist, push fresh `you` ----
-  async function decayTickAll() {
+  // PORT-P1: accepts an optional `now` (tests drive the clock; the
+  // 60s interval in app.js calls it with no args → Date.now()).
+  async function decayTickAll(now = Date.now()) {
     for (const conn of online.values()) {
       try {
         const moodlets = await listActiveMoodlets(conn.user.id);
         const effects = activePerkEffects(conn.character);
-        const res = decayTick(conn.character, { moodlets, perks: effects });
+        const res = decayTick(conn.character, { moodlets, perks: effects }, now);
         await saveCharacter(conn.character);
         let extra = {};
         try { extra = await m12YouSnapshot(conn); } catch (e) { console.error('[decay] m12:', e.message); }

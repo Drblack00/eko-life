@@ -75,9 +75,9 @@ test('pure: calcIncomeTax brackets', () => {
   assert.equal(m10.calcIncomeTax(0), 0);
   assert.equal(m10.calcIncomeTax(999999), 0);
   assert.equal(m10.calcIncomeTax(1000000), 0);
-  assert.equal(m10.calcIncomeTax(2000000), 200000);      // 20% of 1M
-  assert.equal(m10.calcIncomeTax(10000000), 1800000);   // 20% of 9M
-  assert.equal(m10.calcIncomeTax(12000000), 2400000);   // 1.8M + 30% of 2M
+  assert.equal(m10.calcIncomeTax(2000000), 75000);       // 7.5% of 1M
+  assert.equal(m10.calcIncomeTax(10000000), 675000);     // 7.5% of 9M
+  assert.equal(m10.calcIncomeTax(12000000), 825000);     // 7.5% of 11M
 });
 
 test('pure: weekIndex / avgRating / lagosDayStartMs', () => {
@@ -472,7 +472,7 @@ test('lapo offline sweep skips online players', async () => {
 });
 
 // ---------------- tax ----------------
-test('tax: weekly boundary charges progressive bill (online)', async () => {
+test('tax: weekly boundary charges flat bill (online)', async () => {
   const { user, character } = await seedUser(5_000_000);
   // window start FIRST, then earnings land inside the closed week
   await db.setMeta('tax_week', '0');
@@ -482,10 +482,10 @@ test('tax: weekly boundary charges progressive bill (online)', async () => {
   const ctx = { send: f.api.send, youSnapshot: f.api.youSnapshot, getDay: () => ({ day: 8, endsIn: 0 }) };
   const r = await m10.settleOnlinePlayer(ctx, f.api.conn);
   assert.equal(r.dirty, true);
-  assert.equal(character.money, 5_000_000 - 200000); // 20% of (2M-1M)
+  assert.equal(character.money, 5_000_000 - 75000); // 7.5% of (2M-1M)
   const rows = await txns(user.id);
   const t = rows.find(x => x.kind === 'income_tax');
-  assert.ok(t && t.amount === -200000, JSON.stringify(rows.map(x => x.kind)));
+  assert.ok(t && t.amount === -75000, JSON.stringify(rows.map(x => x.kind)));
   assert.ok(f.sent.find(m => m.t === 'sys' && /income tax/.test(m.text)));
   // tax_week advanced; a second settle in the same week charges nothing
   const g = fakeApi(user, character, 9);
@@ -518,7 +518,7 @@ test('tax: free allowance (≤₦1M) → no debit; tax_mult=0 → holiday', asyn
   await db.setMeta('tax_mult', '1');
 });
 
-test('tax: 30% band above ₦10M; non-earning kinds excluded', async () => {
+test('tax: flat 7.5% above ₦1M; non-earning kinds excluded', async () => {
   const { user, character } = await seedUser(50_000_000);
   await db.setMeta('tax_week', '9');
   await db.setMeta('tax_week_start', String(Date.now() - 60000));
@@ -528,8 +528,8 @@ test('tax: 30% band above ₦10M; non-earning kinds excluded', async () => {
   const f = fakeApi(user, character, 71); // week 10
   const ctx = { send: f.api.send, youSnapshot: f.api.youSnapshot, getDay: () => ({ day: 71, endsIn: 0 }) };
   await m10.settleOnlinePlayer(ctx, f.api.conn);
-  // bill on 12M only: 1.8M + 30% of 2M = 2.4M
-  assert.equal(character.money, 50_000_000 - 2400000);
+  // bill on 12M only: 7.5% of 11M = 825k
+  assert.equal(character.money, 50_000_000 - 825000);
 });
 
 test('tax: offline players are taxed in the sweep', async () => {
@@ -540,7 +540,7 @@ test('tax: offline players are taxed in the sweep', async () => {
   const ctx = { getDay: () => ({ day: 22, endsIn: 0 }) }; // week 3
   await m10.settleOfflinePlayers(ctx, () => false);
   const c = await db.getCharacter(user.id);
-  assert.equal(Number(c.money), 5_000_000 - 200000);
+  assert.equal(Number(c.money), 5_000_000 - 75000);
 });
 
 // ---------------- REST handlers ----------------
@@ -566,7 +566,7 @@ test('REST_SPEC handlers: shops browse + tax shape', async () => {
   await taxSpec.handler({ userId: user.id }, res2);
   assert.equal(res2.statusCode, 200);
   assert.equal(res2.body.weekEarnings, 1500000);
-  assert.equal(res2.body.bill, 100000); // 20% of 500k
+  assert.equal(res2.body.bill, 37500); // 7.5% of 500k
   assert.equal(res2.body.holiday, false);
 
   const lapoSpec = m10.REST_SPEC.find(s => s.path === '/api/v2/m10/lapo');

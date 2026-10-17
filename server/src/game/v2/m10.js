@@ -45,11 +45,10 @@ export const LAPO_MAX = 500000;
 export const LAPO_WEEKS = 4;
 export const LAPO_FLAT_RATE = 0.05; // 5% flat on principal, spread across the 4 debits
 
-// Progressive weekly income tax (computed from the ledger).
+// Flat weekly income tax (computed from the ledger).
+// PORT-P2: first ₦1M/week free, then a flat 7.5% on the rest.
 export const TAX_FREE = 1000000;      // first ₦1M/week free
-export const TAX_BAND2 = 9000000;     // next ₦9M taxed at 20%
-export const TAX_RATE2 = 0.20;
-export const TAX_RATE3 = 0.30;        // above ₦10M
+export const TAX_FLAT_RATE = 0.075;   // flat 7.5% on everything above the allowance
 // Ledger kinds that count as earnings. Other milestones that add earning
 // kinds should append here (coordinator-owned list).
 export const EARNING_KINDS = [
@@ -172,21 +171,19 @@ export function lapoTerms(amount) {
   return { principal, interest, total, weeklyDue, weeks: LAPO_WEEKS };
 }
 
-/** Progressive income tax on one week's earnings (before the tax_mult). */
+/** Flat income tax on one week's earnings (before the tax_mult). */
+// PORT-P2: first ₦1M/week free, then 7.5% flat on the rest.
 export function calcIncomeTax(earnings) {
   const e = Math.max(0, Math.floor(Number(earnings) || 0));
-  let bill = 0;
-  if (e > TAX_FREE) bill += Math.min(e - TAX_FREE, TAX_BAND2) * TAX_RATE2;
-  if (e > TAX_FREE + TAX_BAND2) bill += (e - TAX_FREE - TAX_BAND2) * TAX_RATE3;
-  return Math.floor(bill);
+  if (e <= TAX_FREE) return 0;
+  return Math.floor((e - TAX_FREE) * TAX_FLAT_RATE);
 }
 
 /** Display helper: which bracket the earnings land in. */
 export function taxBracketLabel(earnings) {
   const e = Math.max(0, Math.floor(Number(earnings) || 0));
   if (e <= TAX_FREE) return { label: 'Tax-free allowance', rate: 0 };
-  if (e <= TAX_FREE + TAX_BAND2) return { label: '20% band', rate: TAX_RATE2 };
-  return { label: '30% band', rate: TAX_RATE3 };
+  return { label: '7.5% flat', rate: TAX_FLAT_RATE };
 }
 
 /** Game-week index for a 1-based game day (week = 7 game days). */
@@ -877,7 +874,7 @@ export const CONFIG_DATA = {
   shopCreateFee: SHOP_CREATE_FEE,
   shopItemCap: SHOP_ITEM_CAP,
   lapo: { min: LAPO_MIN, max: LAPO_MAX, weeks: LAPO_WEEKS, flatRate: LAPO_FLAT_RATE },
-  tax: { free: TAX_FREE, band2: TAX_BAND2, rate2: TAX_RATE2, rate3: TAX_RATE3, earningKinds: [...EARNING_KINDS] },
+  tax: { free: TAX_FREE, flatRate: TAX_FLAT_RATE, earningKinds: [...EARNING_KINDS] },
 };
 
 // ---------------- REST_SPEC (coordinator mounts) ----------------
@@ -960,7 +957,7 @@ async function restTax(req, res) {
       rawBill: raw,
       taxMult: mult,
       holiday: mult === 0,
-      free: TAX_FREE, band2: TAX_BAND2, rate2: TAX_RATE2, rate3: TAX_RATE3,
+      free: TAX_FREE, flatRate: TAX_FLAT_RATE,
       bracket: taxBracketLabel(weekEarnings),
     });
   } catch (e) {

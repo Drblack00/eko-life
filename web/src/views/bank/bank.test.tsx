@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, cleanup, fireEvent, within } from "@testing-library/react";
 import { previewPayout, termOptionLabel, BankApp } from "./BankApp";
 import type { You } from "../../game/types";
 import type { BankOverview } from "../../lib/api";
@@ -13,9 +13,10 @@ afterEach(() => cleanup());
  * server/tests/bank.test.js; live proof comes from the Playwright run.)
  */
 
-const { mockOverview, mockTransactions } = vi.hoisted(() => ({
+const { mockOverview, mockTransactions, mockTopupPacks } = vi.hoisted(() => ({
   mockOverview: vi.fn(),
   mockTransactions: vi.fn(),
+  mockTopupPacks: vi.fn(),
 }));
 
 vi.mock("../../lib/api", async (importOriginal) => {
@@ -26,6 +27,21 @@ vi.mock("../../lib/api", async (importOriginal) => {
       overview: mockOverview,
       bonds: vi.fn(),
       buyBond: vi.fn(),
+      // PORT-P2: money
+      notes: vi.fn(),
+      buyNote: vi.fn(),
+      withdrawNoteEarly: vi.fn(),
+      credit: vi.fn(),
+      creditPay: vi.fn(),
+      creditPayAll: vi.fn(),
+      housingMove: vi.fn(),
+      housingBuy: vi.fn(),
+      housingPayDebt: vi.fn(),
+      credibility: vi.fn(),
+    },
+    topupApi: {
+      packs: mockTopupPacks,
+      purchase: vi.fn(),
     },
     api: {
       ...orig.api,
@@ -127,10 +143,41 @@ function overviewFixture(): BankOverview {
       taxMult: 1,
       holiday: false,
       free: 1000000,
-      band2: 9000000,
-      rate2: 0.2,
-      rate3: 0.3,
+      flatRate: 0.075,
       bracket: { label: "Tax-free allowance", rate: 0 },
+    },
+    // PORT-P2: money
+    savingsTerms: { weeklyRate: 0.005, cap: 1000000000, minWithdraw: 1000 },
+    termNotes: {
+      active: [],
+      rate: 0.02,
+      termDays: 7,
+      min: 10000,
+      max: 500000000,
+    },
+    credit: null,
+    credibility: {
+      total: 12,
+      parts: [
+        { key: "accountAge", label: "Account age", score: 2, max: 10, detail: "60 days with Èkó Life" },
+        { key: "movedWithPlayers", label: "Money moved with players", score: 5, max: 25, detail: "₦50,000 moved" },
+        { key: "regularPartners", label: "Regular partners", score: 0, max: 15, detail: "0 partners traded on 3+ days" },
+        { key: "streaks", label: "Money streaks", score: 0, max: 15, detail: "0-day active streak" },
+        { key: "collected", label: "Money collected", score: 5, max: 15, detail: "₦50,000 received" },
+        { key: "jobsBusiness", label: "Jobs and business", score: 0, max: 20, detail: "no jobs or business yet" },
+      ],
+      recordOnly: true,
+    },
+    housing: {
+      homes: [
+        { id: "room_oshodi", name: "Single Room · Oshodi", icon: "🏠", weeklyRent: 8000, buyPrice: 450000 },
+        { id: "selfcon_yaba", name: "Self-Contain · Yaba", icon: "🏡", weeklyRent: 15000, buyPrice: 900000 },
+      ],
+      current: null,
+      currentDef: null,
+      owned: [],
+      rentDebt: 0,
+      rentSaturday: false,
     },
     bills: {
       weeklyBill: 1000,
@@ -152,6 +199,7 @@ describe("BankApp render", () => {
   it("shows Èkó Reserve with net worth, tax estimate, bill and receipt", async () => {
     mockOverview.mockResolvedValueOnce(overviewFixture());
     mockTransactions.mockResolvedValueOnce([]);
+    mockTopupPacks.mockResolvedValueOnce({ realMoneyEnabled: false, currencyToggle: ["NGN", "USD"], packs: [], notice: "Top-ups are not available yet." });
     const sendAct = vi.fn();
     render(
       <BankApp token="tok" you={baseYou} sendAct={sendAct} onTopUp={() => {}} />
@@ -167,8 +215,8 @@ describe("BankApp render", () => {
     expect(screen.getByText(/ends on game day 7/)).toBeTruthy();
     // last receipt label (KIND_LABELS extended with bond_buy)
     expect(screen.getByText("Bond purchase")).toBeTruthy();
-    // savings vault + 2%/day note
-    expect(screen.getByText(/Savings earn 2% every game day/)).toBeTruthy();
+    // PORT-P2: savings vault copy (0.5%/week, ₦1bn cap, ₦1k min withdrawal)
+    expect(screen.getByText(/Savings earn 0.5% every game week/)).toBeTruthy();
     // active bond row
     expect(screen.getByText(/Bond #3/)).toBeTruthy();
   });
@@ -176,6 +224,7 @@ describe("BankApp render", () => {
   it("top-up button calls onTopUp (inert dialog lives in Game)", async () => {
     mockOverview.mockResolvedValueOnce(overviewFixture());
     mockTransactions.mockResolvedValueOnce([]);
+    mockTopupPacks.mockResolvedValueOnce({ realMoneyEnabled: false, currencyToggle: ["NGN", "USD"], packs: [], notice: "Top-ups are not available yet." });
     const onTopUp = vi.fn();
     render(
       <BankApp token="tok" you={baseYou} sendAct={vi.fn()} onTopUp={onTopUp} />
@@ -188,6 +237,7 @@ describe("BankApp render", () => {
   it("deposit/withdraw send the existing WS bank act", async () => {
     mockOverview.mockResolvedValueOnce(overviewFixture());
     mockTransactions.mockResolvedValueOnce([]);
+    mockTopupPacks.mockResolvedValueOnce({ realMoneyEnabled: false, currencyToggle: ["NGN", "USD"], packs: [], notice: "Top-ups are not available yet." });
     const sendAct = vi.fn();
     render(
       <BankApp token="tok" you={baseYou} sendAct={sendAct} onTopUp={() => {}} />
@@ -208,11 +258,92 @@ describe("BankApp render", () => {
     ov.bills.arrears = 2500;
     mockOverview.mockResolvedValueOnce(ov);
     mockTransactions.mockResolvedValueOnce([]);
+    mockTopupPacks.mockResolvedValueOnce({ realMoneyEnabled: false, currencyToggle: ["NGN", "USD"], packs: [], notice: "Top-ups are not available yet." });
     render(
       <BankApp token="tok" you={baseYou} sendAct={vi.fn()} onTopUp={() => {}} />
     );
     await waitFor(() => expect(screen.getByText("Èkó Reserve")).toBeTruthy());
     expect(screen.getByText("₦2,500")).toBeTruthy();
     expect(screen.getByText(/No interest on arrears, no lockouts/)).toBeTruthy();
+  });
+
+  // PORT-P2: money — new sections render from the overview bundle.
+  it("renders term notes, credit facility, housing, credibility sections", async () => {
+    mockOverview.mockResolvedValueOnce(overviewFixture());
+    mockTransactions.mockResolvedValueOnce([]);
+    mockTopupPacks.mockResolvedValueOnce({ realMoneyEnabled: false, currencyToggle: ["NGN", "USD"], packs: [], notice: "Top-ups are not available yet." });
+    render(
+      <BankApp token="<redacted>" you={baseYou} sendAct={vi.fn()} onTopUp={() => {}} />
+    );
+    await waitFor(() => expect(screen.getByText("Èkó Reserve")).toBeTruthy());
+    // term notes: 2%/7d terms + min/max
+    expect(screen.getByText(/Lock coins for 7 days at 2%/)).toBeTruthy();
+    expect(screen.getByText("Buy 7-day note")).toBeTruthy();
+    // credit facility: repayment-only empty state
+    expect(screen.getByText(/No credit balance/)).toBeTruthy();
+    // housing ladder: homes listed with move/buy
+    expect(screen.getByText(/Single Room · Oshodi/)).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Move in" }).length).toBeGreaterThan(0);
+    // credibility: score + record-only promise
+    expect(screen.getByText("12/100")).toBeTruthy();
+    expect(screen.getByText(/never limits what you can send/)).toBeTruthy();
+  });
+
+  it("top-up packs render with disabled Buy buttons and compliance notice", async () => {
+    mockOverview.mockResolvedValueOnce(overviewFixture());
+    mockTransactions.mockResolvedValueOnce([]);
+    mockTopupPacks.mockResolvedValueOnce({
+      realMoneyEnabled: false,
+      currencyToggle: ["NGN", "USD"],
+      packs: [
+        { id: "starter", name: "Starter Stack", icon: "🌱", ngn: 1000, usd: 1, coins: 50000, tagline: "Small money, sharp start." },
+        { id: "big_moves", name: "Big Moves", icon: "💼", ngn: 10000, usd: 7, coins: 700000, tagline: "Best value.", bestValue: true },
+      ],
+      notice: "Top-ups are not available yet — they open after the real-money compliance chain is complete.",
+    });
+    render(
+      <BankApp token="<redacted>" you={baseYou} sendAct={vi.fn()} onTopUp={() => {}} />
+    );
+    await waitFor(() => expect(screen.getByText("Starter Stack")).toBeTruthy());
+    expect(screen.getByText("Best value")).toBeTruthy();
+    // scope to the Top up section — the housing ladder has its own Buy buttons
+    const topupSection = screen.getByLabelText("Top up");
+    const buys = within(topupSection).getAllByRole("button", { name: "Buy" });
+    expect(buys.length).toBe(2);
+    buys.forEach((b) => expect((b as HTMLButtonElement).disabled).toBe(true));
+    expect(screen.getByText(/compliance chain is complete/)).toBeTruthy();
+    // ₦/$ toggle
+    fireEvent.click(within(topupSection).getByRole("button", { name: "$ USD" }));
+    expect(within(topupSection).getByText(/\$1 →/)).toBeTruthy();
+  });
+
+  it("credit facility shows balance + Pay now / Pay it all when a loan exists", async () => {
+    const ov = overviewFixture();
+    ov.credit = { balance: 60000, weeklyDue: 12000, weeksLeft: 5, debitsDone: 0 };
+    mockOverview.mockResolvedValueOnce(ov);
+    mockTransactions.mockResolvedValueOnce([]);
+    mockTopupPacks.mockResolvedValueOnce({ realMoneyEnabled: false, currencyToggle: ["NGN", "USD"], packs: [], notice: "x" });
+    render(
+      <BankApp token="<redacted>" you={baseYou} sendAct={vi.fn()} onTopUp={() => {}} />
+    );
+    await waitFor(() => expect(screen.getByText("Èkó Reserve")).toBeTruthy());
+    expect(screen.getByText("₦60,000")).toBeTruthy();
+    expect(screen.getByText("₦12,000/wk")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Pay now" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Pay it all/ })).toBeTruthy();
+  });
+
+  it("rent debt banner shows when rent debt exists", async () => {
+    const ov = overviewFixture();
+    ov.housing.rentDebt = 90000;
+    mockOverview.mockResolvedValueOnce(ov);
+    mockTransactions.mockResolvedValueOnce([]);
+    mockTopupPacks.mockResolvedValueOnce({ realMoneyEnabled: false, currencyToggle: ["NGN", "USD"], packs: [], notice: "x" });
+    render(
+      <BankApp token="<redacted>" you={baseYou} sendAct={vi.fn()} onTopUp={() => {}} />
+    );
+    await waitFor(() => expect(screen.getByText("Èkó Reserve")).toBeTruthy());
+    expect(screen.getByText("₦90,000")).toBeTruthy();
+    expect(screen.getByText("Pay debt")).toBeTruthy();
   });
 });

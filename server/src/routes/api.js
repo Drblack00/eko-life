@@ -13,14 +13,34 @@ import { createAdminRouter } from './admin.js';
 import { createFriendsRouter } from './friends.js';
 import { createNotificationsRouter } from './notifications.js';
 import { createGistsRouter, createNewsRouter } from './gists.js';
+// PORT-P4: social — begin
+import { createSocialRouter } from './social.js';
+// PORT-P4: social — end
 import { createBankRouter } from './bank.js';
+// PORT-P2: money — begin
+import { createTopupRouter } from './topup.js';
+import { createInvestRouter } from './invest.js';
+// PORT-P2: money — end
 import { createBoutiqueRouter } from './boutique.js';
 import { createGovRouter } from './gov.js';
 import { createCrewsRouter } from './crews.js';
 import { createStoryRouter } from './story.js';
 import { createEventsRouter } from './events.js';
 import { createContestsRouter } from './contests.js';
+// PORT-P6: games-hustle — begin
+import { createGamesRouter } from './games.js';
+import { createHustleRouter } from './hustle.js';
+// PORT-P6: games-hustle — end
 import { createGemRouter } from './gem.js';
+// PORT-P1: core loop — begin
+import { createVitalityRouter } from './vitality.js';
+// PORT-P1: core loop — end
+// PORT-P3: careers — begin
+import { createCareersRouter } from './careers.js';
+// PORT-P3: careers — end
+// PORT-P5: world — begin
+import { createWorldRouter } from './world.js';
+// PORT-P5: world — end
 import {
   CLASSES, LOCATIONS, JOBS, FOOD, FUN, HOUSING, SPAWN, WORLD_BOUNDS,
   AVATARS, COLORS, PROPERTIES, BIZ, VEHICLES, FURN, HOME_SLOTS,
@@ -229,12 +249,18 @@ export function createApiRouter({ hub, getDay }) {
     if (Number(user.banned)) return res.status(403).json({ error: 'This account is banned.' });
     const limit = Math.max(1, Math.min(50, Math.floor(Number(req.query.limit) || 25)));
     const leaders = await listTopByNetWorth(limit);
-    const { rank, totalPlayers } = await getNetWorthRank(req.userId);
+    // PORT-P4: social — begin (rich-list header stats)
+    const { rank, totalPlayers, netWorth: yourNetWorth } = await getNetWorthRank(req.userId);
+    // PORT-P4: social — end
     // Phase 8: mark the sitting governor (👑 badge on their row).
     const govId = Number(await getMeta('governor_id')) || 0;
     res.json({
       leaders: leaders.map((l) => ({ ...l, isGovernor: govId !== 0 && Number(l.id) === govId })),
       yourRank: rank, totalPlayers,
+      // PORT-P4: social — begin (rich-list header stats)
+      yourNetWorth,
+      topWorth: leaders.length ? Math.floor(Number(leaders[0].netWorth) || 0) : 0,
+      // PORT-P4: social — end
     });
   });
 
@@ -336,8 +362,22 @@ export function createApiRouter({ hub, getDay }) {
   // ---- Phase 3: Gist social feed (all routes behind Bearer <redacted>) ----
   router.use('/gists', createGistsRouter());
 
+  // PORT-P4: social — begin
+  // ---- P4: Social — groups, message requests, house invites,
+  // closeness bonds (family & dating), social settings.
+  // Game-money only; the fintech cash system is untouched.
+  router.use('/social', createSocialRouter({ hub }));
+  // PORT-P4: social — end
+
   // ---- Phase 4: Èkó Reserve bank app (gameplay coins only) ----
   router.use('/bank', createBankRouter({ getDay }));
+
+  // PORT-P2: money — begin
+  // ---- Top-up packs: STRUCTURE ONLY, purchase stubbed (REAL_MONEY_ENABLED=false) ----
+  router.use('/topup', createTopupRouter());
+  // ---- Invest: land, businesses, haulage (gameplay coins only) ----
+  router.use('/invest', createInvestRouter({ getDay }));
+  // PORT-P2: money — end
 
   // ---- Phase 6: Boutique clothing shop (gameplay coins only) ----
   router.use('/boutique', createBoutiqueRouter());
@@ -357,8 +397,31 @@ export function createApiRouter({ hub, getDay }) {
   // ---- UGC Design Contests: duel voting, 2-tap entries ----
   router.use('/contests', createContestsRouter());
 
+  // PORT-P6: games-hustle — begin
+  // ---- P6: Table games — parlor-games lobby, stake escrow, hall of fame ----
+  router.use('/games', createGamesRouter());
+  // ---- P6: Hustle — gig board with escrow + find-a-pro ----
+  router.use('/hustle', createHustleRouter());
+  // PORT-P6: games-hustle — end
+
   // ---- Phase 9: Daily Gem Hunt (gameplay coins only) ----
   router.use('/gem', createGemRouter({ getDay }));
+
+  // PORT-P1: core loop — begin
+  // Vitality: needs/mood/traits, sleep, cooking, wishes, goals, streak, dream.
+  router.use('/vitality', createVitalityRouter());
+  // PORT-P1: core loop — end
+
+  // PORT-P3: careers — begin (27-career ladders, shifts mini-game; game money only)
+  router.use('/careers', createCareersRouter());
+  // PORT-P3: careers — end
+
+  // PORT-P5: world — begin
+  // ---- P5: World Systems — ride, health, police, court, assurance,
+  // bus co, in-game ads, charity, IPO-style promos, event tickets,
+  // trade school (gameplay coins only) ----
+  router.use('/world', createWorldRouter({ hub, getDay }));
+  // PORT-P5: world — end
 
   // ---- Phase 3: News tab headlines (standard in-game session auth).
   // Mounted at /api/headlines — /api/news is the older M5 ticker feed.

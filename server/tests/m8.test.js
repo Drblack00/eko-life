@@ -33,33 +33,67 @@ function freshChar() {
   };
 }
 
-// ---- decay math ----
+// ---- decay math (PORT-P1: timestamp-based slow decay) ----
 
-test('decayTick: all six needs decay per tick at the documented rates', () => {
+test('decayTick: ~1–2 pts per 15 real minutes (timestamp-based)', () => {
   const c = freshChar();
-  const flags = decayTick(c, { moodlets: [], perks: [] });
-  assert.equal(c.hunger, 100 - DECAY_RATES.hunger);
-  assert.equal(c.energy, 100 - DECAY_RATES.energy);
+  const t0 = Date.now();
+  decayTick(c, { moodlets: [], perks: [] }, t0);
+  assert.equal(c.hunger, 100); // 60s is a fraction of a point — nothing whole yet
+  assert.ok(c.needs_at === t0, 'needs_at marker recorded');
+  const flags = decayTick(c, { moodlets: [], perks: [] }, t0 + 15 * 60 * 1000);
+  assert.equal(c.hunger, 100 - DECAY_RATES.hunger); // 2
+  assert.equal(c.energy, 100 - DECAY_RATES.energy); // 1
   assert.equal(c.fun, 100 - DECAY_RATES.fun);
   assert.equal(c.social, 100 - DECAY_RATES.social);
   assert.equal(c.hygiene, 100 - DECAY_RATES.hygiene);
-  assert.equal(c.bladder, 100 - DECAY_RATES.bladder);
+  assert.equal(c.bladder, 100 - DECAY_RATES.bladder); // 2
   assert.equal(flags.starving, false);
   assert.equal(flags.desperate, false);
   assert.equal(c.happiness, 100); // no cascade while needs are healthy
   assert.equal(c.health, 100);
 });
 
-test('decayTick: documented rates are sane (playable, not punishing)', () => {
+test('decayTick: fractional points accumulate across ticks', () => {
+  const c = freshChar();
+  const t0 = Date.now();
+  // 7 × 60s ticks ≈ 7 min → hunger loses ~0.93 pts → still 100, then 1 more tick crosses 1
+  for (let i = 1; i <= 8; i++) decayTick(c, { moodlets: [], perks: [] }, t0 + i * 60 * 1000);
+  assert.equal(c.hunger, 99);
+  assert.equal(c.energy, 100); // 8/15 of a point — not yet whole
+});
+
+test('decayTick: offline catch-up capped at 1h', () => {
+  const c = freshChar();
+  const t0 = Date.now();
+  c.needs_at = t0 - 48 * 3600 * 1000; // last tick 2 days "ago"
+  decayTick(c, { moodlets: [], perks: [] }, t0);
+  // capped at 1h = 4 × 15min windows → hunger loses 8, not 384
+  assert.equal(c.hunger, 100 - 4 * DECAY_RATES.hunger);
+});
+
+test('decayTick: decay_slow perk halves the drain', () => {
+  const c = freshChar();
+  const t0 = Date.now();
+  const perks = [{ type: 'decay_slow', need: 'hunger', pct: 50 }];
+  decayTick(c, { moodlets: [], perks }, t0); // prime needs_at
+  decayTick(c, { moodlets: [], perks }, t0 + 15 * 60 * 1000);
+  assert.equal(c.hunger, 100 - Math.floor(DECAY_RATES.hunger * 0.5));
+  assert.equal(c.energy, 100 - DECAY_RATES.energy); // other needs unaffected
+});
+
+test('decayTick: documented rates are sane (1–2 pts per 15 min)', () => {
   for (const [need, rate] of Object.entries(DECAY_RATES)) {
-    assert.ok(rate > 0 && rate <= 5, `${need} rate ${rate} out of sane range`);
+    assert.ok(rate >= 1 && rate <= 2, `${need} rate ${rate} out of 1–2/15min range`);
   }
 });
 
 test('decayTick: starvation cascade unchanged (hunger 0 → energy/happiness/health)', () => {
   const c = freshChar();
-  c.hunger = 3;
-  const flags = decayTick(c);
+  c.hunger = 2;
+  const t0 = Date.now();
+  decayTick(c, { moodlets: [], perks: [] }, t0); // prime needs_at
+  const flags = decayTick(c, { moodlets: [], perks: [] }, t0 + 15 * 60 * 1000);
   assert.equal(c.hunger, 0);
   assert.equal(flags.starving, true);
   assert.equal(c.energy, 100 - DECAY_RATES.energy - 5);
@@ -69,19 +103,23 @@ test('decayTick: starvation cascade unchanged (hunger 0 → energy/happiness/hea
 
 test('decayTick: bladder at 0 drags happiness + hygiene (desperate cascade)', () => {
   const c = freshChar();
-  c.bladder = 4;
-  const flags = decayTick(c);
+  c.bladder = 2;
+  const t0 = Date.now();
+  decayTick(c, { moodlets: [], perks: [] }, t0); // prime needs_at
+  const flags = decayTick(c, { moodlets: [], perks: [] }, t0 + 15 * 60 * 1000);
   assert.equal(c.bladder, 0);
   assert.equal(flags.desperate, true);
   assert.equal(c.happiness, 100 - 5);
-  // hygiene decays 2 then takes the −10 accident hit
+  // hygiene decays 1 then takes the −10 accident hit
   assert.equal(c.hygiene, 100 - DECAY_RATES.hygiene - 10);
 });
 
 test('decayTick: hygiene/social/fun at 0 drag happiness (grimy/lonely/bored cascades)', () => {
   const c = freshChar();
-  c.hygiene = 2; c.social = 2; c.fun = 2;
-  const flags = decayTick(c);
+  c.hygiene = 1; c.social = 1; c.fun = 1;
+  const t0 = Date.now();
+  decayTick(c, { moodlets: [], perks: [] }, t0); // prime needs_at
+  const flags = decayTick(c, { moodlets: [], perks: [] }, t0 + 15 * 60 * 1000);
   assert.equal(flags.grimy, true);
   assert.equal(flags.lonely, true);
   assert.equal(flags.bored, true);
@@ -93,17 +131,21 @@ test('decayTick: hygiene/social/fun at 0 drag happiness (grimy/lonely/bored casc
 test('decayTick: decay_slow moodlet slows one need', () => {
   const c = freshChar();
   const mods = { moodlets: [{ effects: [{ type: 'decay_slow', need: 'bladder', pct: 50 }] }], perks: [] };
-  decayTick(c, mods);
-  assert.equal(c.bladder, 100 - 2); // 4 * 0.5, floored
+  const t0b = Date.now();
+  decayTick(c, mods, t0b); // prime needs_at
+  decayTick(c, mods, t0b + 15 * 60 * 1000);
+  assert.equal(c.bladder, 100 - 1); // 2 * 0.5
   assert.equal(c.hunger, 100 - DECAY_RATES.hunger); // others unaffected
 });
 
 test('decayTick: decay_all perk slows every need', () => {
   const c = freshChar();
   const mods = { moodlets: [], perks: [{ type: 'decay_all', pct: 50 }] };
-  decayTick(c, mods);
-  assert.equal(c.bladder, 100 - 2);
-  assert.equal(c.hunger, 98); // floor(100 − 3×0.5) — clamp floors the result
+  const t0c = Date.now();
+  decayTick(c, mods, t0c); // prime needs_at
+  decayTick(c, mods, t0c + 15 * 60 * 1000);
+  assert.equal(c.bladder, 100 - 1);
+  assert.equal(c.hunger, 100 - 1); // floor(2 × 0.5)
 });
 
 test('decayTick: decay_slow + decay_all stack multiplicatively', () => {
@@ -114,7 +156,7 @@ test('decayTick: decay_slow + decay_all stack multiplicatively', () => {
   assert.ok(Math.abs(mult - 0.5 * 0.8) < 1e-9);
 });
 
-test('decayTick: stat_drain / stat_boost applied per tick', () => {
+test('decayTick: stat_drain / stat_boost applied per call', () => {
   const c = freshChar();
   c.energy = 90; c.happiness = 90;
   const mods = {
@@ -124,9 +166,9 @@ test('decayTick: stat_drain / stat_boost applied per tick', () => {
     ] }],
     perks: [],
   };
-  decayTick(c, mods);
+  decayTick(c, mods); // single 60s call: no whole-point need decay, moodlet shifts apply
   assert.equal(c.happiness, 85);
-  assert.equal(c.energy, 90 - DECAY_RATES.energy + 3); // decay first, then boost
+  assert.equal(c.energy, 93);
 });
 
 test('decayTick: unknown/malformed effects are ignored defensively', () => {
@@ -142,7 +184,9 @@ test('decayTick: unknown/malformed effects are ignored defensively', () => {
     ] }],
     perks: [null],
   };
-  decayTick(c, mods);
+  const t0d = Date.now();
+  decayTick(c, mods, t0d); // prime needs_at
+  decayTick(c, mods, t0d + 15 * 60 * 1000);
   assert.equal(c.hunger, 100 - DECAY_RATES.hunger);
   assert.equal(c.money, 1234); // money is never a moodlet stat
   assert.equal(c.happiness, 100);
@@ -150,9 +194,9 @@ test('decayTick: unknown/malformed effects are ignored defensively', () => {
 
 test('decayTick: missing new-need fields default full-ish (pre-M8 rows)', () => {
   const c = { hunger: 100, energy: 100, happiness: 100, health: 100 }; // no fun/social/hygiene/bladder
-  decayTick(c);
-  assert.equal(c.fun, 100 - DECAY_RATES.fun);
-  assert.equal(c.bladder, 100 - DECAY_RATES.bladder);
+  decayTick(c); // single 60s call: normalizes, no whole-point decay yet
+  assert.equal(c.fun, 100);
+  assert.equal(c.bladder, 100);
 });
 
 test('decayTick: negative stats clamp to 0 (anti-cheat floor)', () => {

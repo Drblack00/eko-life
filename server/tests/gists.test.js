@@ -15,7 +15,7 @@ const { createApp } = await import('../src/app.js');
 const db = await import('../src/db.js');
 const { signToken } = await import('../src/auth.js');
 const { parseFeedXml, stripHtml } = await import('../src/news.js');
-const { sanitizePlainText, _resetGistRateLimit } = await import('../src/routes/gists.js');
+const { sanitizePlainText, containsBannedWord } = await import('../src/routes/gists.js');
 
 let base, app;
 const users = {};
@@ -26,7 +26,6 @@ test.before(async () => {
   base = `http://127.0.0.1:${port}`;
 });
 test.after(async () => { await app.close(); });
-test.beforeEach(() => { _resetGistRateLimit(); });
 
 async function post(p, body, token) {
   const headers = { 'content-type': 'application/json' };
@@ -70,12 +69,17 @@ test('post validation: empty rejected, over-limit rejected, valid accepted', asy
   assert.equal(r3.json.gist.text.length, 280);
 });
 
-test('post rate limit: second post within 30s is rejected', async () => {
+test('post rate limit: second post within 5 minutes is rejected', async () => {
   const u = await mkuser('gistrate');
   const r1 = await post('/api/gists', { text: 'first' }, u.token);
   assert.equal(r1.status, 201);
   const r2 = await post('/api/gists', { text: 'second' }, u.token);
   assert.equal(r2.status, 429);
+  assert.match(r2.json.error, /5 minutes/);
+  // …but a different user is unaffected (per-user limit).
+  const v = await mkuser('gistrateB');
+  const r3 = await post('/api/gists', { text: 'other user posts fine' }, v.token);
+  assert.equal(r3.status, 201);
 });
 
 test('sanitization: markup is stripped to plain text server-side', async () => {
@@ -200,9 +204,8 @@ test('pagination: latest cursor walks the full feed', async () => {
   const u = await mkuser('gistpag');
   const ids = [];
   for (let i = 0; i < 5; i++) {
-    _resetGistRateLimit();
-    const r = await post('/api/gists', { text: `page-post-${i}` }, u.token);
-    ids.push(r.json.gist.id);
+    const g = await db.createGist(u.id, `page-post-${i}`);
+    ids.push(g.id);
   }
   const seen = [];
   let cursor = null;
@@ -223,18 +226,14 @@ test('delete: own post ok, other\'s forbidden, admin allowed', async () => {
   const a = await mkuser('gistdelA');
   const b = await mkuser('gistdelB');
   const admin = await mkuser('gistdelAdmin', { admin: true });
-  const p = await post('/api/gists', { text: 'to delete' }, a.token);
-  const d1 = await del(`/api/gists/${p.json.gist.id}`, b.token);
+  const p = await db.createGist(a.id, 'to delete');
+  const d1 = await del(`/api/gists/${p.id}`, b.token);
   assert.equal(d1.status, 403);
-  _resetGistRateLimit();
-  const p2 = await post('/api/gists', { text: 'admin deletes this' }, a.token);
-  assert.equal(p2.status, 201);
-  const d2 = await del(`/api/gists/${p2.json.gist.id}`, admin.token);
+  const p2 = await db.createGist(a.id, 'admin deletes this');
+  const d2 = await del(`/api/gists/${p2.id}`, admin.token);
   assert.equal(d2.status, 200);
-  _resetGistRateLimit();
-  const p3 = await post('/api/gists', { text: 'self delete' }, b.token);
-  assert.equal(p3.status, 201);
-  const d3 = await del(`/api/gists/${p3.json.gist.id}`, b.token);
+  const p3 = await db.createGist(b.id, 'self delete');
+  const d3 = await del(`/api/gists/${p3.id}`, b.token);
   assert.equal(d3.status, 200);
   const latest = await get('/api/gists?tab=latest&limit=50', a.token);
   assert.ok(!latest.json.gists.some((g) => g.text === 'self delete'));
@@ -243,18 +242,94 @@ test('delete: own post ok, other\'s forbidden, admin allowed', async () => {
 test('report flow: records a report visible to admins', async () => {
   const a = await mkuser('gistrepA');
   const admin = await mkuser('gistrepAdmin', { admin: true });
-  const p = await post('/api/gists', { text: 'reportable post' }, a.token);
-  const r1 = await post(`/api/gists/${p.json.gist.id}/report`, { reason: '' }, a.token);
+  const p = await db.createGist(a.id, 'reportable post');
+  const r1 = await post(`/api/gists/${p.id}/report`, { reason: '' }, a.token);
   assert.equal(r1.status, 400);
-  const r2 = await post(`/api/gists/${p.json.gist.id}/report`, { reason: 'spam' }, a.token);
+  const r2 = await post(`/api/gists/${p.id}/report`, { reason: 'spam' }, a.token);
   assert.equal(r2.status, 201);
   assert.ok(r2.json.report_id);
   const q = await get('/api/admin/gist-reports', admin.token);
   assert.equal(q.status, 200);
-  assert.ok(q.json.reports.some((r) => r.gist_id === p.json.gist.id && r.reason === 'spam'));
+  assert.ok(q.json.reports.some((r) => r.gist_id === p.id && r.reason === 'spam'));
   // non-admin cannot see the queue
   const q2 = await get('/api/admin/gist-reports', a.token);
   assert.equal(q2.status, 403);
+});
+
+/* ---------------- PORT-P4: moderation ---------------- */
+
+test('moderation: 20/day cap — 21st post rejected', async () => {
+  const u = await mkuser('gistday');
+  for (let i = 0; i < 20; i++) await db.createGist(u.id, `day-post-${i}`);
+  // age the batch past the 5-minute floor so the day cap is what trips
+  await db.dbRun(
+    'UPDATE gists SET created_at = ? WHERE user_id = ?',
+    'UPDATE gists SET created_at = $1 WHERE user_id = $2',
+    [Date.now() - 10 * 60 * 1000, u.id]);
+  const r = await post('/api/gists', { text: 'one too many' }, u.token);
+  assert.equal(r.status, 429);
+  assert.match(r.json.error, /20\/day/);
+});
+
+test('moderation: banned words rejected in posts and comments', async () => {
+  const u = await mkuser('gistban');
+  const r = await post('/api/gists', { text: 'this is shit, honestly' }, u.token);
+  assert.equal(r.status, 400);
+  assert.match(r.json.error, /banned word/);
+  // padded matching avoids false positives on substrings
+  assert.equal(containsBannedWord('bullshit happens'), false);
+  assert.equal(containsBannedWord('this is shit'), true);
+  assert.equal(containsBannedWord('DOUBLE YOUR MONEY fast'), true);
+  const g = await db.createGist(u.id, 'clean post');
+  const c = await post(`/api/gists/${g.id}/comments`, { text: 'double your money fast' }, u.token);
+  assert.equal(c.status, 400);
+  assert.match(c.json.error, /banned word/);
+});
+
+test('moderation: accounts younger than 7 days cannot post links', async () => {
+  const u = await mkuser('gisturl');
+  const r = await post('/api/gists', { text: 'check https://example.com' }, u.token);
+  assert.equal(r.status, 400);
+  assert.match(r.json.error, /7 days/);
+  const r2 = await post('/api/gists', { text: 'visit www.example.com' }, u.token);
+  assert.equal(r2.status, 400);
+  // backdate the account 8 days: links are fine now
+  const old = Date.now() - 8 * 24 * 3600 * 1000;
+  await db.dbRun(
+    'UPDATE users SET created_at = ? WHERE id = ?',
+    'UPDATE users SET created_at = $1 WHERE id = $2',
+    [old, u.id]);
+  const r3 = await post('/api/gists', { text: 'check https://example.com now' }, u.token);
+  assert.equal(r3.status, 201);
+});
+
+test('moderation: 3 distinct reports auto-hide the post globally', async () => {
+  const a = await mkuser('gistmodA');
+  const b = await mkuser('gistmodB');
+  const c = await mkuser('gistmodC');
+  const d = await mkuser('gistmodD');
+  const e = await mkuser('gistmodE');
+  const g = await db.createGist(a.id, 'spammy spam spam');
+  const rep = (u) => post(`/api/gists/${g.id}/report`, { reason: 'spam' }, u.token);
+  const r1 = await rep(b);
+  assert.equal(r1.status, 201);
+  assert.equal(r1.json.globally_hidden, false);
+  const r2 = await rep(c);
+  assert.equal(r2.status, 201);
+  assert.equal(r2.json.globally_hidden, false);
+  const r3 = await rep(d);
+  assert.equal(r3.status, 201);
+  assert.equal(r3.json.globally_hidden, true);
+  // stranger's feed: gone
+  const latest = await get('/api/gists?tab=latest&limit=50', e.token);
+  assert.ok(!latest.json.gists.some((x) => x.id === g.id));
+  // reporter's feed: gone immediately (already hidden after their own report)
+  const bl = await get('/api/gists?tab=latest&limit=50', b.token);
+  assert.ok(!bl.json.gists.some((x) => x.id === g.id));
+  // author's "me" tab: still visible, flagged hidden pending review
+  const me = await get('/api/gists?tab=me&limit=50', a.token);
+  const mine = me.json.gists.find((x) => x.id === g.id);
+  assert.ok(mine && mine.hidden === true);
 });
 
 test('auth: gists endpoints require a token', async () => {

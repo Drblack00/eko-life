@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Card, EmptyState, Loading, useToast } from "../components";
 import { ApiError, friendsApi, type FriendEntry, type FriendLookup, type InviteInfo } from "../lib/api";
 import "./Friends.css";
+// PORT-P4: social — begin (house invites + closeness bonds sections)
+import { HousePanel } from "./social/HousePanel";
+import { BondsPanel } from "./social/BondsPanel";
+// PORT-P4: social — end
 
 /**
  * W3 — dedicated Friends page (9th tab).
@@ -451,6 +455,11 @@ export function FriendsPage({ token }: { token: string }) {
           )}
         </Card>
       </section>
+
+      {/* PORT-P4: social — begin (house invites + closeness bonds) */}
+      <HousePanel token={token} />
+      <BondsPanel token={token} />
+      {/* PORT-P4: social — end */}
     </div>
   );
 }

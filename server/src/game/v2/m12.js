@@ -57,9 +57,26 @@ CREATE TABLE IF NOT EXISTS academy_certs (
   PRIMARY KEY (user_id, course_id)
 );`;
 
+// PORT-P1: external certificate registry (Phase 5 hook) — begin
+export const SCHEMA_SQLITE_3 = `
+CREATE TABLE IF NOT EXISTS cert_skill_map (
+  course_id TEXT PRIMARY KEY,
+  skill_id TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT ''
+);`;
+export const SCHEMA_PG_3 = `
+CREATE TABLE IF NOT EXISTS cert_skill_map (
+  course_id TEXT PRIMARY KEY,
+  skill_id TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT ''
+);`;
+// PORT-P1: external certificate registry (Phase 5 hook) — end
+
 export async function ensureSchema() {
   await dbRun(SCHEMA_SQLITE, SCHEMA_PG);
   await dbRun(SCHEMA_SQLITE_2, SCHEMA_PG_2);
+  // PORT-P1: external certificate registry
+  await dbRun(SCHEMA_SQLITE_3, SCHEMA_PG_3);
 }
 
 // ---------------- 2. Pure logic: skills ----------------
@@ -73,6 +90,8 @@ export const SKILLS = [
   { id: 'dance', name: 'Dance', icon: '💃' },
   { id: 'comedy', name: 'Comedy', icon: '🎤' },
   { id: 'photography', name: 'Photography', icon: '📸' },
+  // PORT-P1: 10th skill — style & stitch.
+  { id: 'fashion', name: 'Fashion', icon: '👗' },
 ];
 export const SKILL_IDS = SKILLS.map(s => s.id);
 
@@ -118,6 +137,8 @@ export const TRAIN_GATES = {
   dance:       { tags: ['beach', 'club'],     label: 'beaches & clubs',     fee: 500,  note: 'Move where the music plays.' },
   comedy:      { tags: ['landmark'],          label: 'landmarks',           fee: 0,    note: 'Open-mic at city landmarks.' },
   photography: { tags: ['beach', 'landmark'], label: 'beaches & landmarks', fee: 1000, note: 'Golden-hour shoots.' },
+  // PORT-P1: fashion trains where style is sold and sewn.
+  fashion:     { tags: ['mall', 'market'], label: 'malls & markets', fee: 500, note: 'Apprentice under tailors and stylists.' },
 };
 
 // ---- Character-column helpers (columns added by the coordinator) ----
@@ -397,6 +418,81 @@ export async function hasAcademyCert(userId, courseId) {
     [userId, courseId],
   );
   return !!row;
+}
+
+// ---------------- PORT-P1: external certificate hook (Phase 5) ----------------
+// Phase 5's courses (or any other phase) call grantCertificate() to award a
+// certificate + career boost for one skill. The cert is stored in
+// academy_certs with an `ext:<skill>:<course>` id, and its title/skill in
+// cert_skill_map. skillBoostsFor(userId) returns every boosted skill id
+// (academy + external); skillLevelWithExt() applies the +1 effective level
+// exactly like an academy cert, without double-counting.
+export async function grantCertificate(userId, { courseId, title, skillId }) {
+  if (!courseId) throw new Error('courseId required');
+  if (!SKILL_IDS.includes(skillId)) throw new Error('unknown skill');
+  const slug = String(courseId).replace(/[^a-z0-9_-]/gi, '').slice(0, 60) || 'course';
+  const extId = `ext:${skillId}:${slug}`;
+  const now = Date.now();
+  await dbRun(
+    'INSERT OR IGNORE INTO academy_certs (user_id, course_id, awarded_at) VALUES (?, ?, ?)',
+    'INSERT INTO academy_certs (user_id, course_id, awarded_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+    [userId, extId, now]);
+  await dbRun(
+    `INSERT INTO cert_skill_map (course_id, skill_id, title) VALUES (?,?,?)
+     ON CONFLICT(course_id) DO UPDATE SET skill_id=excluded.skill_id, title=excluded.title`,
+    `INSERT INTO cert_skill_map (course_id, skill_id, title) VALUES ($1,$2,$3)
+     ON CONFLICT (course_id) DO UPDATE SET skill_id=excluded.skill_id, title=excluded.title`,
+    [extId, skillId, String(title || courseId).slice(0, 120)]);
+  return { ok: true, courseId: extId, skillId, boost: '+1 effective skill level on career gates' };
+}
+
+// All certificates for a user: academy courses + external, with skill + title.
+export async function listCertificates(userId) {
+  const rows = await dbAll(
+    `SELECT ac.course_id, ac.awarded_at, COALESCE(m.skill_id, '') AS skill_id, COALESCE(m.title, '') AS title
+       FROM academy_certs ac LEFT JOIN cert_skill_map m ON m.course_id = ac.course_id
+      WHERE ac.user_id = ? ORDER BY ac.awarded_at`,
+    `SELECT ac.course_id, ac.awarded_at, COALESCE(m.skill_id, '') AS skill_id, COALESCE(m.title, '') AS title
+       FROM academy_certs ac LEFT JOIN cert_skill_map m ON m.course_id = ac.course_id
+      WHERE ac.user_id = $1 ORDER BY ac.awarded_at`,
+    [userId]);
+  return rows.map(r => ({
+    courseId: r.course_id,
+    skillId: r.skill_id || skillIdOfAcademyCourse(r.course_id),
+    title: r.title || academyCourseName(r.course_id),
+    awardedAt: Number(r.awarded_at) || 0,
+    external: String(r.course_id).startsWith('ext:'),
+  }));
+}
+
+function skillIdOfAcademyCourse(courseId) {
+  const c = COURSES.find(x => x.id === courseId);
+  return c ? c.skillBoost.skill : '';
+}
+function academyCourseName(courseId) {
+  const c = COURSES.find(x => x.id === courseId);
+  return c ? c.name : String(courseId);
+}
+
+// Skill ids with any certificate boost (academy or external).
+export function boostedSkills(certCourseIds = []) {
+  const out = new Set();
+  for (const cid of certCourseIds || []) {
+    const m = /^ext:([^:]+):/.exec(String(cid));
+    if (m && SKILL_IDS.includes(m[1])) { out.add(m[1]); continue; }
+    const c = COURSES.find(x => x.id === cid);
+    if (c) out.add(c.skillBoost.skill);
+  }
+  return [...out];
+}
+
+// skillLevel() that also honors external certificates (no double count).
+export function skillLevelWithExt(char, id, certCourseIds = []) {
+  if (!SKILL_IDS.includes(id)) return 0;
+  const base = getSkills(char)[id].level;
+  const hasBoost = boostedSkills(certCourseIds).includes(id);
+  const rust = rustLoss(getSkillsUsed(char)[id]);
+  return Math.max(0, base + (hasBoost ? 1 : 0) - rust);
 }
 async function upsertAcademyProgress(userId, courseId, patch) {
   const now = Date.now();

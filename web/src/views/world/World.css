@@ -1,0 +1,211 @@
+/* P5 World Systems — shared phone-app styles. Reuses tokens.css variables. */
+.world-app {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  color: var(--text);
+}
+.world-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+}
+.world-head p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.world-banner {
+  border-radius: var(--radius, 12px);
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--neutral-200);
+  font-size: 0.85rem;
+}
+.world-banner--rush {
+  background: #fff7e6;
+  border-color: var(--danfo-500);
+}
+.world-banner--sick {
+  background: #fff1f1;
+  border-color: #ef4444;
+}
+.world-banner--good {
+  background: #ecfdf5;
+  border-color: var(--palm-500);
+}
+.world-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.world-card {
+  background: var(--surface);
+  border: 1px solid var(--neutral-200);
+  border-radius: var(--radius, 12px);
+  padding: 12px;
+}
+.world-card--full {
+  grid-column: 1 / -1;
+}
+.world-card h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-family: var(--font-display);
+}
+.world-card .sub {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin: 0 0 8px;
+}
+.world-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--neutral-200);
+}
+.world-row:last-child {
+  border-bottom: none;
+}
+.world-row .grow {
+  flex: 1;
+  min-width: 0;
+}
+.world-price {
+  font-weight: 700;
+  color: var(--primary-strong);
+  white-space: nowrap;
+}
+.world-notice {
+  border-radius: var(--radius, 12px);
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  background: var(--surface-2);
+  border: 1px solid var(--neutral-200);
+}
+.world-notice--error {
+  background: #fff1f1;
+  border-color: #ef4444;
+}
+.world-notice--ok {
+  background: #ecfdf5;
+  border-color: var(--palm-500);
+}
+.world-input,
+.world-select {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--neutral-200);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: var(--font-body);
+}
+.world-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 10px 0 4px;
+}
+.world-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.world-tab {
+  border: 1px solid var(--neutral-200);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.world-tab--active {
+  background: var(--primary);
+  border-color: var(--primary-strong);
+  color: #fff;
+}
+.world-pill {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--neutral-200);
+  color: var(--text-muted);
+}
+.world-pill--live {
+  background: #ecfdf5;
+  color: var(--palm-700);
+  border-color: var(--palm-500);
+}
+.world-pill--warn {
+  background: #fff7e6;
+  color: var(--danfo-600);
+  border-color: var(--danfo-500);
+}
+.world-pill--bad {
+  background: #fff1f1;
+  color: #b91c1c;
+  border-color: #ef4444;
+}
+.world-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--neutral-100);
+  overflow: hidden;
+  margin: 6px 0;
+}
+.world-progress > i {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  border-radius: 999px;
+}
+.world-big {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+.world-muted {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+.world-btnrow {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.world-quiz-opt {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 6px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--neutral-200);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.88rem;
+}
+.world-quiz-opt--sel {
+  border-color: var(--primary-strong);
+  background: #ecfdf5;
+}
+.world-cert {
+  text-align: center;
+  padding: 18px 12px;
+  border: 2px dashed var(--danfo-500);
+  border-radius: var(--radius, 12px);
+  background: #fffdf5;
+}

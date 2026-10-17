@@ -22,6 +22,9 @@ import { ensureSchema as m10Schema } from './game/v2/m10.js';
 import { ensureSchema as m11Schema } from './game/v2/m11.js';
 import { ensureSchema as m12Schema } from './game/v2/m12.js';
 import { ensureSchema as m13Schema } from './game/v2/m13.js';
+// PORT-P3: careers — begin
+import { ensureSchema as p3Schema, onTickMinute as p3Tick } from './game/careers.js';
+// PORT-P3: careers — end
 // Fintech foundation (M5/M6a): chart of accounts + fee policy v1 seeding.
 import { ensureChartOfAccounts, ensureFeePolicyV1 } from './fintech/seed.js';
 // Phase 3 (News tab): headline-aggregator refresh job (title + source +
@@ -122,6 +125,9 @@ export async function createApp() {
   await m11Schema();
   await m12Schema();
   await m13Schema();
+  // PORT-P3: careers — begin (career columns on characters)
+  await p3Schema();
+  // PORT-P3: careers — end
   await bootM9({ broadcast: (m) => hub.broadcast(m) });
 
   // ---- API ----
@@ -190,6 +196,18 @@ export async function createApp() {
     catch (e) { console.error('[m8]', e.message); }
     try { await m9Tick({ broadcast: (m) => hub.broadcast(m), pushNews: hub.pushNews }); }
     catch (e) { console.error('[m9]', e.message); }
+    // PORT-P3: careers — begin (mini-game events + end-of-shift bonuses +
+    // auto-start. MUST run before m7Tick: it credits the performance bonus
+    // first, m7's tick then settles base pay on a fresh row read.)
+    try {
+      await p3Tick({
+        now: Date.now(),
+        sendTo: (uid, msg) => hub.sendTo(uid, msg),
+        broadcast: (m) => hub.broadcast(m),
+        refreshYou: (uid) => hub.pushYou(uid),
+      });
+    } catch (e) { console.error('[p3-careers]', e.message); }
+    // PORT-P3: careers — end
     try {
       const done = await m7Tick({
         broadcast: (m) => hub.broadcast(m),

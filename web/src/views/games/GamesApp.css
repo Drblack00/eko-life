@@ -1,0 +1,231 @@
+/* P6 — Table Games hall. Tokens only; no invented visual identity. */
+.eko-gm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  color: var(--text);
+}
+
+.eko-gm__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.eko-gm__h {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+}
+
+.eko-gm__pill {
+  background: var(--lagoon-100);
+  color: var(--lagoon-900);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.eko-gm__muted { color: var(--text-muted); margin: 0; }
+.eko-gm__small { font-size: 0.82rem; }
+
+.eko-gm__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.eko-gm__chips--sub { margin-top: -4px; }
+
+.eko-gm__chip {
+  border: 1px solid var(--neutral-200);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.eko-gm__chip--on {
+  background: var(--lagoon-500);
+  border-color: var(--lagoon-500);
+  color: #fff;
+  font-weight: 700;
+}
+
+.eko-gm__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.eko-gm__card {
+  background: var(--surface);
+  border: 1px solid var(--neutral-200);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eko-gm__card--wide { width: min(520px, 92vw); }
+.eko-gm__card--you { border-color: var(--lagoon-500); }
+
+.eko-gm__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.eko-gm__title { font-weight: 700; font-size: 1rem; }
+.eko-gm__stake { font-weight: 800; font-size: 1.05rem; color: var(--lagoon-700); }
+
+.eko-gm__seats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.eko-gm__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--neutral-200);
+}
+
+.eko-gm__dot--on { background: var(--palm-500); }
+
+.eko-gm__seatct {
+  margin-left: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.eko-gm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.eko-gm__btn {
+  border: 1px solid var(--neutral-200);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.eko-gm__btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.eko-gm__btn--primary {
+  background: var(--lagoon-500);
+  border-color: var(--lagoon-500);
+  color: #fff;
+}
+
+.eko-gm__btn--go {
+  background: var(--palm-500);
+  border-color: var(--palm-500);
+  color: #fff;
+}
+
+.eko-gm__btn--big { padding: 12px 18px; font-size: 1rem; margin-top: 8px; }
+
+.eko-gm__link {
+  background: none;
+  border: none;
+  color: var(--lagoon-600);
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-decoration: underline;
+}
+
+.eko-gm__x {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.eko-gm__rules {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eko-gm__toast {
+  background: var(--danfo-400);
+  color: var(--neutral-900);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.eko-gm__label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 8px;
+}
+
+.eko-gm__input {
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  background: var(--surface);
+  color: var(--text);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.eko-gm__you {
+  background: var(--lagoon-100);
+  color: var(--lagoon-900);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 0.75rem;
+  margin-left: 6px;
+}
+
+.eko-gm__scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  padding: 12px;
+}
+
+.eko-gm__log {
+  max-height: 40vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.eko-gm__line { margin: 0; font-size: 0.9rem; }
+.eko-gm__line--new { font-weight: 700; }

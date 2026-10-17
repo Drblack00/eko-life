@@ -18,6 +18,9 @@ import {
 import {
   RUN_FEE, POLICIES, PICKABLE_POLICIES, COMMISSIONER_TITLES,
   applyPolicy, getPolicyState, listCommissioners, appointCommissioner, dismissCommissioner,
+  // PORT-P5: world — begin
+  isElectionPaused, setElectionPaused,
+  // PORT-P5: world — end
 } from '../game/elections.js';
 import { isPickablePolicy, policyWindowOpen, isKnownTitle, titleIcon, policyEffectLine } from '../game/v2/m11.js';
 import { canAfford, charge } from '../game/money.js';
@@ -31,6 +34,9 @@ export function createGovRouter({ hub, getDay }) {
   /** Full governance state for the phone app (viewer-aware). */
   async function govState(viewerId) {
     const { day } = getDay();
+    // PORT-P5: world — begin
+    const govElectionPaused = await isElectionPaused();
+    // PORT-P5: world — end
     const el = await currentElection();
     const govId = Number(await getMeta('governor_id')) || 0;
     const govUser = govId ? await getUserById(govId) : null;
@@ -47,7 +53,10 @@ export function createGovRouter({ hub, getDay }) {
       election: el
         ? {
             id: Number(el.id),
-            status: 'voting',
+            // PORT-P5: world — begin (election pause state)
+            status: govElectionPaused ? 'paused' : 'voting',
+            paused: govElectionPaused,
+            // PORT-P5: world — end
             startDay: Number(el.start_day),
             endDay: Number(el.end_day),
             daysLeft: Math.max(0, Number(el.end_day) - Number(day)),
@@ -123,6 +132,11 @@ export function createGovRouter({ hub, getDay }) {
     if (!user) return;
     const el = await currentElection();
     if (!el) return res.status(400).json({ error: 'No election running right now.' });
+    // PORT-P5: world — begin
+    if (await isElectionPaused()) {
+      return res.status(400).json({ error: 'Elections are paused by the State House.' });
+    }
+    // PORT-P5: world — end
     const cands = await listCandidates(el.id);
     if (cands.some((x) => Number(x.player_id) === Number(req.userId))) {
       return res.status(400).json({ error: 'You are already running.' });
@@ -161,6 +175,11 @@ export function createGovRouter({ hub, getDay }) {
     if (!user) return;
     const el = await currentElection();
     if (!el) return res.status(400).json({ error: 'No election running right now.' });
+    // PORT-P5: world — begin
+    if (await isElectionPaused()) {
+      return res.status(400).json({ error: 'Elections are paused by the State House.' });
+    }
+    // PORT-P5: world — end
     const cid = Number(req.body && req.body.candidateId);
     if (!Number.isFinite(cid)) return res.status(400).json({ error: 'Pick a candidate.' });
     const cands = await listCandidates(el.id);
@@ -227,6 +246,40 @@ export function createGovRouter({ hub, getDay }) {
     await hub.pushElectionAll();
     res.json({ ok: true, state: await govState(req.userId) });
   });
+
+  // PORT-P5: world — begin
+  // Election pause / resume (admin only). While paused, tallies don't
+  // run and run/vote are rejected; the sitting governor keeps the seat.
+  async function requireAdmin(req, res) {
+    const user = await authedUser(req, res);
+    if (!user) return null;
+    if (!Number(user.is_admin)) {
+      res.status(403).json({ error: 'Admins only.' });
+      return null;
+    }
+    return user;
+  }
+
+  router.post('/election/pause', async (req, res) => {
+    const user = await requireAdmin(req, res);
+    if (!user) return;
+    await setElectionPaused(true);
+    hub.broadcast({ t: 'sys', text: '🏛️ The State House has paused elections. The sitting Governor stays in office.' });
+    hub.pushNews('election', '🏛️ Elections paused by the State House.');
+    await hub.pushElectionAll();
+    res.json({ ok: true, state: await govState(req.userId) });
+  });
+
+  router.post('/election/resume', async (req, res) => {
+    const user = await requireAdmin(req, res);
+    if (!user) return;
+    await setElectionPaused(false);
+    hub.broadcast({ t: 'sys', text: '🗳️ Elections are back on! The race resumes.' });
+    hub.pushNews('election', '🗳️ Elections resumed.');
+    await hub.pushElectionAll();
+    res.json({ ok: true, state: await govState(req.userId) });
+  });
+  // PORT-P5: world — end
 
   return router;
 }

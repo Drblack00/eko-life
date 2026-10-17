@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Card, EmptyState, useToast } from "../../components";
 import type { GameSocket } from "../../hooks/useGameSocket";
 import type { DmThread } from "../../game/types";
 import type { ProfileTarget } from "./ProfileSheet";
+// PORT-P4: social — begin (message requests inbox)
+import { ApiError, socialApi, type MessageRequest } from "../../lib/api";
+// PORT-P4: social — end
 
 function timeOf(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -122,11 +125,14 @@ function Conversation({
 /** DMs sub-view: thread list with unread → conversation. */
 export function DmsView({
   sock,
+  token,
   onOpenProfile,
   startWith,
   onStartWithConsumed,
 }: {
   sock: GameSocket;
+  // PORT-P4: social — REST token for the message-requests inbox.
+  token: string;
   onOpenProfile: (t: ProfileTarget) => void;
   /** From the profile sheet: jump straight into this peer's conversation. */
   startWith: { id: number; username: string } | null;
@@ -135,6 +141,57 @@ export function DmsView({
   const { toast } = useToast();
   const [activePeer, setActivePeer] = useState<{ id: number; username: string } | null>(null);
   const [newUser, setNewUser] = useState("");
+  // PORT-P4: social — begin (message requests inbox)
+  const [requests, setRequests] = useState<MessageRequest[]>([]);
+  const [actingId, setActingId] = useState<number | null>(null);
+
+  const loadRequests = useCallback(async () => {
+    try {
+      const r = await socialApi.listMessageRequests(token);
+      setRequests(r.requests);
+    } catch {
+      /* inbox is best-effort; the badge still nudges */
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadRequests();
+  }, [loadRequests]);
+  // A live `dm_request` push bumps sock.dmRequestCount → refresh the inbox.
+  useEffect(() => {
+    void loadRequests();
+  }, [sock.dmRequestCount, loadRequests]);
+
+  const errMsg = (err: unknown, fallback: string) =>
+    err instanceof ApiError ? err.message : fallback;
+
+  const approve = async (req: MessageRequest) => {
+    setActingId(req.id);
+    try {
+      const r = await socialApi.approveRequest(token, req.id);
+      toast(`You're now chatting with @${req.from_username}.`, "success");
+      setRequests((prev) => prev.filter((x) => x.id !== req.id));
+      sock.requestDmThreads();
+      setActivePeer({ id: r.partner_id, username: req.from_username });
+    } catch (err) {
+      toast(errMsg(err, "Couldn't approve the request."), "error");
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const ignore = async (req: MessageRequest) => {
+    setActingId(req.id);
+    try {
+      await socialApi.ignoreRequest(token, req.id);
+      setRequests((prev) => prev.filter((x) => x.id !== req.id));
+    } catch (err) {
+      toast(errMsg(err, "Couldn't ignore the request."), "error");
+    } finally {
+      setActingId(null);
+    }
+  };
+  // PORT-P4: social — end
 
   useEffect(() => {
     if (startWith) {
@@ -191,7 +248,56 @@ export function DmsView({
           New
         </Button>
       </form>
-      {sorted.length === 0 ? (
+      {/* PORT-P4: social — message requests inbox */}
+      {requests.length > 0 && (
+        <section aria-label="Message requests" className="eko-dms__requests">
+          <h3 className="eko-dms__requests-h">
+            📨 Message requests ({requests.length})
+          </h3>
+          <p className="eko-chat__hint">
+            First messages from players you haven't chatted with wait here.
+            Approve to start the conversation, ignore to dismiss.
+          </p>
+          {requests.map((req) => (
+            <Card key={req.id} className="eko-dmcard">
+              <div className="eko-dmcard__row">
+                <span className="eko-dmcard__avatar" aria-hidden="true">
+                  {req.from_username.slice(0, 1).toUpperCase()}
+                </span>
+                <span className="eko-dmcard__meta">
+                  <strong className="eko-dmcard__name">
+                    @{req.from_username}
+                  </strong>
+                  {req.text && (
+                    <span className="eko-dmcard__last">
+                      {req.text.slice(0, 80)}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="eko-dmcard__acts">
+                <Button
+                  size="md"
+                  variant="accent"
+                  disabled={actingId === req.id}
+                  onClick={() => void approve(req)}
+                >
+                  Approve
+                </Button>
+                <Button
+                  size="md"
+                  variant="ghost"
+                  disabled={actingId === req.id}
+                  onClick={() => void ignore(req)}
+                >
+                  Ignore
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </section>
+      )}
+      {sorted.length === 0 && requests.length === 0 ? (
         <EmptyState
           emoji="💬"
           title="No conversations yet"

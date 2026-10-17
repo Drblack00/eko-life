@@ -1,0 +1,425 @@
+/* P3 careers — co-located styles. Reuses the live design tokens and the
+   shared component styles; no new visual identity. Own namespace (p3-*). */
+
+.p3-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 12px calc(16px + env(safe-area-inset-bottom));
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.p3-note {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.p3-note--off {
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.p3-h {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+
+.p3-toast {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  background: var(--neutral-900);
+  color: var(--neutral-0);
+  border-radius: var(--radius-pill);
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+/* ---- sub-tabs ---- */
+.p3-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 12px 0;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.p3-tab {
+  flex: 1;
+  border: 1px solid var(--neutral-200);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius-pill);
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.p3-tab--on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* sub-tabs embedded inside an existing padded container (phone Jobs app) */
+.p3-tabs--jobs {
+  padding: 0 0 4px;
+  max-width: none;
+}
+
+/* ---- hero / current career ---- */
+.p3-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.p3-hero__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.p3-hero__icon {
+  font-size: 2.2rem;
+}
+
+.p3-hero__name {
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+
+.p3-hero__rank {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.p3-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.p3-rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.92rem;
+}
+
+.p3-rows dt {
+  color: var(--text-muted);
+}
+
+.p3-rows dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ---- weekly schedule strip ---- */
+.p3-strip {
+  display: flex;
+  gap: 6px;
+}
+
+.p3-strip__day {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--neutral-100);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.p3-strip__day--work {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* ---- performance ---- */
+.p3-perf {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.p3-perf__head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.92rem;
+}
+
+.p3-perf__bar {
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--neutral-100);
+  overflow: hidden;
+}
+
+.p3-perf__fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--danfo-500), var(--primary));
+  transition: width 0.4s ease;
+}
+
+/* ---- next rank / promotion ---- */
+.p3-next {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.p3-next__label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.p3-next__title {
+  font-weight: 700;
+}
+
+/* ---- auto-start + actions ---- */
+.p3-auto {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.92rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.p3-auto input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+.p3-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ---- live work event (mini-game) ---- */
+.p3-event {
+  border-left: 4px solid var(--danger);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: p3-pulse 2s ease-in-out infinite;
+}
+
+@keyframes p3-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15); }
+}
+
+.p3-event__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.3rem;
+}
+
+.p3-event__title {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.p3-event__timer {
+  font-size: 0.85rem;
+  color: var(--danger);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.p3-event__flavor {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--text-muted);
+}
+
+.p3-event__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.p3-event__choice {
+  width: 100%;
+}
+
+/* ---- ladder ---- */
+.p3-ladder__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.p3-ladder__list li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.p3-ladder__item--current {
+  outline: 2px solid var(--primary);
+}
+
+.p3-ladder__rank {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--neutral-200);
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.p3-ladder__item--current .p3-ladder__rank {
+  background: var(--primary);
+  color: #fff;
+}
+
+.p3-ladder__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.p3-ladder__body em {
+  font-style: normal;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.p3-ladder__body small {
+  color: var(--text-muted);
+}
+
+/* ---- browser ---- */
+.p3-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.p3-search {
+  border: 1px solid var(--neutral-200);
+  border-radius: var(--radius-pill);
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.p3-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.p3-chip {
+  flex-shrink: 0;
+  border: 1px solid var(--neutral-200);
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: var(--radius-pill);
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.p3-chip--on {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--neutral-0);
+}
+
+.p3-career {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.p3-career__head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.p3-career__icon {
+  font-size: 1.8rem;
+}
+
+.p3-career__name {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.p3-career__meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.p3-career__pay {
+  font-weight: 700;
+  color: var(--primary-strong);
+}
+
+.p3-career__ranks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.p3-career__rank {
+  font-size: 0.78rem;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  color: var(--text-muted);
+}
+
+/* ---- dialogs ---- */
+.p3-dialog__text {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.p3-dialog__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}

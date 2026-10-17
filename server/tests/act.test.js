@@ -303,15 +303,18 @@ test('move: position persisted on disconnect, restored on reconnect', async () =
 });
 
 // ---------------- decay tick ----------------
-test('decayTickAll: hunger decays, persists, pushes you', async () => {
+test('decayTickAll: needs decay slowly (~1–2 pts/15min), persist, push you', async () => {
   const E = await guestWithCharacter('street_smart');
   await setChar(E.userId, { hunger: 50 });
   const { ws, msgs } = await connectAs(E);
-  await app.hub.decayTickAll();
-  const pushed = await waitFor(msgs, m => m.t === 'you' && m.you.hunger === 47);
-  assert.equal(pushed.you.hunger, 47);
+  await app.hub.decayTickAll(); // one 60s tick: fractional, no whole-point change
+  const pushed = await waitFor(msgs, m => m.t === 'you');
+  assert.equal(pushed.you.hunger, 50);
+  await app.hub.decayTickAll(Date.now() + 16 * 60 * 1000); // ~16 min later: −2 hunger
+  const pushed2 = await waitFor(msgs, m => m.t === 'you' && m.you.hunger === 48);
+  assert.equal(pushed2.you.hunger, 48);
   const c = await db.getCharacter(E.userId);
-  assert.equal(Number(c.hunger), 47);
+  assert.equal(Number(c.hunger), 48);
   ws.close();
 });
 

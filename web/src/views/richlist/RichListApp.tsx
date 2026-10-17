@@ -69,6 +69,10 @@ export function RichListApp({
   const [leaders, setLeaders] = useState<RichListEntry[]>([]);
   const [yourRank, setYourRank] = useState<number | null>(null);
   const [totalPlayers, setTotalPlayers] = useState(0);
+  // PORT-P4: social — begin (header stats: top worth + your net worth)
+  const [yourNetWorth, setYourNetWorth] = useState(0);
+  const [topWorth, setTopWorth] = useState(0);
+  // PORT-P4: social — end
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileTarget | null>(null);
@@ -81,6 +85,10 @@ export function RichListApp({
       setLeaders(r.leaders);
       setYourRank(r.yourRank);
       setTotalPlayers(r.totalPlayers);
+      // PORT-P4: social — begin
+      setYourNetWorth(r.yourNetWorth ?? 0);
+      setTopWorth(r.topWorth ?? 0);
+      // PORT-P4: social — end
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Couldn't load the rich list."
@@ -110,6 +118,14 @@ export function RichListApp({
               "Ranked by net worth"
             )}
           </p>
+          {/* PORT-P4: social — header stats */}
+          {totalPlayers > 1 && (
+            <p className="eko-rich__stats">
+              👑 Top: <strong>{formatNaira(topWorth)}</strong>
+              {" · "}
+              💰 You: <strong>{formatNaira(yourNetWorth)}</strong>
+            </p>
+          )}
         </div>
         <button
           type="button"

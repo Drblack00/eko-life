@@ -137,8 +137,16 @@ export function GovApp({ token, you }: { token: string; you: You }) {
               </p>
             ) : (
               <>
+                {/* PORT-P5: world — begin (election pause state) */}
+                {state.election.paused && (
+                  <p className="eko-gov__notice" role="status">
+                    ⏸️ Elections are paused by the State House. The sitting
+                    Governor stays in office until the race resumes.
+                  </p>
+                )}
+                {/* PORT-P5: world — end */}
                 <p className="eko-gov__race-meta">
-                  Voting open · {state.election.daysLeft} day
+                  {state.election.paused ? "Paused" : "Voting open"} · {state.election.daysLeft} day
                   {state.election.daysLeft === 1 ? "" : "s"} left
                 </p>
                 {state.candidates.length === 0 ? (
@@ -225,6 +233,45 @@ export function GovApp({ token, you }: { token: string; you: You }) {
               and the Governor badge across the city.
             </p>
           </section>
+
+          {/* PORT-P5: world — begin (admin election pause / resume) */}
+          {(() => {
+            if (!you.is_admin || !state.election) return null;
+            const election = state.election;
+            return (
+              <section aria-label="Election controls">
+                <h3 className="eko-gov__h">🛠️ Election controls</h3>
+                <button
+                  type="button"
+                  className="eko-gov__run"
+                  disabled={busy != null}
+                  onClick={() =>
+                    act(
+                      election.paused ? "resume" : "pause",
+                      () =>
+                        election.paused
+                          ? govApi.resumeElection(token)
+                          : govApi.pauseElection(token),
+                      election.paused
+                        ? "Elections resumed. 🗳️"
+                        : "Elections paused. ⏸️"
+                    )
+                  }
+                >
+                  {busy === "pause" || busy === "resume"
+                    ? "Working…"
+                    : election.paused
+                      ? "▶️ Resume elections"
+                      : "⏸️ Pause elections"}
+                </button>
+                <p className="eko-gov__fine">
+                  Admin only. While paused, tallies don't run and run/vote are
+                  rejected; the sitting Governor keeps the seat.
+                </p>
+              </section>
+            );
+          })()}
+          {/* PORT-P5: world — end */}
 
           {/* ---- policy ---- */}
           <section aria-label="City policy">

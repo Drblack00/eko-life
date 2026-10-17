@@ -241,8 +241,36 @@ for (const track of CAREER_TRACKS) {
   for (const role of track.roles) ROLE_INDEX.set(role.id, role);
 }
 
+// PORT-P3: careers — begin
+// P3 career-rank roles (server/src/game/careers.js) register here so the
+// 1-hour shift engine — shift_start gates, activeShiftOf, stale settle,
+// tick settlement — treats them exactly like built-in roles. Registered
+// roles use the same object shape as ROLE_INDEX entries and may carry a
+// `careerId` field, which the day-off predicate below uses.
+// The day-off predicate is registered by careers.js (m7 never imports
+// careers — one-way dependency, no import cycle). It returns an error
+// string when clocking in is blocked today, else null.
+const EXT_ROLE_INDEX = new Map();
+export function registerShiftRole(role) {
+  if (role && role.id) EXT_ROLE_INDEX.set(String(role.id), role);
+}
+export function isExtendedRole(id) {
+  return EXT_ROLE_INDEX.has(String(id));
+}
+let dayOffCheck = null;
+export function registerDayOffCheck(fn) {
+  dayOffCheck = typeof fn === 'function' ? fn : null;
+}
+function dayOffBlocked(role, now) {
+  if (!role || !role.careerId || !dayOffCheck) return null;
+  return dayOffCheck(role, now);
+}
+// PORT-P3: careers — end
+
 export function findRole(id) {
-  return ROLE_INDEX.get(String(id)) || null;
+  // PORT-P3: careers — begin (extended roles fall through here)
+  return ROLE_INDEX.get(String(id)) || EXT_ROLE_INDEX.get(String(id)) || null;
+  // PORT-P3: careers — end
 }
 
 export function trackOf(roleId) {
@@ -347,6 +375,11 @@ export const INTENTS = {
 
     const role = findRole(msg && msg.job);
     if (!role) { err('Unknown job.'); return; }
+
+    // PORT-P3: careers — begin (day-off enforcement for career roles)
+    const dayOffErr = dayOffBlocked(role, now);
+    if (dayOffErr) { err(dayOffErr); return; }
+    // PORT-P3: careers — end
 
     // Already on a live shift → refuse (no double shifts).
     const active = activeShiftOf(c, now);

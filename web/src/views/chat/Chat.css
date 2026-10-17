@@ -152,6 +152,7 @@
 .eko-profile__avatar {
   width: 52px;
   height: 52px;
+  flex: none; /* anti-oval: never let iOS Safari squeeze this circle */
   border-radius: 50%;
   background: var(--lagoon-100);
   color: var(--lagoon-700);
@@ -535,7 +536,7 @@
 }
 /* --lagoon-100 is a light chip in both themes: darken it at night so the
    light message text stays legible. */
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-dm--mine {
+[data-theme="night"] .eko-dm--mine {
   background: #16405f;
 }
 
@@ -633,4 +634,64 @@
 .eko-dot--sm {
   width: 8px;
   height: 8px;
+}
+
+/* PORT-P4: social — group create + message requests (existing tokens only) */
+.eko-createroom__memberadd {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.eko-createroom__memberadd input {
+  flex: 1;
+}
+
+.eko-createroom__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.eko-createroom__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--surface-2);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.875rem;
+}
+
+.eko-createroom__chip button {
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 var(--space-1);
+}
+
+.eko-dms__requests {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eko-dms__requests-h {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.eko-dmcard__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.eko-dmcard__acts {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }

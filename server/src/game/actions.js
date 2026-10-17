@@ -34,8 +34,13 @@ import { INTENTS as M7_INTENTS } from './v2/m7.js';
 import { INTENTS as M8_INTENTS, triggerMoodlet } from './v2/m8.js';
 import { INTENTS as M9_INTENTS } from './v2/m9.js';
 import * as m10 from './v2/m10.js';
+// PORT-P2: money — savings accrue per minute; settle before vault moves.
+import { accrueSavings, SAVINGS_CAP, SAVINGS_MIN_WITHDRAW } from './v2/p2money.js';
 import { INTENTS as M11_INTENTS } from './v2/m11.js';
 import { INTENTS as M12_INTENTS, m12YouSnapshot, addSkillXp, xpBoostMult } from './v2/m12.js';
+// PORT-P3: careers — begin
+import { INTENTS as CAREER_INTENTS } from './careers.js';
+// PORT-P3: careers — end
 // Phase 5: venue activities ("things to do").
 import { findActivity, activityOfferedAt, VENUE_COOLDOWN_MS } from './v2/venues.js';
 // M8: modest fun restoration per food item (FOOD table untouched).
@@ -153,6 +158,14 @@ export async function handleAct(ctx, msg) {
     await M7_INTENTS[a]({ conn, send, broadcast, youSnapshot, err, commit, now, getDay: ctx.getDay }, msg);
     return;
   }
+
+  // PORT-P3: careers — begin (career_apply / career_quit / career_promote /
+  // career_auto / career_respond / career_status — same api contract as M7)
+  if (CAREER_INTENTS[a]) {
+    await CAREER_INTENTS[a]({ conn, send, broadcast, youSnapshot, err, commit, now, getDay: ctx.getDay }, msg);
+    return;
+  }
+  // PORT-P3: careers — end
 
   // ---------- work (M7: instant work retired — shifts only) ----------
   // The old instant-pay `work` is replaced by 1-hour shifts (see v2/m7.js).
@@ -346,20 +359,26 @@ export async function handleAct(ctx, msg) {
     return;
   }
 
-  // ---------- bank (savings earn 2%/day in the day tick) ----------
+  // ---------- bank (savings: 0.5%/game-week, per-minute accrual, daily credit) ----------
+  // PORT-P2: accrue pending interest BEFORE moving money so deposits and
+  // withdrawals never forfeit what the vault already earned.
   if (a === 'bank') {
     const amt = Math.floor(Number(msg.amount));
     if (!amt || amt <= 0) { err('Enter a valid amount.'); return; }
     if (msg.op === 'deposit') {
       if (!afford(amt)) { err("You don't have that much cash."); return; }
+      await accrueSavings(conn.user.id, c, Date.now());
+      if (!afford(amt)) { err("You don't have that much cash."); return; } // re-check after the async accrue
       payFor(amt);
       c.savings = Math.floor(Number(c.savings)) + amt;
       console.log(`[act] ${conn.user.username} deposited ${naira(amt)}`);
       const m8saveNote = await triggerMoodlet(conn.user.id, 'saving_discipline'); // M8
-      await commit({ kind: 'deposit', amount: -amt, meta: { op: 'deposit', savings: c.savings }, note: `🏦 Deposited ${naira(amt)}. Savings earn 2%/day.${m8saveNote ? ' ' + m8saveNote : ''}` });
+      await commit({ kind: 'deposit', amount: -amt, meta: { op: 'deposit', savings: c.savings }, note: `🏦 Deposited ${naira(amt)}. Savings earn 0.5% every game week (first ${naira(SAVINGS_CAP)}).${m8saveNote ? ' ' + m8saveNote : ''}` });
       return;
     }
     if (msg.op === 'withdraw') {
+      if (amt < SAVINGS_MIN_WITHDRAW) { err(`Minimum withdrawal is ${naira(SAVINGS_MIN_WITHDRAW)}.`); return; }
+      await accrueSavings(conn.user.id, c, Date.now());
       if (Number(c.savings) < amt) { err("You don't have that much saved."); return; }
       c.savings = Math.floor(Number(c.savings)) - amt;
       c.money = Math.floor(Number(c.money)) + amt;
@@ -806,8 +825,10 @@ export async function settleDayRent(ctx, conn) {
 }
 
 // ---- Day-rollover economy for one connected player ----
-// Business income → note; savings +2%/day; loan +10%/day; owned-property and
+// Business income → note; loan +10%/day; owned-property and
 // placed-furniture day-hook happiness. Ledger rows for every money/balance move.
+// PORT-P2: savings interest now accrues per minute in game/v2/p2money.js
+// (0.5%/game-week on the first ₦1bn) — credited on the day tick, not here.
 export async function settleDayEconomy(ctx, conn) {
   const { send, youSnapshot } = ctx;
   const c = conn.character;
@@ -819,9 +840,6 @@ export async function settleDayEconomy(ctx, conn) {
   if (res.income > 0) {
     await addTransaction(conn.user.id, 'biz_income', res.income, c.money, { biz: c.biz });
   }
-  if (res.savingsInterest > 0) {
-    await addTransaction(conn.user.id, 'savings_interest', res.savingsInterest, c.savings, { balance: 'savings' });
-  }
   if (res.loanInterest > 0) {
     await addTransaction(conn.user.id, 'loan_interest', res.loanInterest, c.loan, { balance: 'loan' });
   }
@@ -832,10 +850,9 @@ export async function settleDayEconomy(ctx, conn) {
   send(conn, { t: 'you', you: youSnapshot(conn) });
   const bits = [];
   if (res.income > 0 && bizDef) bits.push(`${bizDef.icon} ${bizDef.name} paid you ${naira(res.income)}`);
-  if (res.savingsInterest > 0) bits.push(`🏦 savings interest +${naira(res.savingsInterest)}`);
   if (res.loanInterest > 0) bits.push(`🏦 loan interest +${naira(res.loanInterest)}`);
   if (res.happyGain > 0) bits.push(`😊 +${res.happyGain} happiness`);
   if (bits.length) send(conn, { t: 'sys', text: '🌅 New day: ' + bits.join(' • ') });
-  console.log(`[economy] ${conn.user.username}: income=${res.income} savInt=${res.savingsInterest} loanInt=${res.loanInterest} happy=${res.happyGain}`);
+  console.log(`[economy] ${conn.user.username}: income=${res.income} loanInt=${res.loanInterest} happy=${res.happyGain}`);
   return res;
 }

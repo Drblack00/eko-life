@@ -9,9 +9,11 @@ function freshChar() {
   return { hunger: 100, energy: 100, happiness: 100, health: 100, money: 0, housing: 'face_me', rent_misses: 0 };
 }
 
-test('decayTick (M8): decays six needs at their rates', () => {
+test('decayTick (M8): decays six needs ~1–2 pts per 15 real minutes', () => {
   const c = { hunger: 100, energy: 100, fun: 100, social: 100, hygiene: 100, bladder: 100, happiness: 100, health: 100 };
-  const res = decayTick(c);
+  const t0 = Date.now();
+  decayTick(c, { moodlets: [], perks: [] }, t0); // prime needs_at
+  const res = decayTick(c, { moodlets: [], perks: [] }, t0 + 15 * 60 * 1000);
   assert.equal(c.hunger, 100 - DECAY_RATES.hunger);
   assert.equal(c.energy, 100 - DECAY_RATES.energy);
   assert.equal(c.fun, 100 - DECAY_RATES.fun);
@@ -20,13 +22,13 @@ test('decayTick (M8): decays six needs at their rates', () => {
   assert.equal(c.bladder, 100 - DECAY_RATES.bladder);
   assert.equal(res.starving, false);
   assert.equal(res.desperate, false);
-  // stats untouched while needs are healthy
-  assert.equal(c.energy, 100 - DECAY_RATES.energy);
 });
 
 test('decayTick (M8): starving (hunger 0) drains energy/happiness/health', () => {
   const c = { hunger: DECAY_RATES.hunger, energy: 100, happiness: 100, health: 100, fun: 100, social: 100, hygiene: 100, bladder: 100 };
-  const res = decayTick(c);
+  const t1 = Date.now();
+  decayTick(c, { moodlets: [], perks: [] }, t1); // prime needs_at
+  const res = decayTick(c, { moodlets: [], perks: [] }, t1 + 15 * 60 * 1000);
   assert.equal(c.hunger, 0);
   assert.equal(res.starving, true);
   assert.equal(c.energy, 100 - DECAY_RATES.energy - 5); // decay + starving drain
@@ -36,7 +38,9 @@ test('decayTick (M8): starving (hunger 0) drains energy/happiness/health', () =>
 
 test('decayTick (M8): starving clamps; hunger never negative', () => {
   const c = { hunger: 1, energy: 2, happiness: 3, health: 1, fun: 100, social: 100, hygiene: 100, bladder: 100 };
-  decayTick(c);
+  const t2 = Date.now();
+  decayTick(c, { moodlets: [], perks: [] }, t2); // prime needs_at
+  decayTick(c, { moodlets: [], perks: [] }, t2 + 15 * 60 * 1000);
   assert.equal(c.hunger, 0);
   assert.equal(c.energy, 0);
   assert.equal(c.happiness, 0);
@@ -107,13 +111,13 @@ test('applyDayEconomy: business income lands on money', () => {
   assert.ok(res.dirty);
 });
 
-test('applyDayEconomy: savings +2%/day (floored), loan +10%/day (ceiled)', () => {
+test('applyDayEconomy: loan +10%/day (ceiled); savings untouched (PORT-P2 per-minute accrual)', () => {
   const c = freshChar();
   c.savings = 10000; c.loan = 10000;
   const res = applyDayEconomy(c, {});
-  assert.equal(res.savingsInterest, 200);
+  assert.equal(res.savingsInterest, undefined);
   assert.equal(res.loanInterest, 1000);
-  assert.equal(c.savings, 10200);
+  assert.equal(c.savings, 10000); // savings accrual lives in v2/p2money.js now
   assert.equal(c.loan, 11000);
   // zero balances → inert, no dirty flag
   const c2 = freshChar();

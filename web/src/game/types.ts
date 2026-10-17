@@ -350,6 +350,8 @@ export type ActName =
   | "hunt_status"
   | "hustle_status"
   | "hustle_claim"
+  // PORT-P1: daily quest swap
+  | "hustle_swap"
   | "perk_list"
   | "perk_buy"
   | "shop_create"

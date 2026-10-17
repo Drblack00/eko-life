@@ -837,6 +837,8 @@ export interface GistEntry {
   comment_count: number;
   liked: boolean;
   mine: boolean;
+  // PORT-P4: social — auto-hidden by moderation (3+ reports), author sees it flagged.
+  hidden?: boolean;
 }
 
 export interface GistComment {
@@ -906,7 +908,14 @@ export const gistsApi = {
     authPost<{ comment: GistComment }>(`/api/gists/${id}/comments`, token, { text }),
   /** Report a gist (records a row for admins). */
   report: (token: string, id: number, reason: string) =>
-    authPost<{ ok: boolean; report_id: number }>(`/api/gists/${id}/report`, token, {
+    authPost<{
+      ok: boolean;
+      report_id: number;
+      // PORT-P4: social — moderation feedback.
+      hidden_from_you: boolean;
+      globally_hidden: boolean;
+      report_count: number;
+    }>(`/api/gists/${id}/report`, token, {
       reason,
     }),
 };
@@ -924,13 +933,207 @@ export interface RichListEntry {
 }
 
 export const richListApi = {
-  /** Ranked leaders + the caller's own rank and total ranked players. */
+  /** Ranked leaders + the caller's own rank, net worth, and total ranked players. */
   list: (token: string, limit = 25) =>
     authGet<{
       leaders: RichListEntry[];
       yourRank: number | null;
       totalPlayers: number;
+      // PORT-P4: social — begin (rich-list header stats)
+      yourNetWorth: number;
+      topWorth: number;
+      // PORT-P4: social — end
     }>(`/api/richlist?limit=${limit}`, token),
+};
+
+/* ------------------------------------------------------------------ */
+/* PORT-P4 — social API: groups, message requests, house invites,      */
+/* closeness bonds (family & dating), social settings.                 */
+/* ------------------------------------------------------------------ */
+
+export interface SocialGroup {
+  id: number;
+  name: string;
+  topic: string;
+  icon: string;
+  member_count: number;
+  role: "owner" | "member" | null;
+}
+
+export interface MessageRequest {
+  id: number;
+  from_id: number;
+  from_username: string;
+  text: string;
+  ts: number;
+}
+
+export interface HouseInviteInfo {
+  token: string;
+  link: string;
+  guests: number;
+  guest_cap: number;
+}
+
+export interface HouseKnock {
+  id: number;
+  visitor_id: number;
+  visitor_username: string;
+  ts: number;
+  status: string;
+}
+
+export interface BondInfo {
+  other_id: number;
+  other_username: string;
+  dm_count: number;
+  hangout_count: number;
+  gift_count: number;
+  score: number;
+  can_family: boolean;
+  can_date: boolean;
+  family: string;
+  dating: string;
+  family_request_from: number;
+  dating_request_from: number;
+}
+
+export interface GiftItem {
+  id: string;
+  emoji: string;
+  name: string;
+  cost: number;
+}
+
+export interface SocialSettings {
+  read_receipts: boolean;
+  message_policy: "everyone" | "friends";
+  relationships_visible: boolean;
+}
+
+export const socialApi = {
+  /* groups */
+  createGroup: (token: string, body: { name: string; icon: string; members: string[] }) =>
+    authPost<{ group: { id: number; name: string; icon: string; members: string[] } }>(
+      "/api/social/groups",
+      token,
+      body
+    ),
+  listGroups: (token: string) =>
+    authGet<{ groups: SocialGroup[] }>("/api/social/groups", token),
+  addGroupMember: (token: string, groupId: number, username: string) =>
+    authPost<{ ok: boolean; username: string }>(
+      `/api/social/groups/${groupId}/members`,
+      token,
+      { username }
+    ),
+  leaveGroup: (token: string, groupId: number) =>
+    authPost<{ ok: boolean }>(`/api/social/groups/${groupId}/leave`, token, {}),
+  deleteGroup: (token: string, groupId: number) =>
+    authDelete<{ ok: boolean; deleted: boolean }>(
+      `/api/social/groups/${groupId}`,
+      token
+    ),
+  /* message requests */
+  listMessageRequests: (token: string) =>
+    authGet<{ requests: MessageRequest[] }>(
+      "/api/social/messages/requests",
+      token
+    ),
+  approveRequest: (token: string, id: number) =>
+    authPost<{ ok: boolean; approved: boolean; partner_id: number }>(
+      `/api/social/messages/requests/${id}/approve`,
+      token,
+      {}
+    ),
+  ignoreRequest: (token: string, id: number) =>
+    authPost<{ ok: boolean; ignored: boolean }>(
+      `/api/social/messages/requests/${id}/ignore`,
+      token,
+      {}
+    ),
+  /* house invites */
+  houseInvite: (token: string) =>
+    authGet<HouseInviteInfo>("/api/social/house/invite", token),
+  visitHouse: (token: string, linkToken: string) =>
+    authGet<{ host_id: number; host_username: string; guests: number; guest_cap: number }>(
+      `/api/social/house/visit/${encodeURIComponent(linkToken)}`,
+      token
+    ),
+  knock: (token: string, linkToken: string) =>
+    authPost<{ ok: boolean; knock_id: number }>(
+      "/api/social/house/knock",
+      token,
+      { token: linkToken }
+    ),
+  knocks: (token: string) =>
+    authGet<{ pending: HouseKnock[]; guests: HouseKnock[]; guest_cap: number }>(
+      "/api/social/house/knocks",
+      token
+    ),
+  approveKnock: (token: string, id: number) =>
+    authPost<{ ok: boolean; approved: boolean }>(
+      `/api/social/house/knocks/${id}/approve`,
+      token,
+      {}
+    ),
+  declineKnock: (token: string, id: number) =>
+    authPost<{ ok: boolean; declined: boolean }>(
+      `/api/social/house/knocks/${id}/decline`,
+      token,
+      {}
+    ),
+  /* bonds */
+  listBonds: (token: string) =>
+    authGet<{ bonds: BondInfo[] }>("/api/social/bonds", token),
+  bondWith: (token: string, username: string) =>
+    authGet<{
+      bond: BondInfo;
+      // PORT-P4: social — false when the other player hides relationships.
+      relationships_visible: boolean;
+      thresholds: { family_at: number; date_at: number };
+    }>(`/api/social/bonds/${encodeURIComponent(username)}`, token),
+  hangout: (token: string, username: string) =>
+    authPost<{ ok: boolean; score: number }>("/api/social/hangouts", token, {
+      username,
+    }),
+  giftShelf: (token: string) =>
+    authGet<{ gifts: GiftItem[] }>("/api/social/gifts/shelf", token),
+  sendGift: (token: string, username: string, gift: string) =>
+    authPost<{ ok: boolean; gift: string; balance: number; score: number }>(
+      "/api/social/gifts",
+      token,
+      { username, gift }
+    ),
+  familyRequest: (token: string, username: string) =>
+    authPost<{ ok: boolean; pending: boolean }>(
+      "/api/social/family/request",
+      token,
+      { username }
+    ),
+  familyRespond: (token: string, username: string, accept: boolean) =>
+    authPost<{ ok: boolean; accepted: boolean }>(
+      "/api/social/family/respond",
+      token,
+      { username, accept }
+    ),
+  datingRequest: (token: string, username: string) =>
+    authPost<{ ok: boolean; pending: boolean }>(
+      "/api/social/dating/request",
+      token,
+      { username }
+    ),
+  datingRespond: (token: string, username: string, accept: boolean) =>
+    authPost<{ ok: boolean; accepted: boolean }>(
+      "/api/social/dating/respond",
+      token,
+      { username, accept }
+    ),
+  /* settings */
+  getSettings: (token: string) =>
+    authGet<{ settings: SocialSettings }>("/api/social/settings", token),
+  putSettings: (token: string, patch: Partial<SocialSettings>) =>
+    authPut<{ settings: SocialSettings }>("/api/social/settings", token, patch),
 };
 
 export const headlinesApi = {
@@ -983,9 +1186,7 @@ export interface BankTaxInfo {
   taxMult: number;
   holiday: boolean;
   free: number;
-  band2: number;
-  rate2: number;
-  rate3: number;
+  flatRate: number;
   bracket: { label: string; rate: number };
 }
 
@@ -1004,7 +1205,7 @@ export interface BankBillsInfo {
 export interface BankOverview {
   balance: number;
   savings: number;
-  /** coins + savings + active bond principal (see bank.js netWorth). */
+  /** coins + savings + active bond principal + term notes + investments. */
   netWorth: number;
   lastReceipt: TransactionInfo | null;
   bonds: {
@@ -1013,12 +1214,72 @@ export interface BankOverview {
     terms: Record<string, { rate: number; label: string }>;
     min: number;
   };
+  /** PORT-P2: savings terms (0.5%/week, ₦1bn cap, ₦1k min withdrawal). */
+  savingsTerms: { weeklyRate: number; cap: number; minWithdraw: number };
+  /** PORT-P2: term notes (2%/7d). */
+  termNotes: {
+    active: TermNote[];
+    rate: number;
+    termDays: number;
+    min: number;
+    max: number;
+  };
+  /** PORT-P2: credit facility (LAPO repayment state), null when none. */
+  credit: {
+    balance: number;
+    weeklyDue: number;
+    weeksLeft: number;
+    debitsDone: number;
+  } | null;
+  /** PORT-P2: credibility score (record only). */
+  credibility: { total: number; parts: CredibilityPart[]; recordOnly: boolean };
+  /** PORT-P2: housing ladder. */
+  housing: {
+    homes: HomeDef[];
+    current: string | null;
+    currentDef: HomeDef | null;
+    owned: string[];
+    rentDebt: number;
+    rentSaturday: boolean;
+  };
   tax: BankTaxInfo;
   bills: BankBillsInfo;
   /** Savings interest credited since the current week started. */
   interestWeek: number;
   day: number;
   isAdmin: boolean;
+}
+
+export interface TermNote {
+  id: number;
+  principal: number;
+  rate: number;
+  start_day: number;
+  term_days: number;
+  matured: boolean;
+  matured_day: number | null;
+  withdrawn: boolean;
+  withdrawn_day: number | null;
+  matures_day: number;
+  interest: number;
+  payout: number;
+  active: boolean;
+}
+
+export interface CredibilityPart {
+  key: string;
+  label: string;
+  score: number;
+  max: number;
+  detail: string;
+}
+
+export interface HomeDef {
+  id: string;
+  name: string;
+  icon: string;
+  weeklyRent: number;
+  buyPrice: number;
 }
 
 export const bankApi = {
@@ -1039,6 +1300,185 @@ export const bankApi = {
       token,
       { amount, termDays }
     ),
+  /* ---------------- PORT-P2: money ---------------- */
+  /** Term notes (2%/7d) — list. */
+  notes: (token: string) =>
+    authGet<{
+      notes: TermNote[];
+      rate: number;
+      termDays: number;
+      min: number;
+      max: number;
+    }>("/api/bank/notes", token),
+  /** Buy a term note — server validates ₦10k–₦500m + affordability. */
+  buyNote: (token: string, amount: number) =>
+    authPost<{ note: TermNote; balance: number }>("/api/bank/notes", token, {
+      amount,
+    }),
+  /** Early withdrawal — principal back, interest forfeited. */
+  withdrawNoteEarly: (token: string, id: number) =>
+    authPost<{ principal: number; interestForfeited: number; balance: number }>(
+      `/api/bank/notes/${id}/withdraw-early`,
+      token,
+      {}
+    ),
+  /** Credit facility (LAPO repayment state). */
+  credit: (token: string) =>
+    authGet<{
+      loan: {
+        balance: number;
+        weeklyDue: number;
+        weeksLeft: number;
+        debitsDone: number;
+        startDay: number;
+      } | null;
+    }>("/api/bank/credit", token),
+  /** Pay now (amount) toward the credit balance. */
+  creditPay: (token: string, amount: number) =>
+    authPost<{ paid: number; balance: number; cleared: boolean; wallet: number }>(
+      "/api/bank/credit/pay",
+      token,
+      { amount }
+    ),
+  /** Pay the credit balance in full. */
+  creditPayAll: (token: string) =>
+    authPost<{ paid: number; balance: number; cleared: boolean; wallet: number }>(
+      "/api/bank/credit/pay-all",
+      token,
+      {}
+    ),
+  /** Move into a ladder home (rented). */
+  housingMove: (token: string, homeId: string) =>
+    authPost<{ home: HomeDef; current: string; owned: string[]; rentDebt: number }>(
+      "/api/bank/housing/move",
+      token,
+      { homeId }
+    ),
+  /** Buy a ladder home outright. */
+  housingBuy: (token: string, homeId: string) =>
+    authPost<{ home: HomeDef; current: string; owned: string[]; balance: number }>(
+      "/api/bank/housing/buy",
+      token,
+      { homeId }
+    ),
+  /** Pay down rent debt. */
+  housingPayDebt: (token: string, amount: number) =>
+    authPost<{ paid: number; rentDebt: number; balance: number }>(
+      "/api/bank/housing/pay-debt",
+      token,
+      { amount }
+    ),
+  /** Credibility breakdown (record only). */
+  credibility: (token: string) =>
+    authGet<{ total: number; parts: CredibilityPart[]; recordOnly: boolean }>(
+      "/api/bank/credibility",
+      token
+    ),
+};
+
+/* ------------------------------------------------------------------ */
+/* PORT-P2 — Top-up packs (STRUCTURE ONLY; purchase stubbed).           */
+/* ------------------------------------------------------------------ */
+
+export interface TopupPack {
+  id: string;
+  name: string;
+  icon: string;
+  ngn: number;
+  usd: number;
+  coins: number;
+  tagline: string;
+  bestValue?: boolean;
+}
+
+export const topupApi = {
+  /** Pack definitions + disabled state. Public — no auth needed. */
+  packs: () =>
+    fetch("/api/topup/packs").then((r) => {
+      if (!r.ok) throw new ApiError(r.status, "Couldn't load top-up packs.");
+      return r.json() as Promise<{
+        realMoneyEnabled: boolean;
+        currencyToggle: string[];
+        packs: TopupPack[];
+        notice: string | null;
+      }>;
+    }),
+  /** Purchase attempt — always refused while real money is disabled. */
+  purchase: (packId: string) =>
+    fetch("/api/topup/purchase", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ packId }),
+    }).then(async (r) => {
+      const body = (await r.json().catch(() => null)) as {
+        error?: string;
+        detail?: string;
+      } | null;
+      throw new ApiError(
+        r.status,
+        (body && (body.detail || body.error)) || "Top-ups are not available yet."
+      );
+    }),
+};
+
+/* ------------------------------------------------------------------ */
+/* PORT-P2 — Invest: land, businesses, haulage (gameplay coins only).   */
+/* ------------------------------------------------------------------ */
+
+export interface InvestDef {
+  id: string;
+  name: string;
+  icon: string;
+  price: number;
+  weeklyYield?: number;
+  dailyYield?: number;
+  weeklyIncome?: number;
+}
+
+export interface InvestHolding {
+  id: number;
+  kind: "land" | "business" | "haulage";
+  def_id: string;
+  principal: number;
+  accrued: number;
+  last_yield_day: number;
+  name: string;
+  icon: string;
+  price: number;
+  value: number;
+}
+
+export const investApi = {
+  /** Defs + holdings. */
+  overview: (token: string) =>
+    authGet<{
+      balance: number;
+      holdings: InvestHolding[];
+      totalValue: number;
+      totalAccrued: number;
+      defs: { land: InvestDef[]; business: InvestDef[]; haulage: InvestDef[] };
+      day: number;
+      isAdmin: boolean;
+    }>("/api/invest", token),
+  /** Buy — server validates kind/def + affordability. */
+  buy: (token: string, kind: string, defId: string) =>
+    authPost<{ holding: InvestHolding; balance: number }>(
+      "/api/invest/buy",
+      token,
+      { kind, defId }
+    ),
+  /** Collect accrued yield. */
+  collect: (token: string, holdingId: number) =>
+    authPost<{ collected: number; holding: InvestHolding; balance: number }>(
+      "/api/invest/collect",
+      token,
+      { holdingId }
+    ),
+  /** Sell — value + accrued, closes the holding. */
+  sell: (token: string, holdingId: number) =>
+    authPost<{ payout: number; balance: number }>("/api/invest/sell", token, {
+      holdingId,
+    }),
 };
 
 /* ------------------------------------------------------------------ */
@@ -1114,6 +1554,8 @@ export interface GovState {
   election: {
     id: number;
     status: string;
+    // PORT-P5: world — election pause flag.
+    paused?: boolean;
     startDay: number;
     endDay: number;
     daysLeft: number;
@@ -1161,6 +1603,14 @@ export const govApi = {
       token,
       { title }
     ),
+  // PORT-P5: world — begin (election pause / resume, admin only).
+  /** Pause elections (admin only). */
+  pauseElection: (token: string) =>
+    authPost<{ ok: boolean; state: GovState }>("/api/gov/election/pause", token, {}),
+  /** Resume elections (admin only). */
+  resumeElection: (token: string) =>
+    authPost<{ ok: boolean; state: GovState }>("/api/gov/election/resume", token, {}),
+  // PORT-P5: world — end
 };
 
 /* ------------------------------------------------------------------ */
@@ -1522,3 +1972,511 @@ export const eventsApi = {
       token
     ),
 };
+
+/* ------------------------------------------------------------------ */
+/* P5: World Systems — ride, health, police, court, assurance, bus co, */
+/* in-game ads, charity, IPO-style promos, tickets, trade school.     */
+/* ------------------------------------------------------------------ */
+
+export interface RideMode {
+  id: string;
+  name: string;
+  icon: string;
+  blurb: string;
+  fare: number;
+  minSec: number;
+  maxSec: number;
+}
+export interface RideDest {
+  id: string;
+  name: string;
+  icon: string;
+}
+export interface RideState {
+  rush: boolean;
+  rushNote: string;
+  modes: RideMode[];
+  dests: RideDest[];
+  locationId: string;
+}
+export interface RideResult {
+  ok: boolean;
+  mode: string;
+  destId: string;
+  fare: number;
+  travelSecs: number;
+  goSlow: { text: string; extraSec: number } | null;
+  caught: { id: string; name: string; icon: string } | null;
+  balance: number;
+}
+
+export interface HealthState {
+  illness: {
+    id: string;
+    name: string;
+    icon: string;
+    desc: string;
+    until: number;
+    msLeft: number;
+  } | null;
+  decayMult: number;
+  chemistFee: number;
+  hospitalFee: number;
+  providers: { id: string; name: string; icon: string; fee: number; note: string }[];
+}
+
+export interface PoliceOffence {
+  id: number;
+  offence: string;
+  name: string;
+  icon: string;
+  severity: number;
+  detail: string;
+  recordedAt: number;
+}
+export interface PoliceState {
+  record: PoliceOffence[];
+  clean: boolean;
+  robberyCap: number;
+  robberyNote: string;
+  jailed: { until: number; msLeft: number } | null;
+  offenceTypes: { id: string; name: string; icon: string; severity: number }[];
+}
+
+export interface CourtCase {
+  id: number;
+  offence: string;
+  name: string;
+  icon: string;
+  severity: number;
+  status: string;
+  hearingDay: number;
+  outcome: { verdict: string; fine: number; jailHours: number; note: string } | null;
+  decidedAt: number | null;
+  createdAt: number;
+}
+
+export interface AssuranceState {
+  policy: { active: boolean; condition: number; paidUntilWeek: number; startedAt: number } | null;
+  losses: {
+    id: number;
+    risk: string;
+    name: string;
+    icon: string;
+    loss: number;
+    claimed: boolean;
+    payout: number;
+    createdAt: number;
+    expiresAt: number;
+  }[];
+  premium: number;
+  deductible: number;
+  maxPayout: number;
+  fixCost: number;
+  risks: { id: string; name: string; icon: string; weeklyChance: string }[];
+}
+
+export interface BuscoState {
+  company: { buses: number; startedAt: number; weeklyYield: number; paybackWeeks: number } | null;
+  startCost: number;
+  weeklyYield: number;
+  paybackWeeks: number;
+  blurb: string;
+}
+
+export interface WorldAd {
+  id: number;
+  kind: string;
+  title: string;
+  blurb: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+export interface CharityState {
+  fund: number;
+  donors: number;
+  seed: number;
+  projects: { id: string; name: string; icon: string; tag: string; goal: number; desc: string }[];
+  maxSingleDonation: number;
+  note: string;
+}
+
+export interface PromoInfo {
+  id: number;
+  name: string;
+  blurb: string;
+  closesAt: number;
+  msLeft: number;
+  minInvest: number;
+  maxInvest: number;
+  payoutMult: number;
+  status: string;
+  mine: { invested: number; claimed: boolean };
+}
+
+export interface TicketEvent {
+  id: number;
+  title: string;
+  venue: string;
+  price: number;
+  organizerId: number;
+  capacity: number;
+  sold: number;
+  startsAt: number;
+  hasTicket: boolean;
+  organizerFee: number;
+}
+export interface MyTicket {
+  id: number;
+  eventId: number;
+  pricePaid: number;
+  title: string;
+  venue: string;
+  startsAt: number;
+}
+
+export interface CourseSummary {
+  id: string;
+  name: string;
+  icon: string;
+  fee: number;
+  tagline: string;
+  boostLabel: string;
+  lessonsTotal: number;
+  lessonsDone: number;
+  lessonsToday: number;
+  lessonsTodayLeft: number;
+  quizUnlocked: boolean;
+  quizPassed: boolean;
+  certAwarded: boolean;
+  completedAt: number | null;
+}
+export interface CourseDetail extends CourseSummary {
+  lessons: { n: number; title: string; done: boolean }[];
+  quiz: { q: string; options: string[] }[];
+}
+
+export const worldApi = {
+  /* Ride */
+  rideState: (token: string) => authGet<RideState>("/api/world/ride", token),
+  rideTravel: (token: string, mode: string, destId: string) =>
+    authPost<RideResult>("/api/world/ride/travel", token, { mode, destId }),
+  /* Health */
+  health: (token: string) => authGet<HealthState>("/api/world/health", token),
+  treat: (token: string, provider: string) =>
+    authPost<{ ok: boolean; cured: boolean; cost: number; note: string; balance: number }>(
+      "/api/world/health/treat",
+      token,
+      { provider }
+    ),
+  /* Police + court */
+  police: (token: string) => authGet<PoliceState>("/api/world/police", token),
+  reportCrime: (token: string, against: string, offence: string, description: string) =>
+    authPost<{ ok: boolean; note: string }>("/api/world/police/report", token, {
+      against,
+      offence,
+      description,
+    }),
+  court: (token: string) => authGet<{ cases: CourtCase[]; note: string }>("/api/world/court", token),
+  /* Assurance */
+  assurance: (token: string) => authGet<AssuranceState>("/api/world/assurance", token),
+  assuranceBuy: (token: string) =>
+    authPost<{ ok: boolean; note: string; balance: number }>("/api/world/assurance/buy", token, {}),
+  assuranceFix: (token: string) =>
+    authPost<{ ok: boolean; note: string; balance: number }>("/api/world/assurance/fix", token, {}),
+  assuranceClaim: (token: string, lossId: number) =>
+    authPost<{ ok: boolean; payout: number; deductible: number; note: string; balance: number }>(
+      "/api/world/assurance/claim",
+      token,
+      { lossId }
+    ),
+  /* Bus company */
+  busco: (token: string) => authGet<BuscoState>("/api/world/busco", token),
+  buscoStart: (token: string) =>
+    authPost<{ ok: boolean; buses: number; note: string; balance: number }>(
+      "/api/world/busco/start",
+      token,
+      {}
+    ),
+  /* Ads */
+  ads: (token: string) =>
+    authGet<{
+      mine: WorldAd[];
+      prices: { kind: string; name: string; icon: string; cost: number; note: string }[];
+      durationDays: number;
+    }>("/api/world/ads", token),
+  adsFeed: (token: string) => authGet<{ ads: WorldAd[] }>("/api/world/ads/feed", token),
+  adsBuy: (token: string, kind: string, title: string, blurb: string) =>
+    authPost<{ ok: boolean; note: string; balance: number }>("/api/world/ads/buy", token, {
+      kind,
+      title,
+      blurb,
+    }),
+  /* Charity */
+  charity: (token: string) => authGet<CharityState>("/api/world/charity", token),
+  charityGive: (token: string, amount: number, project: string) =>
+    authPost<{ ok: boolean; note: string; fund: number; donors: number; balance: number }>(
+      "/api/world/charity/give",
+      token,
+      { amount, project }
+    ),
+  /* Promos */
+  promos: (token: string) => authGet<{ promos: PromoInfo[] }>("/api/world/promos", token),
+  promoInvest: (token: string, promoId: number, amount: number) =>
+    authPost<{ ok: boolean; note: string; balance: number }>("/api/world/promos/invest", token, {
+      promoId,
+      amount,
+    }),
+  promoClaim: (token: string, promoId: number) =>
+    authPost<{ ok: boolean; invested: number; payout: number; balance: number; note: string }>(
+      "/api/world/promos/claim",
+      token,
+      { promoId }
+    ),
+  /* Tickets */
+  ticketEvents: (token: string) =>
+    authGet<{ events: TicketEvent[]; feeNote: string }>("/api/world/tickets/events", token),
+  myTickets: (token: string) => authGet<{ tickets: MyTicket[] }>("/api/world/tickets/mine", token),
+  ticketBuy: (token: string, eventId: number) =>
+    authPost<{ ok: boolean; note: string; balance: number }>("/api/world/tickets/buy", token, {
+      eventId,
+    }),
+  ticketCreate: (
+    token: string,
+    e: { title: string; venue: string; price: number; capacity: number; startsAt: number }
+  ) => authPost<{ ok: boolean; id: number; note: string }>("/api/world/tickets/create", token, e),
+  /* Trade school */
+  courses: (token: string) =>
+    authGet<{ courses: CourseSummary[]; lessonsPerDay: number; schoolName: string }>(
+      "/api/world/courses",
+      token
+    ),
+  courseDetail: (token: string, id: string) =>
+    authGet<CourseDetail>(`/api/world/courses/${encodeURIComponent(id)}`, token),
+  courseLesson: (token: string, id: string) =>
+    authPost<{
+      ok: boolean;
+      lesson: { n: number; title: string };
+      lessonsDone: number;
+      lessonsTotal: number;
+      quizUnlocked: boolean;
+      balance: number;
+    }>(`/api/world/courses/${encodeURIComponent(id)}/lesson`, token, {}),
+  courseQuiz: (token: string, id: string, answers: number[]) =>
+    authPost<{
+      ok: boolean;
+      correct: number;
+      total: number;
+      passed: boolean;
+      certAwarded: boolean;
+      cert: { name: string; icon: string; boostLabel: string } | null;
+    }>(`/api/world/courses/${encodeURIComponent(id)}/quiz`, token, { answers }),
+};
+
+/* ------------------------------------------------------------------ */
+/* PORT-P6: games-hustle — begin                                       */
+/* P6 — Table games (parlor lobby, stake escrow, hall of fame) +      */
+/* Hustle (gig board with escrow, find-a-pro). Game coins only.        */
+/* ------------------------------------------------------------------ */
+
+export interface TgGame {
+  key: string;
+  name: string;
+  icon: string;
+  tagline: string;
+  seats: number;
+  variants: string[];
+  rules: string[];
+}
+export interface TgVariant { key: string; name: string; icon: string; blurb: string }
+export interface TgVenue { key: string; name: string; icon: string; blurb: string }
+export interface TgCatalogue {
+  games: TgGame[];
+  stakes: number[];
+  venues: TgVenue[];
+  variants: Record<string, TgVariant>;
+  houseCutPct: number;
+  cpuName: string;
+  myBalance: number;
+  note: string;
+}
+export interface TgTable {
+  id: number;
+  game: { key: string; name: string; icon: string; tagline: string };
+  venue: { key: string; name: string; icon: string };
+  stake: number;
+  variant: TgVariant | null;
+  creatorUsername: string;
+  friendInvite: string | null;
+  seatsTaken: number;
+  seatsTotal: number;
+  seats: string[];
+  winnerTakes: number;
+  createdAt: number;
+  needMore?: number;
+}
+export interface TgMatch {
+  id: number;
+  game: { key: string; name: string; icon: string };
+  gameIcon?: string;
+  stake: number;
+  pot: number;
+  outcome?: "win" | "loss" | "draw";
+  scoreText?: string;
+  log: string[];
+  payout: number;
+  houseKept?: number;
+  winner: string | null;
+}
+export interface TgMatchResult {
+  match: TgMatch;
+  myBalance: number;
+  note?: string;
+}
+export interface TgFameEntry {
+  rank: number;
+  username: string;
+  games: number;
+  winPct: number;
+  bestPot: number;
+  isYou: boolean;
+}
+export interface TgFame {
+  game: { key: string; name: string; icon: string };
+  leaders: TgFameEntry[];
+  me: { games: number; wins: number; winPct: number; bestPot: number } | null;
+  emptyCopy: string;
+}
+
+export const gamesApi = {
+  /** Catalogue: games, stake tiers, venues, variants, house cut. */
+  catalogue: (token: string) => authGet<TgCatalogue>("/api/games", token),
+  /** Open tables, each with seatsTaken/seatsTotal + needMore for the viewer. */
+  tables: (token: string, game?: string) =>
+    authGet<{ tables: TgTable[]; myBalance: number }>(
+      game ? `/api/games/tables?game=${encodeURIComponent(game)}` : "/api/games/tables",
+      token
+    ),
+  /** Create a table: venue, game, stake tier, variant, optional @username invite. */
+  create: (
+    token: string,
+    body: { game: string; venue: string; stake: number; variant?: string | null; friendInvite?: string | null }
+  ) =>
+    authPost<{ table: TgTable; myBalance: number }>("/api/games/tables", token, body),
+  /** Join a seat (stake escrowed). */
+  join: (token: string, id: number) =>
+    authPost<{ table: TgTable; myBalance: number }>(`/api/games/tables/${id}/join`, token, {}),
+  /** Leave a table (stake refunded). */
+  leave: (token: string, id: number) =>
+    authPost<{ ok: boolean; myBalance: number }>(`/api/games/tables/${id}/leave`, token, {}),
+  /** Start my match vs the CPU placeholder (instant resolution). */
+  start: (token: string, id: number) =>
+    authPost<TgMatchResult>(`/api/games/tables/${id}/start`, token, {}),
+  /** Matches on the tables now (replay window). */
+  live: (token: string) => authGet<{ live: TgMatch[] }>("/api/games/live", token),
+  /** Watch a match: scoreboard replay. */
+  watch: (token: string, id: number) => authGet<TgMatch>(`/api/games/live/${id}`, token),
+  /** Hall of fame for one game. */
+  fame: (token: string, game: string) =>
+    authGet<TgFame>(`/api/games/fame/${encodeURIComponent(game)}`, token),
+  /** Report a table or match. */
+  reportTable: (token: string, id: number) =>
+    authPost<{ ok: boolean }>(`/api/games/tables/${id}/report`, token, {}),
+  reportMatch: (token: string, id: number) =>
+    authPost<{ ok: boolean }>(`/api/games/matches/${id}/report`, token, {}),
+};
+
+export interface HustleCategory { key: string; name: string; icon: string; blurb: string }
+export interface HustleStartOption { key: string; name: string; blurb: string }
+export interface HustleGig {
+  id: number;
+  category: { key: string; name: string; icon: string };
+  title: string;
+  details: string;
+  fee: number;
+  materialsBudget: number;
+  startOption: string;
+  startKey: string;
+  status: "open" | "hired" | "done" | "cancelled";
+  escrowed: boolean;
+  clientUsername: string;
+  proUsername: string | null;
+  rating: number | null;
+  createdAt: number;
+  hiredAt: number | null;
+  doneAt: number | null;
+}
+export interface HustlePro {
+  userId: number;
+  username: string;
+  categories: { key: string; name: string; icon: string }[];
+  rateFrom: number;
+  tagline: string;
+  services: string[];
+  stars: number;
+  jobsDone: number;
+  ratingsCount: number;
+}
+export interface HustleMeta {
+  categories: HustleCategory[];
+  startOptions: HustleStartOption[];
+  minFee: number;
+  copy: { escrow: string; noPay: string; safety: string; decorator: string };
+  me: { isPro: boolean; stars: number; jobsDone: number; openGigs: number; workingGigs: number };
+}
+
+export const hustleApi = {
+  /** Meta: categories, start options, escrow/safety copy, my summary. */
+  meta: (token: string) => authGet<HustleMeta>("/api/hustle", token),
+  /** Open gig board, optional category + search. */
+  gigs: (token: string, category?: string, q?: string) => {
+    const p = new URLSearchParams();
+    if (category) p.set("category", category);
+    if (q) p.set("q", q);
+    const qs = p.toString();
+    return authGet<{ gigs: HustleGig[] }>(`/api/hustle/gigs${qs ? `?${qs}` : ""}`, token);
+  },
+  /** Post a job (free — nothing held until someone is hired). */
+  post: (
+    token: string,
+    body: { category: string; title: string; details?: string; fee: number; materialsBudget?: number; startOption?: string }
+  ) => authPost<{ gig: HustleGig; copy: { noPay: string } }>("/api/hustle/gigs", token, body),
+  /** Hire a pro: fee moves into escrow. */
+  hire: (token: string, id: number, proUserId?: number | null) =>
+    authPost<{ gig: HustleGig; copy: { escrow: string } }>(`/api/hustle/gigs/${id}/hire`, token, { proUserId: proUserId ?? null }),
+  /** Mark done: escrow released to the pro, optional 1–5 rating. */
+  done: (token: string, id: number, rating?: number | null) =>
+    authPost<{ gig: HustleGig }>(`/api/hustle/gigs/${id}/done`, token, { rating: rating ?? null }),
+  /** Cancel: free when open, escrow refunded when hired. */
+  cancel: (token: string, id: number) =>
+    authPost<{ ok: boolean }>(`/api/hustle/gigs/${id}/cancel`, token, {}),
+  /** My posted gigs + gigs I'm working. */
+  myjobs: (token: string) =>
+    authGet<{ posted: HustleGig[]; working: HustleGig[] }>("/api/hustle/myjobs", token),
+  /** Find a pro, optional category + search. */
+  pros: (token: string, category?: string, q?: string) => {
+    const p = new URLSearchParams();
+    if (category) p.set("category", category);
+    if (q) p.set("q", q);
+    const qs = p.toString();
+    return authGet<{ pros: HustlePro[] }>(`/api/hustle/pros${qs ? `?${qs}` : ""}`, token);
+  },
+  /** List my services ("hire me"). */
+  listMe: (
+    token: string,
+    body: { categories: string[]; rateFrom: number; tagline: string; services: string[] }
+  ) => authPost<{ pro: HustlePro }>("/api/hustle/pros", token, body),
+  /** Remove my pro listing. */
+  unlist: (token: string) => authDelete<{ ok: boolean }>(`/api/hustle/pros`, token),
+  /** Book a pro directly: hired gig + escrow in one step. */
+  book: (
+    token: string,
+    body: { proUserId: number; category: string; title: string; details?: string; fee: number; startOption?: string }
+  ) => authPost<{ gig: HustleGig; copy: { escrow: string } }>("/api/hustle/gigs/book", token, body),
+  /** Report a gig. */
+  reportGig: (token: string, id: number) =>
+    authPost<{ ok: boolean }>(`/api/hustle/gigs/${id}/report`, token, {}),
+};
+
+/* PORT-P6: games-hustle — end */
