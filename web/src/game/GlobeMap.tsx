@@ -437,6 +437,8 @@ export function GlobeMap({ currentCityId, selectedCityId, onSelectCity, geo }: G
     // ---- playable city markers on the globe ----
     const globeCityTargets: THREE.Object3D[] = [];
     const globeCityFade: THREE.Material[] = [];
+    const globeCityLabelFade: THREE.Material[] = [];
+    const globeCityLabelObjs: THREE.Object3D[] = [];
     for (const [id, [clat, clon]] of Object.entries(CITY_LATLON)) {
       const dot = glowSprite(245, 166, 35, 4.6);
       dot.position.copy(new THREE.Vector3(...latLonToVec3(clat, clon, R * 1.025)));
@@ -455,7 +457,8 @@ export function GlobeMap({ currentCityId, selectedCityId, onSelectCity, geo }: G
       lab.userData.cityId = id;
       spinGroup.add(lab);
       globeCityTargets.push(lab);
-      globeCityFade.push(lab.material as THREE.Material);
+      globeCityLabelFade.push(lab.material as THREE.Material);
+      globeCityLabelObjs.push(lab);
     }
 
     // ---- Nigeria detail, reparented onto the globe surface ----
@@ -658,11 +661,8 @@ export function GlobeMap({ currentCityId, selectedCityId, onSelectCity, geo }: G
     };
 
     cvs.addEventListener("pointerdown", (e) => {
-      try {
-        cvs.setPointerCapture(e.pointerId);
-      } catch {
-        /* noop */
-      }
+      // NOTE: no setPointerCapture — on iOS Safari it fires pointercancel for
+      // the second finger, which kills pinch-zoom entirely.
       markInteract();
       activePtrs.set(e.pointerId, [e.clientX, e.clientY]);
       if (activePtrs.size === 1) {
@@ -691,7 +691,8 @@ export function GlobeMap({ currentCityId, selectedCityId, onSelectCity, geo }: G
       } else if (activePtrs.size === 2) {
         const p = [...activePtrs.values()];
         const d = Math.hypot(p[0][0] - p[1][0], p[0][1] - p[1][1]);
-        if (lastPinch > 0 && d > 0) tT = clamp((tT * lastPinch) / d, 0, 1);
+        // spread (d grows) => zoom in (tT grows); pinch (d shrinks) => zoom out
+        if (lastPinch > 0 && d > 0) tT = clamp((tT * d) / lastPinch, 0, 1);
         lastPinch = d;
       }
     });
@@ -773,6 +774,13 @@ export function GlobeMap({ currentCityId, selectedCityId, onSelectCity, geo }: G
       ringN.scale.set(rs, rs, 1);
       const gk = 1 - smooth(0.3, 0.48, zoomT);
       for (const m of globeCityFade) m.opacity = gk;
+      // city name labels: hidden at space level (they pile up over southern
+      // Nigeria), fade in on the dive, then hand off to the detail patch's
+      // own labels as the deep LOD takes over.
+      const labelK =
+        smooth(0.3, 0.45, zoomT) * (1 - smooth(0.5, 0.62, zoomT));
+      for (const m of globeCityLabelFade) m.opacity = labelK;
+      for (const s of globeCityLabelObjs) s.visible = labelK > 0.01;
       for (const s of lockTargets) {
         (s.material as THREE.SpriteMaterial).opacity = gk;
         s.visible = gk > 0.01;

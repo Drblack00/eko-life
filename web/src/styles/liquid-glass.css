@@ -444,6 +444,53 @@
   font-size: 11px;
   margin-top: 3px;
 }
+/* Discover card with a real banner photo (A1 full-bleed): the photo fills
+ * the card, a dark scrim keeps the white bold name + blurb readable. */
+.discover-card--photo {
+  position: relative;
+  min-height: 188px;
+  display: flex;
+  align-items: flex-end;
+  isolation: isolate;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.discover-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+.discover-card--photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  background: linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.8) 0%,
+    rgba(0, 0, 0, 0.28) 55%,
+    rgba(0, 0, 0, 0.04) 100%
+  );
+}
+.discover-card--photo .discover-copy {
+  position: relative;
+  z-index: 2;
+  padding: 12px;
+}
+.discover-card--photo .discover-copy strong {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.6);
+}
+.discover-card--photo .discover-copy small {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11.5px;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
 .feed-item {
   padding: 14px;
   display: flex;

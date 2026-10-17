@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { GameSocket } from "../../hooks/useGameSocket";
 import type { GameConfig } from "../../lib/api";
 import { asList } from "../../lib/api";
@@ -14,6 +15,15 @@ import "./Dashboard.css";
  * today's goals → community pulse. No invented numbers: every value
  * comes from the `you` snapshot, the game config, or the socket.
  * ------------------------------------------------------------------ */
+
+/* District banner photos — one lazy chunk per city (AI-generated, embedded
+ * as data URLs because binary files can't go through the GitHub file API). */
+const districtPhotoLoaders: Record<string, () => Promise<{ default: Record<string, string> }>> = {
+  lagos: () => import("../../game/districtImages/lagos"),
+  benin: () => import("../../game/districtImages/benin"),
+  ph: () => import("../../game/districtImages/ph"),
+  abuja: () => import("../../game/districtImages/abuja"),
+};
 
 function greetingFor(date: Date): string {
   const h = date.getHours();
@@ -88,7 +98,27 @@ export function Dashboard({
     "Somewhere in Lagos";
   const wallet = you.is_admin ? "∞" : naira(you.money);
   const needs = needsFor(you);
-  const districts = asList(config.locations).slice(0, 4);
+  // Discover shows the player's CURRENT city's districts (not just Lagos).
+  const cityId = you.currentCity ?? "lagos";
+  const allDistricts = asList(config.locations);
+  const cityDistricts = allDistricts.filter((l) => l.cities?.includes(cityId));
+  const districts = (cityDistricts.length > 0 ? cityDistricts : allDistricts).slice(0, 4);
+  // Banner photos for this city's districts (lazy chunk, missing => gradient).
+  const [districtPhotos, setDistrictPhotos] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let live = true;
+    const load = districtPhotoLoaders[cityId] ?? districtPhotoLoaders.lagos;
+    load()
+      .then((m) => {
+        if (live) setDistrictPhotos(m.default);
+      })
+      .catch(() => {
+        if (live) setDistrictPhotos({});
+      });
+    return () => {
+      live = false;
+    };
+  }, [cityId]);
   const goCity = () => onTab?.("map");
 
   const quick: Array<{
@@ -229,17 +259,35 @@ export function Dashboard({
                 </button>
               </div>
               <div className="cards">
-                {districts.map((d) => (
-                  <button key={d.id} type="button" className="discover-card" onClick={goCity}>
-                    <div className="discover-art" aria-hidden="true">
-                      <Icon name="map-pin" />
-                    </div>
-                    <div className="discover-copy">
-                      <strong>{d.name}</strong>
-                      <small>{d.blurb ?? d.zone ?? d.region ?? "Lagos"}</small>
-                    </div>
-                  </button>
-                ))}
+                {districts.map((d) => {
+                  const photo = districtPhotos[d.id];
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      className={`discover-card${photo ? " discover-card--photo" : ""}`}
+                      onClick={goCity}
+                    >
+                      {photo ? (
+                        <img
+                          className="discover-photo"
+                          src={photo}
+                          alt=""
+                          aria-hidden="true"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="discover-art" aria-hidden="true">
+                          <Icon name="map-pin" />
+                        </div>
+                      )}
+                      <div className="discover-copy">
+                        <strong>{d.name}</strong>
+                        <small>{d.blurb ?? d.zone ?? d.region ?? "Lagos"}</small>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
