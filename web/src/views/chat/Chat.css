@@ -152,7 +152,7 @@
 .eko-profile__avatar {
   width: 52px;
   height: 52px;
-  flex: none; /* anti-oval: never let iOS Safari squeeze this circle */
+  flex: none; /* never let iOS Safari squeeze this circle */
   border-radius: 50%;
   background: var(--lagoon-100);
   color: var(--lagoon-700);
@@ -636,42 +636,9 @@
   height: 8px;
 }
 
-/* PORT-P4: social — group create + message requests (existing tokens only) */
-.eko-createroom__memberadd {
-  display: flex;
-  gap: var(--space-2);
-}
+/* ---- Port-added features (same tokens/classes as the rest of the sheet) ---- */
 
-.eko-createroom__memberadd input {
-  flex: 1;
-}
-
-.eko-createroom__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.eko-createroom__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  background: var(--surface-2);
-  border-radius: var(--radius-full);
-  padding: var(--space-1) var(--space-2);
-  font-size: 0.875rem;
-}
-
-.eko-createroom__chip button {
-  border: none;
-  background: none;
-  color: var(--text);
-  cursor: pointer;
-  font-size: 1rem;
-  line-height: 1;
-  padding: 0 var(--space-1);
-}
-
+/* Message requests inbox (DMs): pending first messages from strangers. */
 .eko-dms__requests {
   display: flex;
   flex-direction: column;
@@ -694,4 +661,40 @@
   display: flex;
   gap: var(--space-2);
   margin-top: var(--space-2);
+}
+
+/* Group creation (Rooms): add members by username before creating. */
+.eko-createroom__memberadd {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.eko-createroom__memberadd input {
+  flex: 1;
+}
+
+.eko-createroom__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.eko-createroom__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--surface-2);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.85rem;
+}
+
+.eko-createroom__chip button {
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 var(--space-1);
 }

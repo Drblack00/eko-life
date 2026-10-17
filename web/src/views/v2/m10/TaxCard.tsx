@@ -10,7 +10,7 @@ interface Props {
 
 /**
  * Tax card — this week's earnings from the ledger, the projected bill
- * under the progressive brackets, and any governor tax holiday.
+ * under the flat rate, and any governor tax holiday.
  */
 export function TaxCard({ token, refreshKey }: Props) {
   const [tax, setTax] = useState<TaxInfo | null>(null);

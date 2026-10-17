@@ -1661,9 +1661,6 @@ export function Game({
           notifPrefs={sock.notifPrefs}
           onNotifPrefs={sock.updateNotifPrefs}
           onProfileChanged={(patch) => sock.patchYou(patch)}
-          // PORT-P1: core loop — begin
-          send={(a, params) => sock.sendAct(a as ActName, params)}
-          // PORT-P1: core loop — end
         />
       )}
 

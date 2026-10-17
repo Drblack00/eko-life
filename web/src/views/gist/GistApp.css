@@ -417,6 +417,3 @@
 .eko-gist__tabs .eko-gist__tab-icon {
   display: none;
 }
-
-/* PORT-P4: social — author's own post, auto-hidden pending review */
-.eko-gist__badge--review { background: #3b3b4f; color: #c7c9e0; }

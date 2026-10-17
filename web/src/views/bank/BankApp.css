@@ -213,22 +213,23 @@
   font-size: 0.88rem;
 }
 
-/* PORT-P2: "Best value" marker on the top-up pack list. */
-.eko-bank__pill {
-  display: inline-block;
-  margin-left: 0.5rem;
-  padding: 0.1rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  background: var(--accent, #22d3ee);
-  color: #062025;
-  vertical-align: middle;
-}
-
 /* Narrow phones: stack the stat cards. */
 @media (max-width: 420px) {
   .eko-bank__cards {
     grid-template-columns: 1fr;
   }
+}
+
+/* Port-added marker: "Best value" on top-up packs, "Home"/"Owned" on the
+   housing ladder. */
+.eko-bank__pill {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--accent);
+  color: #062025;
+  vertical-align: middle;
 }
