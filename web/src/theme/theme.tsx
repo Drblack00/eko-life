@@ -1,19 +1,31 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Èkó Life theme system — 5 switchable themes for the liquid-glass
- * redesign (2026-10-13).
+ * Èkó Life theme system — 6 switchable chrome themes ("Èkó Way" hub +
+ * dock release, 2026-10-27, replacing the 2026-10-13 liquid-glass set).
+ * The palettes are the approved hub/dock samples blended with Èkó Life's
+ * own design: A Green Glass · B Night Market · C Danfo Pop ·
+ * D Owambe Gold · E Adire Indigo (default) · F Clean Day.
  *
  * The active theme id is persisted in localStorage under THEME_STORAGE_KEY
  * and applied as `data-theme` on <html>, which styles/themes.css keys off.
  * Every theme defines the same CSS variable names with different values,
- * so switching is a single attribute change.
+ * so switching is a single attribute change. The themes govern the
+ * chrome (hub, dock, panels, settings); the in-world day/night paint is
+ * a separate in-game clock system and is untouched.
  *
- * Precedence: explicit user choice only (default "liquid-dark"). The old
- * light/dark/automatic clock system was retired with the redesign.
+ * Precedence: explicit user choice only (default "adire-indigo"). A
+ * stored id from the retired 5-theme set is not a valid ThemeId, so
+ * getTheme() falls back to the new default for those players.
  */
 
-export type ThemeId = "liquid-dark" | "warm-light" | "midnight-amber" | "sage-calm" | "ocean-glass";
+export type ThemeId =
+  | "green-glass"
+  | "night-market"
+  | "danfo-pop"
+  | "owambe-gold"
+  | "adire-indigo"
+  | "clean-day";
 
 export interface ThemeMeta {
   id: ThemeId;
@@ -25,34 +37,46 @@ export interface ThemeMeta {
 
 export const THEMES: ThemeMeta[] = [
   {
-    id: "liquid-dark",
-    name: "Liquid Dark",
-    blurb: "Midnight navy glass with electric blue light.",
-    swatches: ["#06101c", "#0d2033", "#168bff"],
+    id: "adire-indigo",
+    name: "Adire Indigo",
+    blurb: "Deep indigo night, Èkó cyan, a faint adire dot weave.",
+    swatches: ["#05090f", "#0a1622", "#22d3ee"],
   },
   {
-    id: "warm-light",
-    name: "Warm Light",
-    blurb: "Cream mornings, white cards, deep green calm.",
-    swatches: ["#faf7f2", "#ffffff", "#1b7a4d"],
+    id: "green-glass",
+    name: "Green Glass",
+    blurb: "Èkó's own green in liquid glass; gold only for coins.",
+    swatches: ["#060806", "#0d1510", "#4ade80"],
   },
   {
-    id: "midnight-amber",
-    name: "Midnight Amber",
-    blurb: "Lagos at night — charcoal and warm amber glow.",
-    swatches: ["#0c0a08", "#1a1512", "#f5a623"],
+    id: "night-market",
+    name: "Night Market",
+    blurb: "Lagos-night blue and warm amber, ankara dock strip.",
+    swatches: ["#0a0f1a", "#141c2e", "#f5a623"],
   },
   {
-    id: "sage-calm",
-    name: "Sage Calm",
-    blurb: "Soft sage quiet with a muted green accent.",
-    swatches: ["#eef2ec", "#ffffff", "#5a7d5a"],
+    id: "danfo-pop",
+    name: "Danfo Pop",
+    blurb: "Floating pill dock, danfo-yellow centre cab.",
+    swatches: ["#080806", "#14140f", "#ffd21f"],
   },
-{ id: "ocean-glass", name: "Ocean Glass", blurb: "Deep ocean gradient with frosted teal glass.", swatches: ["#0d2242", "#0e3a5c", "#2dd4bf"] }, ];
+  {
+    id: "owambe-gold",
+    name: "Owambe Gold",
+    blurb: "Champagne gold celebration, gold-glass dock bubble.",
+    swatches: ["#080604", "#171106", "#fbbf24"],
+  },
+  {
+    id: "clean-day",
+    name: "Clean Day",
+    blurb: "The light one — off-white glass, soft shadows, green lead.",
+    swatches: ["#e9eee1", "#ffffff", "#16a34a"],
+  },
+];
 
 export const THEME_STORAGE_KEY = "eko-theme";
 export const THEME_ATTRIBUTE = "data-theme";
-export const DEFAULT_THEME: ThemeId = "liquid-dark";
+export const DEFAULT_THEME: ThemeId = "adire-indigo";
 
 function isThemeId(v: unknown): v is ThemeId {
   return THEMES.some((t) => t.id === v);
@@ -188,7 +212,7 @@ export function setThemePreference(_next: ThemePreference): void {
 }
 
 /* ------------------------------------------------------------------ */
-/* ThemePicker — 5-theme swatch picker (Me → Settings, CharacterPanel). */
+/* ThemePicker — 6-theme swatch picker (Me → Settings, CharacterPanel). */
 /* ------------------------------------------------------------------ */
 
 /**
