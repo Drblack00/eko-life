@@ -37,11 +37,17 @@
 }
 /* color-scheme follows the resolved theme (form controls, scrollbars). */
 [data-theme="warm-light"] .eko-phone__panel,
-[data-theme="sage-calm"] .eko-phone__panel {
+[data-theme="sage-calm"] .eko-phone__panel,
+[data-theme="clean-day"] .eko-phone__panel {
   color-scheme: light;
 }
 [data-theme="liquid-dark"] .eko-phone__panel,
-[data-theme="midnight-amber"] .eko-phone__panel {
+[data-theme="midnight-amber"] .eko-phone__panel,
+[data-theme="green-glass"] .eko-phone__panel,
+[data-theme="night-market"] .eko-phone__panel,
+[data-theme="danfo-pop"] .eko-phone__panel,
+[data-theme="owambe-gold"] .eko-phone__panel,
+[data-theme="adire-indigo"] .eko-phone__panel {
   color-scheme: dark;
 }
 
@@ -319,7 +325,12 @@
 
 /* Dark themes: night wallpaper + light text. */
 [data-theme="liquid-dark"] .eko-phone__panel--iphone,
-[data-theme="midnight-amber"] .eko-phone__panel--iphone {
+[data-theme="midnight-amber"] .eko-phone__panel--iphone,
+[data-theme="green-glass"] .eko-phone__panel--iphone,
+[data-theme="night-market"] .eko-phone__panel--iphone,
+[data-theme="danfo-pop"] .eko-phone__panel--iphone,
+[data-theme="owambe-gold"] .eko-phone__panel--iphone,
+[data-theme="adire-indigo"] .eko-phone__panel--iphone {
   --iphone-text: #f1f5f9;
   --iphone-muted: rgba(241, 245, 249, 0.62);
   --iphone-card: rgba(255, 255, 255, 0.13);
@@ -844,6 +855,11 @@
   backdrop-filter: none !important;
 }
 [data-theme="liquid-dark"] .eko-phone__panel--iphone,
-[data-theme="midnight-amber"] .eko-phone__panel--iphone {
+[data-theme="midnight-amber"] .eko-phone__panel--iphone,
+[data-theme="green-glass"] .eko-phone__panel--iphone,
+[data-theme="night-market"] .eko-phone__panel--iphone,
+[data-theme="danfo-pop"] .eko-phone__panel--iphone,
+[data-theme="owambe-gold"] .eko-phone__panel--iphone,
+[data-theme="adire-indigo"] .eko-phone__panel--iphone {
   background-color: #0d1526 !important;
 }
