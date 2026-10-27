@@ -9,12 +9,15 @@ import { describe, expect, it } from "vitest";
  * level: the TABS structure in TabBar.tsx and the .mobile-nav rules in
  * styles/liquid-glass.css. Real-browser screenshots are the visual proof.
  *
- * Contract (prototype mobile-nav):
+ * Contract (prototype mobile-nav + "Èkó Way" dock, 2026-10-27):
  * - exactly 4 tabs: Home, Buy, Map, Phone — tab ids and routing unchanged;
  * - shared Icon component (stroke SVG, no emoji), icon + visible label;
  * - active tab marked aria-current="page";
  * - red notification dot on the Phone tab when hasUnread is set;
- * - fixed bottom glass bar with safe-area padding.
+ * - fixed bottom glass bar with safe-area padding;
+ * - a glider bubble slides under the active tab (measured in TabBar.tsx,
+ *   spring transition in HubDock.css) and a raised centre Èkó button
+ *   (real player avatar) opens the character panel.
  *
  * Deviation from the original file (design revert, 2026-10-17): the shared
  * components/Icon was removed from the tree, so TabBar.tsx defines its own
@@ -25,6 +28,7 @@ import { describe, expect, it } from "vitest";
 const here = dirname(fileURLToPath(import.meta.url));
 const tabTsx = readFileSync(join(here, "TabBar.tsx"), "utf8");
 const lgCss = readFileSync(join(here, "..", "styles", "liquid-glass.css"), "utf8");
+const hubCss = readFileSync(join(here, "HubDock.css"), "utf8");
 
 const EXPECTED_TABS = [
   { id: "home", label: "Home" },
@@ -88,6 +92,20 @@ describe("tab bar structure (TabBar.tsx)", () => {
     expect(navMarkup()).toMatch(/aria-current=\{active \? "page" : undefined\}/);
   });
 
+  it("renders the glider bubble and the raised centre Èkó button", () => {
+    const nav = navMarkup();
+    expect(nav).toMatch(/mobile-nav__glider/);
+    expect(nav).toMatch(/nav-centre/);
+    expect(nav).toMatch(/nav-centre__face/);
+    // The centre face is the player's real avatar on their colour, and
+    // the button is wired to a real destination (character panel).
+    expect(tabTsx).toMatch(/centreAvatar\?: string/);
+    expect(tabTsx).toMatch(/centreColor\?: string/);
+    expect(tabTsx).toMatch(/onCentre\?: \(\) => void/);
+    expect(nav).toMatch(/onClick=\{onCentre\}/);
+    expect(nav).toMatch(/aria-label="My character — Èkó home"/);
+  });
+
   it("accepts a hasUnread prop and shows the dot on the Phone tab", () => {
     expect(tabTsx).toMatch(/hasUnread\?: boolean/);
     expect(tabTsx).toMatch(/hasUnread = false/);
@@ -126,5 +144,21 @@ describe("tab bar styling (liquid-glass.css)", () => {
     const m = block.match(/min-height:\s*(\d+)px/);
     expect(m).not.toBeNull();
     expect(Number(m![1])).toBeGreaterThanOrEqual(44);
+  });
+
+  it("gives the dock 5 slots — Home · Buy · centre · Map · Phone", () => {
+    const block = ruleBlock(hubCss, ".mobile-nav");
+    expect(block).toMatch(/grid-template-columns:\s*1fr 1fr 1\.18fr 1fr 1fr/);
+  });
+
+  it("slides the glider with a spring and bobs the centre face", () => {
+    const glider = ruleBlock(hubCss, ".mobile-nav__glider");
+    expect(glider).toMatch(/position:\s*absolute/);
+    expect(glider).toMatch(/border-radius:\s*999px/);
+    expect(glider).toMatch(/var\(--spring\)/);
+    const face = ruleBlock(hubCss, ".nav-centre__face");
+    expect(face).toMatch(/border-radius:\s*50%/);
+    expect(face).toMatch(/border:\s*2px solid var\(--accent\)/);
+    expect(face).toMatch(/animation:\s*eko-centre-bob/);
   });
 });

@@ -104,8 +104,9 @@ import {
   TopUpDialog,
 } from "./home/HomeChrome";
 import "./home/HomeChrome.css";
+import "./HubDock.css";
 import { moodFor } from "./home/homeChrome";
-import { blip, isSoundEnabled, setSoundEnabled } from "../lib/sound";
+import { blip, isSoundEnabled, setSoundEnabled, SOUND_EVENT } from "../lib/sound";
 // Phase 5: venue dialogs with activities ("things to do").
 import { ThingsToDoDialog, VenueExtras } from "./VenuePanel";
 import "./VenuePanel.css";
@@ -166,6 +167,21 @@ function Hud({
 }) {
   const mood = moodFor(you.happiness);
   const balance = you.is_admin ? "∞" : naira(you.money);
+  // Hub sound toggle: lib/sound is the source of truth (localStorage +
+  // SOUND_EVENT broadcast), so this stays in sync with the Settings /
+  // CharacterPanel toggles that flip the same switch.
+  const [soundOn, setSoundOnState] = useState(isSoundEnabled());
+  useEffect(() => {
+    const onSoundEvent = (e: Event) =>
+      setSoundOnState((e as CustomEvent<boolean>).detail);
+    window.addEventListener(SOUND_EVENT, onSoundEvent);
+    return () => window.removeEventListener(SOUND_EVENT, onSoundEvent);
+  }, []);
+  const toggleSound = () => {
+    const next = !soundOn;
+    setSoundEnabled(next);
+    if (next) blip("tap");
+  };
   return (
     <header className="eko-hud">
       <div className="eko-hud__pills">
@@ -201,12 +217,47 @@ function Hud({
         </span>
       </div>
       <div className="eko-hud__orbs" aria-label="Quick actions">
+        <span className="eko-hub__iconpill glass">
+          <NotificationBell unread={unreadNotifications} onOpen={onOpenNotifications} />
+          <button
+            type="button"
+            className="eko-hub__sound"
+            aria-pressed={soundOn}
+            aria-label={soundOn ? "Mute sound effects" : "Unmute sound effects"}
+            title="Sound effects"
+            onClick={toggleSound}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M11 5 5 9H2v6h3l6 4z" />
+              {soundOn ? (
+                <>
+                  <path d="M15.5 9.5a4 4 0 0 1 0 5" />
+                  <path d="M18.2 7a8 8 0 0 1 0 10" />
+                </>
+              ) : (
+                <path d="m16 9 6 6M22 9l-6 6" />
+              )}
+            </svg>
+          </button>
+        </span>
         <span
-          className="eko-orb eko-orb--wallet glass"
+          className="eko-orb eko-orb--wallet eko-hub__coinpill glass"
           aria-label={
             you.is_admin ? "Unlimited admin balance" : `Balance ${naira(you.money)}`
           }
         >
+          <span className="eko-hub__coin" aria-hidden="true" />
           <span className="eko-orb__wallet-text">{balance}</span>
           <button
             type="button"
@@ -220,9 +271,6 @@ function Hud({
           >
             +
           </button>
-        </span>
-        <span className="eko-orb glass">
-          <NotificationBell unread={unreadNotifications} onOpen={onOpenNotifications} />
         </span>
         <button
           type="button"
@@ -1682,6 +1730,9 @@ export function Game({
         tab={tab}
         onTab={(t) => { if (t === "phone") setPhoneOpen(true); else { setPhoneOpen(false); setTab(t); } }}
         hasUnread={sock.unreadNotifications > 0}
+        centreAvatar={you.avatar}
+        centreColor={you.color}
+        onCentre={() => openCharacterPanel("profile")}
       />
         </>
       )}

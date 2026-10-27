@@ -50,7 +50,7 @@ function Toggle({
   );
 }
 
-/** Appearance — 4 theme cards with swatch dots. Persisted via localStorage. */
+/** Appearance — 6 theme cards with swatch dots. Persisted via localStorage. */
 function AppearanceSection() {
   const [theme, setTheme] = useTheme();
   const select = (id: ThemeId) => setTheme(id);

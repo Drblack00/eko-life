@@ -165,7 +165,7 @@
   /* --danger fails on dark surfaces — theme the flag ink. */
   color: #b91c1c;
 }
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-admin__flag--banned {
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) .eko-admin__flag--banned {
   color: #f87171;
 }
 
@@ -173,7 +173,7 @@
   background: color-mix(in srgb, var(--accent, #7c3aed) 14%, transparent);
   color: #92400e;
 }
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-admin__flag--admin {
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) .eko-admin__flag--admin {
   color: var(--danfo-400);
 }
 

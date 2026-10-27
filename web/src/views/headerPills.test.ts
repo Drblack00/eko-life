@@ -4,12 +4,13 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /**
- * Header contract — "Pill + floating orbs" (user-picked 2026-10-12).
+ * Header contract — the "Èkó Way" top hub (user-picked 2026-10-27,
+ * superseding the 2026-10-12 "Pill + floating orbs" pick).
  * The status pill holds the avatar + two stacked text lines (name /
- * mood · online); every action floats as its own glass circle — wallet
- * pill, bell orb, governor orb. The sound toggle lives in Settings
- * (CharacterPanel), not in the header. No horizontal scrolling anywhere;
- * nothing may clip at 390px.
+ * mood · online); then an icon pill (bell + sound toggle — the sound
+ * toggle returned to the header with this pick, wired to lib/sound),
+ * the gold coin pill (real balance + top-up) and the governor orb.
+ * No horizontal scrolling anywhere; nothing may clip at 390px.
  * Source-level (node-only vitest); real-browser screenshots are the visual
  * proof.
  */
@@ -66,22 +67,34 @@ describe("orbs header structure (Game.tsx)", () => {
     expect(status).not.toContain("eko-orb--wallet");
   });
 
-  it("orbs row holds wallet pill, bell orb, governor orb", () => {
+  it("orbs row holds icon pill, gold coin pill, governor orb", () => {
     const pills = pillsBlock();
     const orbsStart = pills.indexOf("eko-hud__orbs");
     const orbs = pills.slice(orbsStart);
+    expect(orbs).toContain("eko-hub__iconpill");
     expect(orbs).toContain("eko-orb--wallet");
+    expect(orbs).toContain("eko-hub__coinpill");
+    expect(orbs).toContain("eko-hub__coin");
     expect(orbs).toContain("eko-orb__wallet-text");
     expect(orbs).toContain("eko-top-pill__topup");
     expect(orbs).toContain("NotificationBell");
     expect(orbs).toContain("eko-orb--gov");
   });
 
-  it("the sound toggle is gone from the header (it lives in Settings)", () => {
+  it("the hub icon pill holds the sound toggle, wired to lib/sound state", () => {
     const pills = pillsBlock();
-    expect(pills).not.toMatch(/toggleSound/);
-    expect(pills).not.toMatch(/aria-pressed=\{soundOn\}/);
-    expect(pills).not.toContain("Mute sounds");
+    const orbsStart = pills.indexOf("eko-hud__orbs");
+    const orbs = pills.slice(orbsStart);
+    expect(orbs).toContain("eko-hub__sound");
+    expect(orbs).toMatch(/onClick=\{toggleSound\}/);
+    expect(orbs).toMatch(/aria-pressed=\{soundOn\}/);
+    expect(orbs).toContain("Mute sound effects");
+    // The toggle flips the shared lib/sound switch (Settings stays in sync).
+    expect(gameTsx).toMatch(/setSoundEnabled\(next\)/);
+    expect(gameTsx).toMatch(/SOUND_EVENT/);
+    // …and it never leaks into the display-only status pill.
+    const status = pills.slice(pills.indexOf("eko-top-pill--status"), orbsStart);
+    expect(status).not.toContain("eko-hub__sound");
   });
 
   it("governor orb is icon-only; full text stays in title/aria-label", () => {

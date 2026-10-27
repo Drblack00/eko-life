@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef, useState } from "react";
+
 /**
  * Stroke-SVG tab icons (original artwork, 24x24 grid) — the four icons the
  * old tab bar used from the shared components/Icon set. The shared Icon
@@ -49,11 +51,15 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
 }
 
 /**
- * Bottom tab bar — liquid-glass redesign (2026-10-13).
+ * Bottom dock — "Èkó Way" redesign (2026-10-27, from the approved
+ * hub + dock samples).
  *
- * Fixed bottom glass bar in the prototype's mobile-nav language: 5-slot
- * grid, SVG icons + visible labels, active tab gets the accent pill.
- * Tab ids and routing are unchanged — only the visuals moved.
+ * Fixed bottom glass dock: 5 slots — Home · Buy · raised centre Èkó
+ * character · Map · Phone. Tab ids and routing are unchanged (the centre
+ * button opens the character panel, the same destination as the hub
+ * avatar). A glider bubble slides under the active tab with spring
+ * easing; the centre face is the player's real avatar on their colour.
+ * Styling lives in HubDock.css + styles/themes.css.
  */
 export type Tab = "home" | "buy" | "map" | "phone";
 
@@ -71,23 +77,77 @@ const TAB_ICONS: Record<Tab, IconName> = {
   phone: "smartphone",
 };
 
+interface GliderBox {
+  left: number;
+  width: number;
+  show: boolean;
+}
+
 export function TabBar({
   tab,
   onTab,
   hasUnread = false,
+  centreAvatar,
+  centreColor,
+  onCentre,
 }: {
   tab: Tab;
   onTab: (t: Tab) => void;
   /** Shows the red notification dot on the Phone tab. */
   hasUnread?: boolean;
+  /** The player's real avatar glyph + colour for the raised centre face. */
+  centreAvatar?: string;
+  centreColor?: string;
+  /** Opens the character panel (Èkó home). Centre button hides without it. */
+  onCentre?: () => void;
 }) {
+  const navRef = useRef<HTMLElement | null>(null);
+  const itemRefs = useRef(new Map<Tab, HTMLButtonElement>());
+  const [glider, setGlider] = useState<GliderBox>({ left: 0, width: 0, show: false });
+
+  // Measure the active tab and slide the glider bubble under it. Runs on
+  // tab change, mount and resize; the CSS transition supplies the spring.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const nav = navRef.current;
+      const btn = itemRefs.current.get(tab);
+      if (!nav || !btn) {
+        setGlider((g) => ({ ...g, show: false }));
+        return;
+      }
+      const navBox = nav.getBoundingClientRect();
+      const box = btn.getBoundingClientRect();
+      setGlider({
+        left: box.left - navBox.left + 4,
+        width: Math.max(box.width - 8, 0),
+        show: box.width > 0,
+      });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [tab, onCentre]);
+
   return (
-    <nav className="mobile-nav" aria-label="Game sections">
-      {TABS.map((t) => {
+    <nav className="mobile-nav" aria-label="Game sections" ref={navRef}>
+      <span
+        className="mobile-nav__glider"
+        aria-hidden="true"
+        style={{
+          transform: `translateX(${glider.left}px)`,
+          width: glider.width,
+          opacity: glider.show ? 1 : 0,
+        }}
+      />
+      {TABS.flatMap((t) => {
         const active = tab === t.id;
-        return (
+        const btn = (
           <button
             key={t.id}
+            ref={(el) => {
+              if (el) itemRefs.current.set(t.id, el);
+              else itemRefs.current.delete(t.id);
+            }}
             type="button"
             className="nav-item"
             aria-current={active ? "page" : undefined}
@@ -101,6 +161,30 @@ export function TabBar({
             )}
           </button>
         );
+        // The raised centre Èkó button rides between Buy and Map.
+        if (t.id === "map" && onCentre) {
+          return [
+            <button
+              key="centre"
+              type="button"
+              className="nav-centre"
+              aria-label="My character — Èkó home"
+              title="My character"
+              onClick={onCentre}
+            >
+              <span
+                className="nav-centre__face"
+                style={centreColor ? { backgroundColor: centreColor } : undefined}
+                aria-hidden="true"
+              >
+                {centreAvatar ?? "🙂"}
+              </span>
+              <span>Èkó</span>
+            </button>,
+            btn,
+          ];
+        }
+        return [btn];
       })}
     </nav>
   );

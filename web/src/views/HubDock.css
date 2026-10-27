@@ -1,0 +1,307 @@
+/* Hub + dock — "Èkó Way" production chrome (2026-10-27).
+ *
+ * The approved samples (hub-dock-eko.html) rebuilt on the game's real
+ * markup: the HUD status pill + orbs row in Game.tsx, and TabBar's
+ * .mobile-nav. All colours come from the 6 chrome themes in
+ * styles/themes.css (--glass-bg, --nav-bg, --accent, --gold, --online),
+ * so hub, dock, panels and settings restyle together on one attribute.
+ *
+ * Motion: spring easing everywhere (glider slide, entrance, presses);
+ * tokens.css already kills decorative animation for reduced-motion.
+ */
+
+:root {
+  --spring: cubic-bezier(0.22, 1.4, 0.36, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Theme switching crossfades the chrome instead of snapping. */
+.eko-game,
+.eko-hud,
+.mobile-nav,
+.glass {
+  transition:
+    background-color 0.5s var(--ease-out),
+    border-color 0.5s var(--ease-out),
+    color 0.5s var(--ease-out);
+}
+
+/* ================= Top hub ================= */
+
+@keyframes eko-hub-drop {
+  from {
+    transform: translateY(-14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.eko-hud {
+  animation: eko-hub-drop 0.7s var(--spring) both;
+  background: var(--glass-bg);
+  border-bottom: 1px solid var(--glass-border);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+/* Status pill: real avatar + name + clock · mood · online (Game.tsx). */
+.eko-top-pill--status {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--card-shadow);
+}
+.eko-top-pill__avatar {
+  position: relative;
+  border-color: var(--accent);
+  transition: transform 0.35s var(--spring);
+}
+.eko-top-pill__avatar:active {
+  transform: scale(0.9);
+}
+/* Online light on the avatar (green in every theme except Clean Day's
+ * deeper green — both arrive via --online). */
+.eko-top-pill__avatar::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--online);
+  border: 2px solid var(--panel);
+  animation: eko-online-pulse 2.2s ease-in-out infinite;
+}
+@keyframes eko-online-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.22);
+  }
+}
+.eko-top-pill__online {
+  color: var(--online);
+  font-weight: 700;
+}
+
+/* Icon pill: bell + sound grouped in one glass capsule (sample hub).
+ * The bell keeps its own component + badge; inside the pill it sits
+ * flat — the capsule provides the glass. */
+.eko-hub__iconpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 2.65rem;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--card-shadow);
+  flex: none;
+}
+.eko-hub__iconpill .eko-notifbell {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-radius: 50%;
+  transition: transform 0.35s var(--spring);
+}
+.eko-hub__iconpill .eko-notifbell:active {
+  transform: scale(0.82);
+}
+.eko-hub__sound {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex: none;
+  transition:
+    transform 0.35s var(--spring),
+    color 0.3s;
+}
+.eko-hub__sound:active {
+  transform: scale(0.82);
+}
+.eko-hub__sound[aria-pressed="false"] {
+  color: var(--muted);
+}
+
+/* Coin pill: the wallet orb in gold — real balance, "+" opens the real
+ * top-up dialog (Game.tsx TopUpDialog). */
+.eko-hub__coinpill {
+  background: linear-gradient(180deg, var(--gold-soft), transparent), var(--glass-bg);
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  box-shadow: var(--card-shadow);
+}
+.eko-hub__coin {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff3c4, var(--gold) 55%, var(--gold-deep));
+  box-shadow: 0 0 11px var(--gold-soft);
+  animation: eko-online-pulse 2.6s ease-in-out infinite;
+}
+.eko-hub__coinpill .eko-top-pill__topup {
+  background: var(--gold);
+  color: var(--on-gold);
+  border: 0;
+}
+
+/* Governor orb joins the hub as its own glass circle (unchanged job). */
+.eko-hud .eko-orb--gov {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--card-shadow);
+}
+
+/* ================= Bottom dock ================= */
+
+@keyframes eko-dock-rise {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 5 slots: Home · Buy · centre · Map · Phone (was 4 columns). */
+.mobile-nav {
+  grid-template-columns: 1fr 1fr 1.18fr 1fr 1fr;
+  animation: eko-dock-rise 0.7s var(--spring) both;
+}
+
+/* Glider bubble: slides under the active tab (measured in TabBar.tsx).
+ * Default glass uses the theme accent; Green Glass gets the liquid
+ * highlight, Owambe Gold a gold-glass tint. */
+.mobile-nav__glider {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  height: calc(100% - 16px - env(safe-area-inset-bottom, 0px));
+  min-height: 52px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--glass-border);
+  pointer-events: none;
+  transition:
+    transform 0.55s var(--spring),
+    width 0.55s var(--spring),
+    opacity 0.3s;
+}
+[data-theme="green-glass"] .mobile-nav__glider {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05) 55%);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -8px 14px rgba(74, 222, 128, 0.18),
+    0 8px 20px rgba(0, 0, 0, 0.35);
+}
+[data-theme="owambe-gold"] .mobile-nav__glider {
+  background: linear-gradient(160deg, rgba(255, 225, 150, 0.28), rgba(251, 191, 36, 0.07) 55%);
+  border-color: rgba(251, 191, 36, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 200, 0.6),
+    0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+/* The active tab's own pill (liquid-glass.css) is replaced by the glider
+ * where it can measure; keep the colour cue on the tab itself. */
+.nav-item {
+  transition:
+    color 0.3s,
+    transform 0.35s var(--spring);
+}
+.nav-item:active {
+  transform: scale(0.92);
+}
+.nav-item[aria-current="page"] {
+  background: transparent;
+  border-color: transparent;
+}
+
+/* Raised centre Èkó character. */
+.nav-centre {
+  position: relative;
+  z-index: 1;
+  margin-top: -30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 0 0 3px;
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.35s var(--spring);
+}
+.nav-centre:active {
+  transform: scale(0.92);
+}
+.nav-centre__face {
+  width: 60px;
+  height: 60px;
+  min-width: 60px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  line-height: 1;
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.45),
+    0 0 22px var(--accent-soft);
+  animation: eko-centre-bob 3.6s ease-in-out infinite;
+}
+@keyframes eko-centre-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.4deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(1.4deg);
+  }
+}
+
+/* Narrow phones (360–390px): tighten the hub so nothing clips. */
+@media (max-width: 390px) {
+  .eko-hud__pills {
+    gap: 0.4rem;
+  }
+  .eko-hud__orbs {
+    gap: 0.35rem;
+  }
+  .eko-orb__wallet-text {
+    max-width: 4.2rem;
+  }
+  .nav-centre__face {
+    width: 54px;
+    height: 54px;
+    min-width: 54px;
+    font-size: 26px;
+  }
+  .nav-centre {
+    margin-top: -26px;
+  }
+}
