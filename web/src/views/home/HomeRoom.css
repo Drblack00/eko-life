@@ -419,7 +419,7 @@
   color: var(--palm-700);
   white-space: nowrap;
 }
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-room__sheet-balance {
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) .eko-room__sheet-balance {
   color: var(--palm-400);
 }
 
@@ -566,7 +566,7 @@
   padding: 4px 12px;
   white-space: nowrap;
 }
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-room__placing--compact .eko-room__placing-warn {
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) .eko-room__placing--compact .eko-room__placing-warn {
   color: #fbbf24;
 }
 
@@ -603,7 +603,7 @@
   --glass-radius: var(--radius-pill);
   border: 1px dashed var(--palm-500);
 }
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-room__trybar.glass {
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) .eko-room__trybar.glass {
   border-color: var(--palm-400);
 }
 
