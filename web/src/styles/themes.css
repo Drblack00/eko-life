@@ -1,98 +1,250 @@
-/* Èkó Life — 5-theme liquid-glass design system.
+/* Èkó Life — 6-theme chrome design system ("Èkó Way" hub + dock release,
+ * 2026-10-27). The six palettes come from the approved Corium-style
+ * samples blended with Èkó Life's own design (hub-dock-eko.html):
+ * A Green Glass · B Night Market · C Danfo Pop · D Owambe Gold ·
+ * E Adire Indigo (DEFAULT) · F Clean Day.
  *
  * Each theme is selected via [data-theme="..."] on <html> (see
  * theme/theme.tsx). Variable NAMES are identical across themes; only the
  * values change, so every component restyles by switching one attribute.
+ * These themes govern the CHROME (hub, dock, panels, settings). The
+ * in-world day/night paint is a separate in-game clock system and is
+ * untouched.
  *
  * Import order (boot.tsx): tokens.css → base.css → glass.css →
  * themes.css → liquid-glass.css. These attribute selectors beat the
- * `:root` defaults in tokens.css on equal specificity via source order.
+ * `:root` defaults in tokens.css on equal specificity via source order,
+ * including the dark/light token groups in tokens.css (the new dark ids
+ * were added to its dark group; clean-day to its light group).
  */
 
-/* ---------------- liquid-dark (default) ----------------
-   Prototype spec: midnight navy, frosted glass, electric blue. */
-[data-theme="liquid-dark"] {
+/* ---------------- adire-indigo (DEFAULT) ----------------
+   Deep indigo night with Èkó cyan; faint adire dot pattern. */
+[data-theme="adire-indigo"] {
   color-scheme: dark;
-  --bg: #06101c;
-  --panel: #0d2033;
-  --panel2: #102940;
-  --text: #f4f8ff;
-  --muted: #a7bbd0;
-  --line: rgba(255, 255, 255, 0.14);
-  --accent: #168bff;
-  --accent-soft: rgba(22, 139, 255, 0.15);
-  --success: #35d49a;
-  --warning: #ffbf5c;
-  --glass-bg: rgba(14, 28, 46, 0.73);
-  --glass-border: rgba(255, 255, 255, 0.14);
-  --nav-bg: rgba(5, 14, 25, 0.83);
-  --card-shadow: 0 12px 36px rgba(0, 0, 0, 0.19);
-  --hero-scrim: rgba(3, 12, 23, 0.82);
-  --on-accent: #ffffff;
+  --bg: #05090f;
+  --panel: #0a1622;
+  --panel2: #0d1e2e;
+  --surface: #0a1622;
+  --surface-2: #0d1e2e;
+  --text: #eef7fa;
+  --muted: #8fa6ad;
+  --text-muted: #8fa6ad;
+  --line: rgba(238, 247, 250, 0.13);
+  --accent: #22d3ee;
+  --accent-soft: rgba(34, 211, 238, 0.13);
+  --primary: #22d3ee;
+  --primary-strong: #a5f3fc;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --gold: #fbbf24;
+  --gold-deep: #b96a00;
+  --gold-soft: rgba(251, 191, 36, 0.14);
+  --on-gold: #231400;
+  --online: #4ade80;
+  --glass-bg: rgba(10, 24, 34, 0.86);
+  --glass-border: rgba(34, 211, 238, 0.28);
+  --nav-bg: rgba(7, 17, 26, 0.95);
+  --card-shadow: 0 12px 36px rgba(0, 0, 0, 0.38);
+  --hero-scrim: rgba(4, 10, 16, 0.82);
+  --on-accent: #062530;
+}
+/* Subtle adire dot weave behind the game world (chrome layer only —
+ * the world's own day/night sky colours paint over their canvas). */
+[data-theme="adire-indigo"] .eko-game {
+  background-image: radial-gradient(rgba(34, 211, 238, 0.055) 1.2px, transparent 1.4px);
+  background-size: 22px 22px;
 }
 
-/* ---------------- warm-light ----------------
-   Cream background, white cards, deep green accent. */
-[data-theme="warm-light"] {
-  color-scheme: light;
-  --bg: #faf7f2;
-  --panel: #ffffff;
-  --panel2: #f3eee6;
-  --text: #23211d;
-  --muted: #7a7368;
-  --line: rgba(35, 33, 29, 0.12);
-  --accent: #1b7a4d;
-  --accent-soft: rgba(27, 122, 77, 0.12);
-  --success: #1b7a4d;
-  --warning: #c77e1f;
-  --glass-bg: rgba(255, 255, 255, 0.78);
-  --glass-border: rgba(35, 33, 29, 0.1);
-  --nav-bg: rgba(250, 247, 242, 0.88);
-  --card-shadow: 0 12px 32px rgba(60, 50, 35, 0.1);
-  --hero-scrim: rgba(35, 28, 20, 0.55);
-  --on-accent: #ffffff;
+/* ---------------- green-glass ----------------
+   Èkó's own green leads; gold is only for coins. */
+[data-theme="green-glass"] {
+  color-scheme: dark;
+  --bg: #060806;
+  --panel: #0d1510;
+  --panel2: #122016;
+  --surface: #0d1510;
+  --surface-2: #122016;
+  --text: #f2f7f3;
+  --muted: #93a89a;
+  --text-muted: #93a89a;
+  --line: rgba(242, 247, 243, 0.13);
+  --accent: #4ade80;
+  --accent-soft: rgba(74, 222, 128, 0.13);
+  --primary: #4ade80;
+  --primary-strong: #bbf7d0;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --gold: #fbbf24;
+  --gold-deep: #b96a00;
+  --gold-soft: rgba(251, 191, 36, 0.14);
+  --on-gold: #231400;
+  --online: #4ade80;
+  --glass-bg: rgba(14, 22, 17, 0.82);
+  --glass-border: rgba(74, 222, 128, 0.3);
+  --nav-bg: rgba(9, 14, 11, 0.93);
+  --card-shadow: 0 12px 36px rgba(0, 0, 0, 0.36);
+  --hero-scrim: rgba(4, 8, 5, 0.82);
+  --on-accent: #0a1f10;
 }
 
-/* ---------------- midnight-amber ----------------
-   Near-black warm charcoal, amber city-light accent. */
-[data-theme="midnight-amber"] {
+/* ---------------- night-market ----------------
+   Deep Lagos-night blue, warm amber lead, ankara dock strip. */
+[data-theme="night-market"] {
   color-scheme: dark;
-  --bg: #0c0a08;
-  --panel: #1a1512;
-  --panel2: #221b16;
-  --text: #faf3e8;
-  --muted: #b3a48f;
-  --line: rgba(250, 243, 232, 0.13);
+  --bg: #0a0f1a;
+  --panel: #141c2e;
+  --panel2: #1a2438;
+  --surface: #141c2e;
+  --surface-2: #1a2438;
+  --text: #f7f3ea;
+  --muted: #a89e8a;
+  --text-muted: #a89e8a;
+  --line: rgba(247, 243, 234, 0.13);
   --accent: #f5a623;
-  --accent-soft: rgba(245, 166, 35, 0.14);
-  --success: #7fc96b;
+  --accent-soft: rgba(245, 166, 35, 0.13);
+  --primary: #f5a623;
+  --primary-strong: #fde68a;
+  --success: #4ade80;
   --warning: #f5a623;
-  --glass-bg: rgba(26, 21, 18, 0.78);
-  --glass-border: rgba(250, 243, 232, 0.13);
-  --nav-bg: rgba(12, 10, 8, 0.86);
-  --card-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
-  --hero-scrim: rgba(10, 7, 5, 0.8);
-  --on-accent: #1a1206;
+  --gold: #fbbf24;
+  --gold-deep: #b96a00;
+  --gold-soft: rgba(251, 191, 36, 0.14);
+  --on-gold: #231400;
+  --online: #4ade80;
+  --glass-bg: rgba(24, 32, 48, 0.85);
+  --glass-border: rgba(245, 166, 35, 0.3);
+  --nav-bg: rgba(16, 22, 36, 0.95);
+  --card-shadow: 0 12px 36px rgba(0, 0, 0, 0.36);
+  --hero-scrim: rgba(6, 9, 16, 0.82);
+  --on-accent: #231300;
+}
+/* Ankara diamond strip along the dock's top edge. */
+[data-theme="night-market"] .mobile-nav::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--accent) 0 8px,
+    transparent 8px 16px,
+    var(--gold) 16px 24px,
+    transparent 24px 32px
+  );
+  opacity: 0.85;
+  pointer-events: none;
 }
 
-/* ---------------- sage-calm ----------------
-   Soft sage background, white/sage cards, muted green accent. */
-[data-theme="ocean-glass"] { color-scheme: dark; --bg: #0d2242; --panel: #10314f; --panel2: #0e3a5c; --text: #f2f7ff; --muted: #a9c2d4; --line: rgba(255, 255, 255, 0.14); --accent: #2dd4bf; --accent-soft: rgba(45, 212, 191, 0.14); --success: #35d49a; --warning: #ffbf5c; --glass-bg: rgba(13, 42, 66, 0.72); --glass-border: rgba(255, 255, 255, 0.15); --nav-bg: rgba(10, 28, 48, 0.85); --card-shadow: 0 12px 36px rgba(0, 0, 0, 0.3); --hero-scrim: rgba(8, 25, 42, 0.82); --on-accent: #062a26; } [data-theme="ocean-glass"] body { background: linear-gradient(180deg, #0d2242 0%, #0e3a5c 50%, #0a4a44 100%); background-attachment: fixed; } [data-theme="sage-calm"] {
+/* ---------------- danfo-pop ----------------
+   Green lead, danfo-yellow coins, floating pill dock. */
+[data-theme="danfo-pop"] {
+  color-scheme: dark;
+  --bg: #080806;
+  --panel: #14140f;
+  --panel2: #1c1c14;
+  --surface: #14140f;
+  --surface-2: #1c1c14;
+  --text: #fbfaf3;
+  --muted: #a5a48f;
+  --text-muted: #a5a48f;
+  --line: rgba(251, 250, 243, 0.13);
+  --accent: #22c55e;
+  --accent-soft: rgba(34, 197, 94, 0.14);
+  --primary: #22c55e;
+  --primary-strong: #bbf7d0;
+  --success: #22c55e;
+  --warning: #ffd21f;
+  --gold: #ffd21f;
+  --gold-deep: #a16207;
+  --gold-soft: rgba(255, 210, 31, 0.14);
+  --on-gold: #231a00;
+  --online: #4ade80;
+  --glass-bg: rgba(18, 18, 14, 0.85);
+  --glass-border: rgba(255, 210, 31, 0.32);
+  --nav-bg: rgba(12, 12, 10, 0.96);
+  --card-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+  --hero-scrim: rgba(5, 5, 3, 0.82);
+  --on-accent: #0a1f10;
+}
+/* Danfo Pop: the dock floats as one rounded pill above the screen edge. */
+[data-theme="danfo-pop"] .mobile-nav {
+  left: 12px;
+  right: 12px;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  border: 1px solid var(--glass-border);
+  border-radius: 30px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+}
+/* …and the centre character rides in a danfo-yellow cab circle. */
+[data-theme="danfo-pop"] .nav-centre__face {
+  background: radial-gradient(circle at 35% 28%, #ffe970, var(--gold) 58%, var(--gold-deep));
+  border-color: #0c0c0a;
+  color: #231a00;
+}
+
+/* ---------------- owambe-gold ----------------
+   Champagne gold leads; green only for the online light. */
+[data-theme="owambe-gold"] {
+  color-scheme: dark;
+  --bg: #080604;
+  --panel: #171106;
+  --panel2: #1f1708;
+  --surface: #171106;
+  --surface-2: #1f1708;
+  --text: #faf6ec;
+  --muted: #a79c84;
+  --text-muted: #a79c84;
+  --line: rgba(250, 246, 236, 0.13);
+  --accent: #fbbf24;
+  --accent-soft: rgba(251, 191, 36, 0.14);
+  --primary: #fbbf24;
+  --primary-strong: #fef3c7;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --gold: #fbbf24;
+  --gold-deep: #b96a00;
+  --gold-soft: rgba(251, 191, 36, 0.16);
+  --on-gold: #231400;
+  --online: #4ade80;
+  --glass-bg: rgba(26, 20, 8, 0.86);
+  --glass-border: rgba(251, 191, 36, 0.34);
+  --nav-bg: rgba(18, 14, 5, 0.95);
+  --card-shadow: 0 12px 36px rgba(0, 0, 0, 0.38);
+  --hero-scrim: rgba(8, 6, 2, 0.82);
+  --on-accent: #231400;
+}
+
+/* ---------------- clean-day ----------------
+   The light one: off-white glass, soft shadows, green lead. */
+[data-theme="clean-day"] {
   color-scheme: light;
-  --bg: #eef2ec;
+  --bg: #e9eee1;
   --panel: #ffffff;
-  --panel2: #e2e9e0;
-  --text: #2b332c;
-  --muted: #6f7d70;
-  --line: rgba(43, 51, 44, 0.12);
-  --accent: #5a7d5a;
-  --accent-soft: rgba(90, 125, 90, 0.13);
-  --success: #4e8a5c;
-  --warning: #b07d2b;
-  --glass-bg: rgba(255, 255, 255, 0.72);
-  --glass-border: rgba(43, 51, 44, 0.1);
-  --nav-bg: rgba(238, 242, 236, 0.88);
-  --card-shadow: 0 12px 32px rgba(60, 80, 62, 0.12);
-  --hero-scrim: rgba(30, 40, 32, 0.55);
+  --panel2: #eef2e4;
+  --surface: #ffffff;
+  --surface-2: #eef2e4;
+  --text: #152114;
+  --muted: #5f6d5c;
+  --text-muted: #5f6d5c;
+  --line: rgba(21, 33, 20, 0.12);
+  --accent: #16a34a;
+  --accent-soft: rgba(22, 163, 74, 0.12);
+  --primary: #16a34a;
+  --primary-strong: #14532d;
+  --success: #16a34a;
+  --warning: #b45309;
+  --gold: #f59e0b;
+  --gold-deep: #b45309;
+  --gold-soft: rgba(245, 158, 11, 0.16);
+  --on-gold: #231400;
+  --online: #16a34a;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(21, 33, 20, 0.13);
+  --nav-bg: rgba(255, 255, 255, 0.94);
+  --card-shadow: 0 12px 32px rgba(30, 50, 25, 0.12);
+  --hero-scrim: rgba(21, 33, 20, 0.45);
   --on-accent: #ffffff;
 }

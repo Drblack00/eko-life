@@ -124,7 +124,8 @@
   color: #fff;
 }
 [data-theme="warm-light"] .hero h1,
-[data-theme="sage-calm"] .hero h1 {
+[data-theme="sage-calm"] .hero h1,
+[data-theme="clean-day"] .hero h1 {
   color: #fff;
   text-shadow: 0 2px 18px rgba(0, 0, 0, 0.45);
 }

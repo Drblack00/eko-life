@@ -16,7 +16,7 @@
  */
 
 :root,
-[data-theme="warm-light"], [data-theme="sage-calm"] {
+[data-theme="warm-light"], [data-theme="sage-calm"], [data-theme="clean-day"] {
   /* Shared glass knobs */
   --glass-blur: 16px;
   --glass-saturate: 160%;
@@ -43,7 +43,7 @@
     inset 0 -1px 2px rgb(255 255 255 / 0.06);
 }
 
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) {
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) {
   --glass-blur: 18px;
   --glass-saturate: 140%;
   --glass-sheen: rgb(255 255 255 / 0.12);
@@ -221,7 +221,7 @@
   pointer-events: none;
 }
 /* Night: dimmer rim and sheen so the lens doesn't glow against dark chrome. */
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-game .eko-tabs__pill {
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) .eko-game .eko-tabs__pill {
   background:
     linear-gradient(180deg, rgb(255 255 255 / 0.14), transparent 45%),
     transparent;
@@ -231,12 +231,12 @@
     inset 0 1px 1px rgb(255 255 255 / 0.35),
     inset 0 -1px 2px rgb(255 255 255 / 0.10);
 }
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-game .eko-tabs__pill::before {
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) .eko-game .eko-tabs__pill::before {
   opacity: 0.22;
 }
 /* Selected tab identity inside the lens: green accent, both themes at
    >=4.5:1 against the frosted dock (day: palm-700 in Game.css). */
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-game .eko-tabs__btn--active {
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) .eko-game .eko-tabs__btn--active {
   color: #4ade80;
 }
 
@@ -414,7 +414,7 @@
   cursor: not-allowed;
   transform: none;
 }
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-btn.eko-btn:disabled {
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) .eko-btn.eko-btn:disabled {
   color: #d3ecdd;
 }
 
@@ -482,7 +482,7 @@
   .eko-game .eko-tabs__pill::before {
     display: none;
   }
-  :is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-game .eko-tabs__pill {
+  :is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) .eko-game .eko-tabs__pill {
     background: rgb(13 28 43 / 0.96);
     border-color: rgb(74 222 128 / 0.5);
   }
@@ -502,7 +502,7 @@
     border: 1px solid var(--danfo-500);
     box-shadow: var(--shadow-sm);
   }
-  :is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-game .eko-hint {
+  :is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) .eko-game .eko-hint {
     background: #2a2113;
     color: #fde68a;
   }
@@ -590,12 +590,12 @@ a.glass:active,
 
 /* Night theme: the specular bump is smaller so the press glow doesn't
    blow out against dark surfaces. */
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-room__tabs .eko-room__tab:active,
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) button.glass:active:not(:disabled),
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) a.glass:active,
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) [role="button"].glass:active,
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-hud__gov:active,
-:is([data-theme="liquid-dark"], [data-theme="midnight-amber"]) .eko-hint:active {
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) .eko-room__tabs .eko-room__tab:active,
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) button.glass:active:not(:disabled),
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) a.glass:active,
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) [role="button"].glass:active,
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) .eko-hud__gov:active,
+:is([data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"]) .eko-hint:active {
   --glass-sheen: rgb(255 255 255 / 0.24);
   --glass-blur: 22px;
 }

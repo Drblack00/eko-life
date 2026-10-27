@@ -1,7 +1,7 @@
 /* Èkó Life design tokens — day theme + night theme (data-theme="night") */
 
 :root,
-[data-theme="warm-light"], [data-theme="sage-calm"] {
+[data-theme="warm-light"], [data-theme="sage-calm"], [data-theme="clean-day"] {
   --font-display: "Baloo 2", "Comic Sans MS", system-ui, sans-serif;
   --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 
@@ -70,7 +70,7 @@
   --sar: env(safe-area-inset-right, 0px);
 }
 
-[data-theme="liquid-dark"], [data-theme="midnight-amber"] {
+[data-theme="liquid-dark"], [data-theme="midnight-amber"], [data-theme="green-glass"], [data-theme="night-market"], [data-theme="danfo-pop"], [data-theme="owambe-gold"], [data-theme="adire-indigo"] {
   --bg: #0b1b2a;
   --surface: #12293d;
   --surface-2: #0e2233;
