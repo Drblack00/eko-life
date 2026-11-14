@@ -15,7 +15,11 @@ describe("live map markers", () => {
     const moved = { ...pin, x: 20, name: "Updated" };
     layer.sync([moved], position);
     expect(layer.sprites[0]).toBe(sprite);
-    expect(sprite.position.x).toBe(20);
+    expect(sprite.userData.targetX).toBe(20);
+    expect(sprite.position.x).toBe(1);
+    layer.animate(0.016, 1, 300, 800, null);
+    expect(sprite.position.x).toBeGreaterThan(1);
+    expect(sprite.position.x).toBeLessThan(20);
     expect(sprite.userData.pin).toBe(moved);
     expect(texture).toHaveBeenCalledTimes(1);
     layer.dispose();
@@ -39,4 +43,18 @@ describe("live map markers", () => {
     layer.dispose();
     expect(material).toHaveBeenCalledTimes(1);
   });
+});
+
+it("keeps a marker's bob phase stable when another marker is removed", () => {
+  const layer = createPinLayer(() => new THREE.Texture());
+  const position = (p: PinLocation, s: THREE.Sprite) => s.position.set(p.x, 6, p.z);
+  const second = { ...pin, id: 'b', x: 50 };
+  layer.sync([pin, second], position);
+  layer.animate(1, 2, 300, 800, null);
+  const marker = layer.sprites[1]; const y = marker.position.y;
+  layer.sync([second], position);
+  layer.animate(0, 2, 300, 800, null);
+  expect(layer.sprites[0]).toBe(marker);
+  expect(marker.position.y).toBe(y);
+  layer.dispose();
 });
