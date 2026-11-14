@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { THEMES } from "../theme/theme";
 
 /**
  * Settings polish contract tests (2026-10-12 user request): the toggle
@@ -96,13 +97,15 @@ describe("theme picker styling (glass.css)", () => {
     expect(options).toMatch(/repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
   });
 
-  it("renders Light / Dark / Auto labels (no mid-word breaks possible)", () => {
+  it("renders the current six theme names and descriptions", () => {
     const themeTsx = readFileSync(
       join(here, "..", "theme", "theme.tsx"),
       "utf8"
     );
-    expect(themeTsx).toMatch(/label:\s*"Light"/);
-    expect(themeTsx).toMatch(/label:\s*"Dark"/);
-    expect(themeTsx).toMatch(/label:\s*"Auto"/);
+    expect(THEMES).toHaveLength(6);
+    expect(new Set(THEMES.map((theme) => theme.id)).size).toBe(6);
+    expect(THEMES.every((theme) => theme.name.trim() && theme.blurb.trim())).toBe(true);
+    expect(themeTsx).toContain("{t.name}");
+    expect(themeTsx).toContain("{t.blurb}");
   });
 });

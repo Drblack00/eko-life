@@ -106,9 +106,9 @@ export function parseFeedXml(xml, source) {
 }
 
 /** Fetch one feed with a 10s timeout. Throws on failure (caller skips). */
-export async function fetchFeed(feed, fetchFn = fetch) {
+export async function fetchFeed(feed, fetchFn = fetch, signal) {
   const res = await fetchFn(feed.url, {
-    signal: AbortSignal.timeout(10000),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(10000)]) : AbortSignal.timeout(10000),
     headers: {
       'User-Agent': 'EkoLife-NewsBot/1.0 (+https://ekolife.onrender.com)',
       Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
@@ -124,12 +124,14 @@ export async function fetchFeed(feed, fetchFn = fetch) {
  * Refresh every feed; upsert headlines (dedupe by link); prune stale rows.
  * Failures are logged and skipped — one dead outlet never blocks the rest.
  */
-export async function refreshNewsFeeds({ feeds = NEWS_FEEDS, fetchFn = fetch, log = console } = {}) {
+export async function refreshNewsFeeds({ feeds = NEWS_FEEDS, fetchFn = fetch, log = console, signal } = {}) {
   let stored = 0;
   const errors = [];
   for (const feed of feeds) {
+    if (signal?.aborted) break;
     try {
-      const items = await fetchFeed(feed, fetchFn);
+      const items = await fetchFeed(feed, fetchFn, signal);
+      if (signal?.aborted) break;
       for (const item of items) {
         try {
           await upsertNewsItem(item);
@@ -139,10 +141,12 @@ export async function refreshNewsFeeds({ feeds = NEWS_FEEDS, fetchFn = fetch, lo
         }
       }
     } catch (e) {
+      if (signal?.aborted) break;
       errors.push(`${feed.source}: ${e.message}`);
       log.error('[news] feed failed:', feed.source, '-', e.message);
     }
   }
+  if (signal?.aborted) return { stored, errors, feeds: feeds.length };
   try {
     await pruneNewsItems();
   } catch (e) {

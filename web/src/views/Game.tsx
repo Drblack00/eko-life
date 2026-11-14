@@ -393,7 +393,7 @@ function CityTab({
     }
     // Spread pins that would otherwise stack on top of each other.
     return declutterPins(locPins);
-  }, [config, you, spawns]);
+  }, [config, you.currentCity, you.homeCity, you.locationId, you.id, you.name, you.avatar, spawns]);
 
   const hereName = useMemo(() => {
     const l = asList(config?.locations).find((x) => x.id === you.locationId);

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { shareSnapshot } from "../lib/shareSnapshot";
+import { createFrameInbox } from "../lib/frameInbox";
 import { useToast } from "../components";
 import { normalizeConfig, type GameConfig } from "../lib/api";
 import { markCloudSaveDirty } from "../lib/cloudSave";
@@ -604,6 +606,8 @@ export function useGameSocket(token: string | null): GameSocket {
     const ws = wsRef.current;
     wsRef.current = null;
     if (ws) {
+      const stableTimer = (ws as unknown as { __stableTimer?: number }).__stableTimer;
+      if (stableTimer) window.clearTimeout(stableTimer);
       ws.onclose = null;
       ws.onerror = null;
       ws.onmessage = null;
@@ -650,7 +654,8 @@ export function useGameSocket(token: string | null): GameSocket {
       switch (msg.t) {
         case "init":
           if (msg.you) {
-            setYou(msg.you);
+            const snapshot = msg.you;
+            setYou((previous) => shareSnapshot(previous, snapshot));
             myIdRef.current = msg.you.id;
           }
           if (msg.players) setPlayers(msg.players);
@@ -716,7 +721,8 @@ export function useGameSocket(token: string | null): GameSocket {
           break;
         case "you":
           if (msg.you) {
-            setYou(msg.you);
+            const snapshot = msg.you;
+            setYou((previous) => shareSnapshot(previous, snapshot));
             myIdRef.current = msg.you.id;
           }
           if (msg.note) say(msg.note, "info");
@@ -1139,6 +1145,12 @@ export function useGameSocket(token: string | null): GameSocket {
       else setLastError("Session expired. Please sign in again.");
     };
 
+    // Process network bursts together so React commits one coherent snapshot
+    // per frame. A timer keeps chat/actions responsive in background tabs.
+    const inbox = createFrameInbox<ServerMsg>((msg) => {
+      if (!cancelled()) handleMessage(msg);
+    });
+
     const connect = () => {
       if (cancelled()) return;
       clearTimer();
@@ -1199,11 +1211,15 @@ export function useGameSocket(token: string | null): GameSocket {
         } catch {
           return;
         }
-        if (msg && typeof msg.t === "string") handleMessage(msg);
+        if (wsRef.current !== ws || cancelled()) return;
+        if (msg && typeof msg.t === "string") {
+          inbox.push(msg);
+        }
       };
 
       ws.onclose = (ev) => {
         if (cancelled()) return;
+        inbox.flush();
         // Clear the stable-connection timer — a quick disconnect means
         // the connection wasn't stable, so don't reset the failure counter.
         const stableTimer = (ws as unknown as { __stableTimer?: number }).__stableTimer;
@@ -1227,6 +1243,7 @@ export function useGameSocket(token: string | null): GameSocket {
 
     return () => {
       cancelledRef.current = true;
+      inbox.clear();
       clearTimer();
       closeSocket();
       for (const t of Object.values(roomMembersTimers.current)) clearTimeout(t);

@@ -112,9 +112,12 @@ function act(ws, payload) {
 }
 
 // ---------------- catalogue shape ----------------
-test('M14 catalogue: 16 items, original 6 exact, category+size on all', () => {
+test('catalogue: 22 items including hub additions, original 6 exact, category+size on all', () => {
   const F = data.FURN;
-  assert.equal(Object.keys(F).length, 16);
+  assert.equal(Object.keys(F).length, 22);
+  for (const id of ['jollof_rice', 'zobo', 'keke_ride', 'armchair', 'sneakers', 'headphones']) {
+    assert.equal(F[id]?.id, id, `${id}: hub catalogue entry missing`);
+  }
   // original 6: ids/prices/effects/names/icons/descs unchanged
   assert.deepEqual([F.bed.id, F.bed.name, F.bed.price, F.bed.icon, F.bed.effect, F.bed.desc],
     ['bed', 'Comfy Bed', 15000, '🛏️', 'sleep_health', 'Sleep restores +20 extra health']);

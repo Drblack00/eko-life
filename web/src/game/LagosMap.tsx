@@ -1,6 +1,8 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { mergeStaticMeshes } from "./mergeStaticMeshes";
+import { createPinLayer } from "./pinLayer";
 import waterMaskUrl from "./waterMask.png";
 import type { PinLocation } from "./stubLocations";
 import "./CityMap.css";
@@ -201,7 +203,7 @@ function makeHouseTextures(): { map: THREE.CanvasTexture; emissive: THREE.Canvas
   return { map, emissive };
 }
 
-export function LagosMap({
+export const LagosMap = memo(function LagosMap({
   pins,
   onPinSelect,
 }: {
@@ -225,6 +227,7 @@ export function LagosMap({
   selectRef.current = onPinSelect;
   const pinsRef = useRef(pins);
   pinsRef.current = pins;
+  const syncPinsRef = useRef<(() => void) | null>(null);
   const mountRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -232,7 +235,21 @@ export function LagosMap({
     if (!mount) return;
     const rand = mulberry32(77);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    let renderer: THREE.WebGLRenderer;
+    const showFailure = (message: string) => {
+      const note = document.createElement("div");
+      note.className = "eko-citymap__nogl";
+      note.setAttribute("role", "status");
+      note.textContent = message;
+      mount.appendChild(note);
+      return note;
+    };
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch {
+      const note = showFailure("The 3D city needs WebGL. Try reopening the map or enabling hardware acceleration.");
+      return () => note.remove();
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
@@ -241,17 +258,7 @@ export function LagosMap({
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    {
-      const sc = document.createElement("canvas");
-      sc.width = 4; sc.height = 256;
-      const sx = sc.getContext("2d")!;
-      const grad = sx.createLinearGradient(0, 0, 0, 256);
-      grad.addColorStop(0, "#6ea8dd"); grad.addColorStop(0.6, "#c3d9ee"); grad.addColorStop(1, "#eef0e8");
-      sx.fillStyle = grad; sx.fillRect(0, 0, 4, 256);
-      const skyTex = new THREE.CanvasTexture(sc);
-      skyTex.colorSpace = THREE.SRGBColorSpace;
-      scene.background = skyTex;
-    }
+    scene.background = new THREE.Color(0x6ea8dd);
     scene.fog = new THREE.Fog(0xd4dee8, 420, 900);
 
     const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 1500);
@@ -737,6 +744,10 @@ export function LagosMap({
       const bridgeLampHeads: THREE.Mesh[] = [];
       const bridgeHWs = [HIGHWAYS[0], HIGHWAYS[1], HIGHWAYS[2], HIGHWAYS[8]];
       const bridgeGroup = new THREE.Group();
+      const deckMat = new THREE.MeshStandardMaterial({ color: 0x8f959d, roughness: 0.8 });
+      const railMat = new THREE.MeshStandardMaterial({ color: 0xd7dce2, roughness: 0.6 });
+      const poleMat = new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.7 });
+      const pillarMat = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.85 });
       for (const hw of bridgeHWs) {
         const pts = hw.map(([lat, lon]) => new THREE.Vector3(lon2x(lon), 0, lat2z(lat)));
         const curve = new THREE.CatmullRomCurve3(pts);
@@ -751,7 +762,7 @@ export function LagosMap({
             // Deck
             const deck = new THREE.Mesh(
               new THREE.BoxGeometry(3.2, 0.5, len),
-              new THREE.MeshStandardMaterial({ color: 0x8f959d, roughness: 0.8 })
+              deckMat
             );
             deck.position.set(mx, 1.6, mz);
             deck.rotation.y = ang;
@@ -762,7 +773,7 @@ export function LagosMap({
             for (const side of [-1.45, 1.45]) {
               const rail = new THREE.Mesh(
                 new THREE.BoxGeometry(0.18, 0.7, len),
-                new THREE.MeshStandardMaterial({ color: 0xd7dce2, roughness: 0.6 })
+                railMat
               );
               rail.position.set(
                 mx + Math.cos(ang) * side,
@@ -776,7 +787,7 @@ export function LagosMap({
             if (i % 4 === 0) {
               const lamp = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.06, 0.08, 2.2, 6),
-                new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.7 })
+                poleMat
               );
               lamp.position.set(mx + Math.cos(ang) * 1.2, 2.9, mz - Math.sin(ang) * 1.2);
               bridgeGroup.add(lamp);
@@ -790,7 +801,7 @@ export function LagosMap({
           if (i % 5 === 0) {
             const pillar = new THREE.Mesh(
               new THREE.CylinderGeometry(0.5, 0.65, 4.5, 8),
-              new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.85 })
+              pillarMat
             );
             pillar.position.set(p.x, -0.6, p.z);
             bridgeGroup.add(pillar);
@@ -798,6 +809,7 @@ export function LagosMap({
           prev = p;
         }
       }
+      mergeStaticMeshes(bridgeGroup);
       scene.add(bridgeGroup);
 
       // ---- Living world: day/night cycle, boats, birds, aircraft ----
@@ -975,36 +987,19 @@ export function LagosMap({
         const lat = LAT_N - ((z + 86) / 172) * (LAT_N - LAT_S);
         return [lat, lon];
       };
-      const pinSprites: THREE.Sprite[] = [];
-      const pinGroup = new THREE.Group();
-      const rebuildPins = () => {
-        while (pinGroup.children.length) {
-          const ch = pinGroup.children.pop()!;
-          pinGroup.remove(ch);
-        }
-        pinSprites.length = 0;
-        for (const pin of pinsRef.current) {
-          let [lat, lon] = pinToLatLon(pin.x, pin.z);
-          // Nudge off water
-          let guard = 0;
-          while (isWaterLL(lat, lon) && guard++ < 40) lon -= 0.004;
-          const spr = new THREE.Sprite(
-            new THREE.SpriteMaterial({
-              map: makeEmojiTexture(pin.emoji || "📍"),
-              depthTest: false, transparent: true,
-            })
-          );
-          spr.scale.set(6, 6, 1);
-          spr.position.set(lon2x(lon), 6, lat2z(lat));
-          spr.renderOrder = 10;
-          (spr as any).userData.pin = pin;
-          (spr as any).userData.baseY = 6;
-          pinSprites.push(spr);
-          pinGroup.add(spr);
-        }
-      };
+      const pinLayer = createPinLayer(makeEmojiTexture);
+      const pinSprites = pinLayer.sprites;
+      const rebuildPins = () => pinLayer.sync(pinsRef.current, (pin, spr) => {
+        let [lat, lon] = pinToLatLon(pin.x, pin.z);
+        let guard = 0;
+        while (isWaterLL(lat, lon) && guard++ < 40) lon -= 0.004;
+        spr.position.x = lon2x(lon);
+        spr.position.z = lat2z(lat);
+        if (!spr.position.y) spr.position.y = 6;
+      });
       rebuildPins();
-      scene.add(pinGroup);
+      syncPinsRef.current = rebuildPins;
+      scene.add(pinLayer.group);
 
       // Tooltip + tap-to-select
       const tooltip = document.createElement("div");
@@ -1018,30 +1013,52 @@ export function LagosMap({
         pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
         pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
       };
-      let downX = 0, downY = 0;
-      const onDown = (e: PointerEvent) => { downX = e.clientX; downY = e.clientY; };
+      const pointers = new Map<number, { x: number; y: number; moved: boolean }>();
+      let multiTouch = false;
+      const onDown = (e: PointerEvent) => {
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, moved: false });
+        if (pointers.size > 1) multiTouch = true;
+      };
+      const onMove = (e: PointerEvent) => {
+        const down = pointers.get(e.pointerId);
+        if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) down.moved = true;
+      };
+      const onCancel = (e: PointerEvent) => {
+        pointers.delete(e.pointerId);
+        if (!pointers.size) multiTouch = false;
+      };
       const onUp = (e: PointerEvent) => {
-        if (Math.hypot(e.clientX - downX, e.clientY - downY) > 8) return;
+        const down = pointers.get(e.pointerId);
+        const isTap = down && !down.moved && !multiTouch &&
+          Math.hypot(e.clientX - down.x, e.clientY - down.y) <= 8;
+        onCancel(e);
+        if (!isTap) return;
         setPointer(e);
+        // Raycast against the camera's latest damped orbit position.
+        camera.updateMatrixWorld();
         raycaster.setFromCamera(pointer, camera);
         const hit = raycaster.intersectObjects(pinSprites, false)[0];
-        if (hit) {
-          const pin = (hit.object as THREE.Sprite).userData.pin as PinLocation;
-          selectRef.current(pin);
-        }
+        if (hit) selectRef.current((hit.object as THREE.Sprite).userData.pin as PinLocation);
       };
       const el = renderer.domElement;
       el.addEventListener("pointerdown", onDown);
       el.addEventListener("pointerup", onUp);
+      el.addEventListener("pointermove", onMove);
+      el.addEventListener("pointercancel", onCancel);
+      el.addEventListener("pointerleave", onCancel);
 
       // Animation: day/night + living world + zoom-tier labels
       const clock = new THREE.Clock();
       let raf = 0;
       // Offset clock so dayT starts at dayT0
       const tOffset = dayT0 * DAY_LEN;
+      const duskColor = new THREE.Color(0xff9a5c);
+      let elapsed = 0;
       const animate = () => {
         raf = requestAnimationFrame(animate);
-        const t = clock.getElapsedTime() + tOffset;
+        const dt = Math.min(clock.getDelta(), 0.05);
+        elapsed += dt;
+        const t = elapsed + tOffset;
         const dist = camera.position.distanceTo(controls.target);
 
         // --- Day/night cycle ---
@@ -1057,7 +1074,7 @@ export function LagosMap({
         const sunDist = 220;
         sun.position.set(Math.cos(sunA) * sunDist, Math.max(sunH, -0.3) * sunDist * 0.9 + 20, 80);
         sun.intensity = 0.12 + dayF * 1.6;
-        sun.color.setHex(0xfff7e6).lerp(new THREE.Color(0xff9a5c), duskF * 0.7);
+        sun.color.setHex(0xfff7e6).lerp(duskColor, duskF * 0.7);
         // Night lights: WINDOWS ONLY on every building + bridge lamps
         const nightF = 1 - dayF;
         towerMat.emissiveIntensity = nightF * 1.6;
@@ -1067,7 +1084,7 @@ export function LagosMap({
 
         // --- Moving boats ---
         for (const b of movingBoats) {
-          b.t = (b.t + b.route.speed * (1 / 60)) % 1;
+          b.t = (b.t + b.route.speed * dt) % 1;
           const [lat, lon, ang] = routePoint(b.route, b.t);
           b.grp.position.set(lon2x(lon), 0.15 + Math.sin(t * 2 + b.t * 9) * 0.08, lat2z(lat));
           b.grp.rotation.y = ang;
@@ -1090,7 +1107,7 @@ export function LagosMap({
           bd.spr.material.opacity = 0.25 + dayF * 0.65;
         }
         // --- Aircraft flyover ---
-        planeTimer -= 1 / 60;
+        planeTimer -= dt;
         if (planeT < 0 && planeTimer <= 0) {
           planeT = 0;
           aircraft.visible = true;
@@ -1102,7 +1119,7 @@ export function LagosMap({
           aircraft.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
         }
         if (planeT >= 0) {
-          planeT += (1 / 60) * 0.03;
+          planeT += dt * 0.03;
           const dir = aircraft.userData.dir as number;
           aircraft.position.x = (-140 + planeT * 300) * dir;
           aircraft.position.y = aircraft.userData.h + Math.sin(t * 0.8) * 2;
@@ -1144,7 +1161,7 @@ export function LagosMap({
 
       const resize = () => {
         const w = mount.clientWidth || 1, h = mount.clientHeight || 1;
-        renderer.setSize(w, h);
+        renderer.setSize(w, h, false);
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
       };
@@ -1157,19 +1174,58 @@ export function LagosMap({
         ro.disconnect();
         el.removeEventListener("pointerdown", onDown);
         el.removeEventListener("pointerup", onUp);
+        el.removeEventListener("pointermove", onMove);
+        el.removeEventListener("pointercancel", onCancel);
+        el.removeEventListener("pointerleave", onCancel);
         tooltip.remove();
+        syncPinsRef.current = null;
+        pinLayer.dispose();
+        controls.dispose();
+        const geometries = new Set<THREE.BufferGeometry>();
+        const materials = new Set<THREE.Material>();
+        const textures = new Set<THREE.Texture>();
+        scene.traverse((object) => {
+          const mesh = object as THREE.Mesh;
+          if (mesh.geometry) geometries.add(mesh.geometry);
+          const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          for (const material of list) {
+            if (!material) continue;
+            materials.add(material);
+            for (const value of Object.values(material)) {
+              if (value instanceof THREE.Texture) textures.add(value);
+            }
+          }
+        });
+        for (const geometry of geometries) geometry.dispose();
+        for (const material of materials) material.dispose();
+        for (const texture of textures) texture.dispose();
+        sun.shadow.dispose();
         renderer.dispose();
         if (renderer.domElement.parentElement === mount) mount.removeChild(renderer.domElement);
       };
     };
 
     let cleanup: (() => void) | undefined;
-    if (maskImg.complete) cleanup = build();
+    let failure: HTMLElement | null = null;
+    const maskFailed = () => {
+      failure = showFailure("The city map could not load. Reopen the map to try again.");
+    };
+    maskImg.onerror = maskFailed;
+    if (maskImg.complete && maskImg.naturalWidth > 0) cleanup = build();
+    else if (maskImg.complete) maskFailed();
     else maskImg.onload = () => { cleanup = build(); };
 
-    return () => { cleanup?.(); };
+    return () => {
+      failure?.remove();
+      maskImg.onload = null;
+      maskImg.onerror = null;
+      if (cleanup) cleanup();
+      else { controls.dispose(); renderer.dispose(); renderer.domElement.remove(); }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <div ref={mountRef} className="city-map-wrap" style={{ width: "100%", height: "100%", minHeight: 420 }} />;
-}
+  useEffect(() => { syncPinsRef.current?.(); }, [pins]);
+
+  return <div ref={mountRef} className="city-map-wrap" style={{ position: "relative", width: "100%", height: "100%", minHeight: 420 }} />;
+});
