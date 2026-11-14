@@ -240,7 +240,7 @@ export function Dashboard({
                   <div>
                     <div className="need-label">{n.label}</div>
                     <div className="bar" role="progressbar" aria-valuenow={n.value} aria-valuemin={0} aria-valuemax={100} aria-label={n.label}>
-                      <span style={{ width: `${n.value}%` }} />
+                      <span style={{ transform: `scaleX(${n.value / 100})` }} />
                     </div>
                   </div>
                   <span className="need-value">{n.value}%</span>

@@ -1,6 +1,9 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { createGradientSky, createLagoonMaterial, mapLabelOpacity, sampleDayLight } from "./mapLighting";
+import { mergeStaticMeshes } from "./mergeStaticMeshes";
+import { createPinLayer } from "./pinLayer";
 import waterMaskUrl from "./waterMask.png";
 import type { PinLocation } from "./stubLocations";
 import "./CityMap.css";
@@ -94,8 +97,12 @@ const HIGHWAYS: Array<Array<[number, number]>> = [
 
 function makeEmojiTexture(emoji: string): THREE.CanvasTexture {
   const c = document.createElement("canvas");
-  c.width = 128; c.height = 128;
+  c.width = 256; c.height = 256;
   const g = c.getContext("2d")!;
+  g.scale(2, 2);
+  g.shadowColor = "rgba(5,18,30,0.45)";
+  g.shadowBlur = 5;
+  g.shadowOffsetY = 3;
   g.font = "96px 'Apple Color Emoji','Segoe UI Emoji',sans-serif";
   g.textAlign = "center"; g.textBaseline = "middle";
   g.fillText(emoji, 64, 70);
@@ -110,14 +117,16 @@ function makePillLabel(text: string, tier: number): THREE.CanvasTexture {
   const font = tier === 0 ? "600 40px system-ui,sans-serif" : "500 34px system-ui,sans-serif";
   meas.font = font;
   c.width = Math.ceil(meas.measureText(text).width) + 52;
-  c.height = 68;
+  const logicalWidth = c.width;
+  c.width *= 2; c.height = 136;
   const g = c.getContext("2d")!;
+  g.scale(2, 2);
   // Pill 💊 background
   g.fillStyle = "rgba(8,18,34,0.72)";
   g.strokeStyle = "rgba(255,255,255,0.28)";
   g.lineWidth = 2.5;
   g.beginPath();
-  g.roundRect(3, 3, c.width - 6, 62, 31);
+  g.roundRect(3, 3, logicalWidth - 6, 62, 31);
   g.fill();
   g.stroke();
   g.font = font;
@@ -126,7 +135,7 @@ function makePillLabel(text: string, tier: number): THREE.CanvasTexture {
   g.shadowColor = "rgba(0,0,0,0.4)";
   g.shadowBlur = 6;
   g.fillStyle = "#ffffff";
-  g.fillText(text, c.width / 2, 36);
+  g.fillText(text, logicalWidth / 2, 36);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -201,7 +210,7 @@ function makeHouseTextures(): { map: THREE.CanvasTexture; emissive: THREE.Canvas
   return { map, emissive };
 }
 
-export function LagosMap({
+export const LagosMap = memo(function LagosMap({
   pins,
   onPinSelect,
 }: {
@@ -225,14 +234,30 @@ export function LagosMap({
   selectRef.current = onPinSelect;
   const pinsRef = useRef(pins);
   pinsRef.current = pins;
+  const syncPinsRef = useRef<(() => void) | null>(null);
   const mountRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
     const rand = mulberry32(77);
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    let renderer: THREE.WebGLRenderer;
+    const showFailure = (message: string) => {
+      const note = document.createElement("div");
+      note.className = "eko-citymap__nogl";
+      note.setAttribute("role", "status");
+      note.textContent = message;
+      mount.appendChild(note);
+      return note;
+    };
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch {
+      const note = showFailure("The 3D city needs WebGL. Try reopening the map or enabling hardware acceleration.");
+      return () => note.remove();
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
@@ -240,18 +265,14 @@ export function LagosMap({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     mount.appendChild(renderer.domElement);
 
+    const loadingNote = document.createElement("div");
+    loadingNote.className = "eko-citymap__loading";
+    loadingNote.setAttribute("role", "status");
+    loadingNote.textContent = "Waking up the lagoon…";
+    mount.appendChild(loadingNote);
     const scene = new THREE.Scene();
-    {
-      const sc = document.createElement("canvas");
-      sc.width = 4; sc.height = 256;
-      const sx = sc.getContext("2d")!;
-      const grad = sx.createLinearGradient(0, 0, 0, 256);
-      grad.addColorStop(0, "#6ea8dd"); grad.addColorStop(0.6, "#c3d9ee"); grad.addColorStop(1, "#eef0e8");
-      sx.fillStyle = grad; sx.fillRect(0, 0, 4, 256);
-      const skyTex = new THREE.CanvasTexture(sc);
-      skyTex.colorSpace = THREE.SRGBColorSpace;
-      scene.background = skyTex;
-    }
+    const sky = createGradientSky();
+    scene.add(sky.mesh);
     scene.fog = new THREE.Fog(0xd4dee8, 420, 900);
 
     const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 1500);
@@ -267,13 +288,16 @@ export function LagosMap({
     controls.maxDistance = 600;
     controls.update();
 
-    scene.add(new THREE.HemisphereLight(0xe0f2fe, 0x8a7a5a, 0.9));
+    const ambient = new THREE.HemisphereLight(0xe0f2fe, 0x746650, 0.95);
+    scene.add(ambient);
     const sun = new THREE.DirectionalLight(0xfff7e6, 1.7);
     sun.position.set(-100, 180, 80);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     Object.assign(sun.shadow.camera, { left: -160, right: 160, top: 160, bottom: -160, far: 600 });
-    sun.shadow.bias = -0.0004;
+    sun.shadow.bias = -0.0003;
+    sun.shadow.normalBias = 0.025;
+    sun.shadow.intensity = 0.72;
     scene.add(sun);
 
     const dummy = new THREE.Object3D();
@@ -349,9 +373,22 @@ export function LagosMap({
       const tex = new THREE.CanvasTexture(c);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 4;
+      const maskCanvas = document.createElement("canvas");
+      maskCanvas.width = maskCanvas.height = 128;
+      const maskContext = maskCanvas.getContext("2d")!;
+      const waterPixels = maskContext.createImageData(128, 128);
+      for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+        const value = isWaterLL(LAT_N - (y / 128) * (LAT_N - LAT_S), LON_W + (x / 128) * (LON_E - LON_W)) ? 255 : 0;
+        const offset = (y * 128 + x) * 4;
+        waterPixels.data[offset] = waterPixels.data[offset + 1] = waterPixels.data[offset + 2] = value;
+        waterPixels.data[offset + 3] = 255;
+      }
+      maskContext.putImageData(waterPixels, 0, 0);
+      const waterMask = new THREE.CanvasTexture(maskCanvas);
+      const lagoon = createLagoonMaterial(tex, waterMask);
       const ground = new THREE.Mesh(
         new THREE.PlaneGeometry(200, 220),
-        new THREE.MeshStandardMaterial({ map: tex, roughness: 0.96 })
+        lagoon.material
       );
       ground.rotation.x = -Math.PI / 2;
       ground.receiveShadow = true;
@@ -737,6 +774,10 @@ export function LagosMap({
       const bridgeLampHeads: THREE.Mesh[] = [];
       const bridgeHWs = [HIGHWAYS[0], HIGHWAYS[1], HIGHWAYS[2], HIGHWAYS[8]];
       const bridgeGroup = new THREE.Group();
+      const deckMat = new THREE.MeshStandardMaterial({ color: 0x8f959d, roughness: 0.8 });
+      const railMat = new THREE.MeshStandardMaterial({ color: 0xd7dce2, roughness: 0.6 });
+      const poleMat = new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.7 });
+      const pillarMat = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.85 });
       for (const hw of bridgeHWs) {
         const pts = hw.map(([lat, lon]) => new THREE.Vector3(lon2x(lon), 0, lat2z(lat)));
         const curve = new THREE.CatmullRomCurve3(pts);
@@ -751,7 +792,7 @@ export function LagosMap({
             // Deck
             const deck = new THREE.Mesh(
               new THREE.BoxGeometry(3.2, 0.5, len),
-              new THREE.MeshStandardMaterial({ color: 0x8f959d, roughness: 0.8 })
+              deckMat
             );
             deck.position.set(mx, 1.6, mz);
             deck.rotation.y = ang;
@@ -762,7 +803,7 @@ export function LagosMap({
             for (const side of [-1.45, 1.45]) {
               const rail = new THREE.Mesh(
                 new THREE.BoxGeometry(0.18, 0.7, len),
-                new THREE.MeshStandardMaterial({ color: 0xd7dce2, roughness: 0.6 })
+                railMat
               );
               rail.position.set(
                 mx + Math.cos(ang) * side,
@@ -776,7 +817,7 @@ export function LagosMap({
             if (i % 4 === 0) {
               const lamp = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.06, 0.08, 2.2, 6),
-                new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.7 })
+                poleMat
               );
               lamp.position.set(mx + Math.cos(ang) * 1.2, 2.9, mz - Math.sin(ang) * 1.2);
               bridgeGroup.add(lamp);
@@ -790,7 +831,7 @@ export function LagosMap({
           if (i % 5 === 0) {
             const pillar = new THREE.Mesh(
               new THREE.CylinderGeometry(0.5, 0.65, 4.5, 8),
-              new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.85 })
+              pillarMat
             );
             pillar.position.set(p.x, -0.6, p.z);
             bridgeGroup.add(pillar);
@@ -798,20 +839,17 @@ export function LagosMap({
           prev = p;
         }
       }
+      mergeStaticMeshes(bridgeGroup);
       scene.add(bridgeGroup);
 
       // ---- Living world: day/night cycle, boats, birds, aircraft ----
       const DAY_LEN = 150; // seconds per full day
-      // Sky colors
-      const skyDay = new THREE.Color(0x6ea8dd);
-      const skyNight = new THREE.Color(0x0a1428);
-      const skyDawn = new THREE.Color(0xe8a06a);
-      // Make sky a shader-updatable color (replace static texture)
-      (scene.background as THREE.CanvasTexture).dispose?.();
-      scene.background = new THREE.Color(0x6ea8dd);
-      scene.fog = new THREE.Fog(0xd4dee8, 420, 900);
+      const lighting = { day: 1, warmth: 0, night: 0 };
       const fogDay = new THREE.Color(0xd4dee8);
-      const fogNight = new THREE.Color(0x0a1428);
+      const fogNight = new THREE.Color(0x17263e);
+      const fogWarm = new THREE.Color(0xd6ad89);
+      const ambientDay = new THREE.Color(0xe0f2fe);
+      const ambientNight = new THREE.Color(0x718bb8);
 
       // Moving boats: routes across the lagoon + harbor
       interface BoatRoute { pts: Array<[number, number]>; speed: number; }
@@ -853,7 +891,8 @@ export function LagosMap({
           movingBoats.push({ grp, route, t: rand() });
         }
       }
-      const routePoint = (route: BoatRoute, t: number): [number, number, number] => {
+      const routeSample = new THREE.Vector3();
+      const routePoint = (route: BoatRoute, t: number): void => {
         const n = route.pts.length - 1;
         const ft = (t % 1) * n;
         const i = Math.min(n - 1, Math.floor(ft));
@@ -863,14 +902,15 @@ export function LagosMap({
         const lat = lat0 + (lat1 - lat0) * f;
         const lon = lon0 + (lon1 - lon0) * f;
         const ang = Math.atan2(lon1 - lon0, lat1 - lat0);
-        return [lat, lon, ang];
+        routeSample.set(lat, lon, ang);
       };
 
       // Birds: flapping gull sprites
       const birdTex = (() => {
         const c = document.createElement("canvas");
-        c.width = 64; c.height = 32;
+        c.width = 128; c.height = 64;
         const g = c.getContext("2d")!;
+        g.scale(2, 2);
         g.strokeStyle = "rgba(30,30,40,0.9)";
         g.lineWidth = 4; g.lineCap = "round";
         g.beginPath();
@@ -880,17 +920,25 @@ export function LagosMap({
         t.colorSpace = THREE.SRGBColorSpace;
         return t;
       })();
-      const birds: Array<{ spr: THREE.Sprite; cx: number; cz: number; r: number; speed: number; ph: number; h: number }> = [];
+      // One camera-facing instanced draw for the whole flock, retaining each
+      // bird's orbit/flap. Reuse the existing matrix scratch object per frame.
+      const birdMaterial = new THREE.MeshBasicMaterial({ map: birdTex, transparent: true, depthTest: false, depthWrite: false, opacity: 0.85 });
+      birdMaterial.onBeforeCompile = (shader) => {
+        shader.vertexShader = shader.vertexShader.replace("#include <project_vertex>", `
+          vec4 mvPosition = modelViewMatrix * vec4(instanceMatrix[3].xyz, 1.0);
+          mvPosition.xy += position.xy * vec2(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz));
+          gl_Position = projectionMatrix * mvPosition;`);
+      };
+      birdMaterial.customProgramCacheKey = () => "eko-billboard-flock-v1";
+      const flock = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), birdMaterial, 14);
+      flock.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      flock.frustumCulled = false;
+      flock.renderOrder = 6;
+      scene.add(flock);
+      const birds: Array<{ size: number; cx: number; cz: number; r: number; speed: number; ph: number; h: number }> = [];
       for (let i = 0; i < 14; i++) {
-        const spr = new THREE.Sprite(
-          new THREE.SpriteMaterial({ map: birdTex, transparent: true, depthTest: false, opacity: 0.85 })
-        );
-        const s = 2.2 + rand() * 1.5;
-        spr.scale.set(s, s / 2, 1);
-        spr.renderOrder = 6;
-        scene.add(spr);
         birds.push({
-          spr,
+          size: 2.2 + rand() * 1.5,
           cx: (rand() - 0.5) * 160,
           cz: (rand() - 0.5) * 180,
           r: 25 + rand() * 45,
@@ -951,13 +999,15 @@ export function LagosMap({
       const labelSprites: Array<{ spr: THREE.Sprite; tier: number; region: boolean }> = [];
       const addLabel = (text: string, lon: number, lat: number, tier: number, region: boolean, h: number) => {
         const tex = makePillLabel(text, tier);
-        const aspect = (tex.image as HTMLCanvasElement).width / 68;
+        const aspect = (tex.image as HTMLCanvasElement).width / 136;
+        const initialOpacity = mapLabelOpacity(camera.position.distanceTo(controls.target), tier, region);
         const spr = new THREE.Sprite(
           new THREE.SpriteMaterial({
             map: tex,
-            depthTest: false, transparent: true, opacity: 0.85,
+            depthTest: false, transparent: true, opacity: initialOpacity,
           })
         );
+        spr.visible = initialOpacity > 0.002;
         spr.scale.set(h * aspect, h, 1);
         spr.position.set(lon2x(lon), region ? 22 : 14, lat2z(lat));
         spr.renderOrder = 5;
@@ -975,36 +1025,19 @@ export function LagosMap({
         const lat = LAT_N - ((z + 86) / 172) * (LAT_N - LAT_S);
         return [lat, lon];
       };
-      const pinSprites: THREE.Sprite[] = [];
-      const pinGroup = new THREE.Group();
-      const rebuildPins = () => {
-        while (pinGroup.children.length) {
-          const ch = pinGroup.children.pop()!;
-          pinGroup.remove(ch);
-        }
-        pinSprites.length = 0;
-        for (const pin of pinsRef.current) {
-          let [lat, lon] = pinToLatLon(pin.x, pin.z);
-          // Nudge off water
-          let guard = 0;
-          while (isWaterLL(lat, lon) && guard++ < 40) lon -= 0.004;
-          const spr = new THREE.Sprite(
-            new THREE.SpriteMaterial({
-              map: makeEmojiTexture(pin.emoji || "📍"),
-              depthTest: false, transparent: true,
-            })
-          );
-          spr.scale.set(6, 6, 1);
-          spr.position.set(lon2x(lon), 6, lat2z(lat));
-          spr.renderOrder = 10;
-          (spr as any).userData.pin = pin;
-          (spr as any).userData.baseY = 6;
-          pinSprites.push(spr);
-          pinGroup.add(spr);
-        }
-      };
+      const pinLayer = createPinLayer(makeEmojiTexture);
+      const pinSprites = pinLayer.sprites;
+      const rebuildPins = () => pinLayer.sync(pinsRef.current, (pin, spr) => {
+        let [lat, lon] = pinToLatLon(pin.x, pin.z);
+        let guard = 0;
+        while (isWaterLL(lat, lon) && guard++ < 40) lon -= 0.004;
+        spr.position.x = lon2x(lon);
+        spr.position.z = lat2z(lat);
+        if (!spr.position.y) spr.position.y = 6;
+      });
       rebuildPins();
-      scene.add(pinGroup);
+      syncPinsRef.current = rebuildPins;
+      scene.add(pinLayer.group);
 
       // Tooltip + tap-to-select
       const tooltip = document.createElement("div");
@@ -1013,51 +1046,92 @@ export function LagosMap({
       mount.appendChild(tooltip);
       const raycaster = new THREE.Raycaster();
       const pointer = new THREE.Vector2();
-      const setPointer = (e: PointerEvent) => {
+      const setPointer = (clientX: number, clientY: number) => {
         const r = renderer.domElement.getBoundingClientRect();
-        pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
-        pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+        pointer.x = ((clientX - r.left) / r.width) * 2 - 1;
+        pointer.y = -((clientY - r.top) / r.height) * 2 + 1;
       };
-      let downX = 0, downY = 0;
-      const onDown = (e: PointerEvent) => { downX = e.clientX; downY = e.clientY; };
+      let hoverX = 0, hoverY = 0, hoverPending = false;
+      let hovered: THREE.Sprite | null = null;
+      const hoverHits: THREE.Intersection[] = [];
+      const pointers = new Map<number, { x: number; y: number; moved: boolean }>();
+      let multiTouch = false;
+      const onDown = (e: PointerEvent) => {
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, moved: false });
+        if (pointers.size > 1) multiTouch = true;
+      };
+      const onMove = (e: PointerEvent) => {
+        if (e.pointerType !== "touch" && !e.buttons) {
+          hoverX = e.clientX; hoverY = e.clientY; hoverPending = true;
+        }
+        const down = pointers.get(e.pointerId);
+        if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) down.moved = true;
+      };
+      const onCancel = (e: PointerEvent) => {
+        hovered = null; hoverPending = false;
+        tooltip.hidden = true;
+        pointers.delete(e.pointerId);
+        if (!pointers.size) multiTouch = false;
+      };
       const onUp = (e: PointerEvent) => {
-        if (Math.hypot(e.clientX - downX, e.clientY - downY) > 8) return;
-        setPointer(e);
+        const down = pointers.get(e.pointerId);
+        const isTap = down && !down.moved && !multiTouch &&
+          Math.hypot(e.clientX - down.x, e.clientY - down.y) <= 8;
+        onCancel(e);
+        if (!isTap) return;
+        setPointer(e.clientX, e.clientY);
+        // Raycast against the camera's latest damped orbit position.
+        camera.updateMatrixWorld();
         raycaster.setFromCamera(pointer, camera);
         const hit = raycaster.intersectObjects(pinSprites, false)[0];
-        if (hit) {
-          const pin = (hit.object as THREE.Sprite).userData.pin as PinLocation;
-          selectRef.current(pin);
-        }
+        if (hit) selectRef.current((hit.object as THREE.Sprite).userData.pin as PinLocation);
       };
       const el = renderer.domElement;
       el.addEventListener("pointerdown", onDown);
       el.addEventListener("pointerup", onUp);
+      el.addEventListener("pointermove", onMove);
+      el.addEventListener("pointercancel", onCancel);
+      el.addEventListener("pointerleave", onCancel);
 
       // Animation: day/night + living world + zoom-tier labels
       const clock = new THREE.Clock();
       let raf = 0;
       // Offset clock so dayT starts at dayT0
       const tOffset = dayT0 * DAY_LEN;
+      let viewportWidth = mount.clientWidth || 1;
+      let viewportHeight = mount.clientHeight || 1;
+      const duskColor = new THREE.Color(0xff9a5c);
+      let elapsed = 0;
       const animate = () => {
         raf = requestAnimationFrame(animate);
-        const t = clock.getElapsedTime() + tOffset;
+        const dt = Math.min(clock.getDelta(), 0.05);
+        elapsed += dt;
+        controls.dampingFactor = 1 - Math.exp(-dt * 5);
+        controls.update(dt);
+        const t = elapsed + tOffset;
         const dist = camera.position.distanceTo(controls.target);
 
         // --- Day/night cycle ---
         const dayT = (t / DAY_LEN) % 1; // 0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset
         const sunA = dayT * Math.PI * 2 - Math.PI / 2; // start at sunrise
-        const sunH = Math.sin(sunA); // -1..1, >0 = day
-        const dayF = THREE.MathUtils.smoothstep(sunH, -0.08, 0.25); // 0 night → 1 day
-        const duskF = Math.exp(-Math.pow(sunH / 0.18, 2)); // golden near horizon
-        // Sky
-        (scene.background as THREE.Color).copy(skyNight).lerp(skyDay, dayF).lerp(skyDawn, duskF * 0.55);
-        (scene.fog as THREE.Fog).color.copy(fogNight).lerp(fogDay, dayF);
+        const sunH = Math.sin(sunA);
+        sampleDayLight(dayT, lighting);
+        const dayF = lighting.day;
+        const duskF = lighting.warmth;
+        sky.uniforms.day.value = dayF;
+        sky.uniforms.warmth.value = duskF;
+        lagoon.uniforms.lagoonTime.value = t;
+        lagoon.uniforms.lagoonDay.value = dayF;
+        lagoon.uniforms.lagoonWarmth.value = duskF;
+        (scene.fog as THREE.Fog).color.copy(fogNight).lerp(fogDay, dayF).lerp(fogWarm, duskF * 0.3);
+        ambient.color.copy(ambientNight).lerp(ambientDay, dayF);
+        ambient.intensity = 0.42 + dayF * 0.53;
+        renderer.toneMappingExposure = 0.92 + dayF * 0.12;
         // Sun
         const sunDist = 220;
         sun.position.set(Math.cos(sunA) * sunDist, Math.max(sunH, -0.3) * sunDist * 0.9 + 20, 80);
         sun.intensity = 0.12 + dayF * 1.6;
-        sun.color.setHex(0xfff7e6).lerp(new THREE.Color(0xff9a5c), duskF * 0.7);
+        sun.color.setHex(0xfff7e6).lerp(duskColor, duskF * 0.7);
         // Night lights: WINDOWS ONLY on every building + bridge lamps
         const nightF = 1 - dayF;
         towerMat.emissiveIntensity = nightF * 1.6;
@@ -1067,30 +1141,46 @@ export function LagosMap({
 
         // --- Moving boats ---
         for (const b of movingBoats) {
-          b.t = (b.t + b.route.speed * (1 / 60)) % 1;
-          const [lat, lon, ang] = routePoint(b.route, b.t);
-          b.grp.position.set(lon2x(lon), 0.15 + Math.sin(t * 2 + b.t * 9) * 0.08, lat2z(lat));
-          b.grp.rotation.y = ang;
+          b.t = (b.t + b.route.speed * dt) % 1;
+          routePoint(b.route, b.t);
+          b.grp.position.set(lon2x(routeSample.y), 0.15 + Math.sin(t * 2 + b.t * 9) * 0.08, lat2z(routeSample.x));
+          b.grp.rotation.y = routeSample.z;
         }
-        // --- Pin bobbing ---
-        pinSprites.forEach((s, i) => {
-          s.position.y = (s.userData.baseY as number) + Math.sin(t * 2 + i * 1.7) * 0.45;
-        });
-        // --- Birds ---
-        for (const bd of birds) {
+        // At most one hover raycast/layout read per frame, before tooltip writes.
+        if (hoverPending && !pointers.size) {
+          hoverPending = false;
+          setPointer(hoverX, hoverY);
+          camera.updateMatrixWorld();
+          raycaster.setFromCamera(pointer, camera);
+          hoverHits.length = 0;
+          raycaster.intersectObjects(pinSprites, false, hoverHits);
+          const next = (hoverHits[0]?.object as THREE.Sprite | undefined) ?? null;
+          if (hovered !== next) {
+            hovered = next;
+            el.style.cursor = hovered ? "pointer" : "";
+            tooltip.textContent = hovered ? (hovered.userData.pin as PinLocation).name : "";
+          }
+          tooltip.hidden = !hovered;
+          if (hovered) {
+            tooltip.style.transform = `translate3d(${pointer.x * viewportWidth / 2 + viewportWidth / 2}px, ${-pointer.y * viewportHeight / 2 + viewportHeight / 2 - 18}px, 0) translate(-50%, -100%)`;
+          }
+        }
+        pinLayer.animate(dt, t, dist, viewportHeight, hovered, reducedMotion);
+        // --- Birds: one instance-buffer update, no transient objects ---
+        dummy.rotation.set(0, 0, 0);
+        for (let i = 0; i < birds.length; i++) {
+          const bd = birds[i];
           const a = t * bd.speed + bd.ph;
-          bd.spr.position.set(
-            bd.cx + Math.cos(a) * bd.r,
-            bd.h + Math.sin(t * 0.9 + bd.ph) * 4,
-            bd.cz + Math.sin(a) * bd.r
-          );
-          // Flap: scale y oscillates
+          dummy.position.set(bd.cx + Math.cos(a) * bd.r, bd.h + Math.sin(t * 0.9 + bd.ph) * 4, bd.cz + Math.sin(a) * bd.r);
           const flap = Math.abs(Math.sin(t * 7 + bd.ph));
-          (bd.spr.scale as THREE.Vector3).y = (2.2 * (0.35 + flap * 0.65)) / 2;
-          bd.spr.material.opacity = 0.25 + dayF * 0.65;
+          dummy.scale.set(bd.size, (2.2 * (0.35 + flap * 0.65)) / 2, 1);
+          dummy.updateMatrix();
+          flock.setMatrixAt(i, dummy.matrix);
         }
+        flock.instanceMatrix.needsUpdate = true;
+        birdMaterial.opacity = 0.25 + dayF * 0.65;
         // --- Aircraft flyover ---
-        planeTimer -= 1 / 60;
+        planeTimer -= dt;
         if (planeT < 0 && planeTimer <= 0) {
           planeT = 0;
           aircraft.visible = true;
@@ -1102,7 +1192,7 @@ export function LagosMap({
           aircraft.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
         }
         if (planeT >= 0) {
-          planeT += (1 / 60) * 0.03;
+          planeT += dt * 0.03;
           const dir = aircraft.userData.dir as number;
           aircraft.position.x = (-140 + planeT * 300) * dir;
           aircraft.position.y = aircraft.userData.h + Math.sin(t * 0.8) * 2;
@@ -1121,30 +1211,22 @@ export function LagosMap({
           }
         }
 
-        // --- Labels: pale far → pure near ---
+        // Continuous zoom fades rather than tier-boundary opacity jumps.
+        const labelFollow = reducedMotion ? 1 : 1 - Math.exp(-dt * 10);
         for (const { spr, tier, region } of labelSprites) {
-          if (region) {
-            spr.visible = true;
-            (spr.material as THREE.SpriteMaterial).opacity = dist > 300 ? 0.9 : 0.5;
-          } else if (dist > 320) {
-            spr.visible = tier === 0;
-            (spr.material as THREE.SpriteMaterial).opacity = 0.7;
-          } else if (dist > 150) {
-            spr.visible = true;
-            (spr.material as THREE.SpriteMaterial).opacity = 0.8;
-          } else {
-            spr.visible = true;
-            (spr.material as THREE.SpriteMaterial).opacity = 1.0;
-          }
+          const opacity = mapLabelOpacity(dist, tier, region);
+          spr.material.opacity += (opacity - spr.material.opacity) * labelFollow;
+          spr.visible = spr.material.opacity > 0.002;
         }
-        controls.update();
         renderer.render(scene, camera);
       };
       animate();
+      loadingNote.remove();
 
       const resize = () => {
         const w = mount.clientWidth || 1, h = mount.clientHeight || 1;
-        renderer.setSize(w, h);
+        viewportWidth = w; viewportHeight = h;
+        renderer.setSize(w, h, false);
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
       };
@@ -1157,19 +1239,62 @@ export function LagosMap({
         ro.disconnect();
         el.removeEventListener("pointerdown", onDown);
         el.removeEventListener("pointerup", onUp);
+        el.removeEventListener("pointermove", onMove);
+        el.removeEventListener("pointercancel", onCancel);
+        el.removeEventListener("pointerleave", onCancel);
         tooltip.remove();
+        syncPinsRef.current = null;
+        pinLayer.dispose();
+        controls.dispose();
+        const geometries = new Set<THREE.BufferGeometry>();
+        const materials = new Set<THREE.Material>();
+        const textures = new Set<THREE.Texture>();
+        scene.traverse((object) => {
+          const mesh = object as THREE.Mesh;
+          if (mesh.geometry) geometries.add(mesh.geometry);
+          const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          for (const material of list) {
+            if (!material) continue;
+            materials.add(material);
+            for (const value of Object.values(material)) {
+              if (value instanceof THREE.Texture) textures.add(value);
+            }
+          }
+        });
+        for (const geometry of geometries) geometry.dispose();
+        for (const material of materials) material.dispose();
+        for (const texture of textures) texture.dispose();
+        sky.texture.dispose();
+        waterMask.dispose();
+        sun.shadow.dispose();
         renderer.dispose();
         if (renderer.domElement.parentElement === mount) mount.removeChild(renderer.domElement);
       };
     };
 
     let cleanup: (() => void) | undefined;
-    if (maskImg.complete) cleanup = build();
+    let failure: HTMLElement | null = null;
+    const maskFailed = () => {
+      loadingNote.remove();
+      failure = showFailure("The city map could not load. Reopen the map to try again.");
+    };
+    maskImg.onerror = maskFailed;
+    if (maskImg.complete && maskImg.naturalWidth > 0) cleanup = build();
+    else if (maskImg.complete) maskFailed();
     else maskImg.onload = () => { cleanup = build(); };
 
-    return () => { cleanup?.(); };
+    return () => {
+      loadingNote.remove();
+      failure?.remove();
+      maskImg.onload = null;
+      maskImg.onerror = null;
+      if (cleanup) cleanup();
+      else { sky.texture.dispose(); sky.mesh.geometry.dispose(); sky.mesh.material.dispose(); controls.dispose(); renderer.dispose(); renderer.domElement.remove(); }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <div ref={mountRef} className="city-map-wrap" style={{ width: "100%", height: "100%", minHeight: 420 }} />;
-}
+  useEffect(() => { syncPinsRef.current?.(); }, [pins]);
+
+  return <div ref={mountRef} role="region" aria-label="Living map of Lagos" className="city-map-wrap" style={{ position: "relative", width: "100%", height: "100%", minHeight: 420 }} />;
+});

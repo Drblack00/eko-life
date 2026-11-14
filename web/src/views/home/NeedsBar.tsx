@@ -76,7 +76,7 @@ export function NeedsBar({
               <span className={`eko-needsbar__track ${barTone(v)}`} aria-hidden="true">
                 <span
                   className="eko-needsbar__fill"
-                  style={{ width: `${v}%` }}
+                  style={{ transform: `scaleX(${v / 100})` }}
                 />
               </span>
             </span>

@@ -15,15 +15,12 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Theme switching crossfades the chrome instead of snapping. */
+/* Theme snapshots cross-fade in theme.tsx; chrome motion stays on the compositor. */
 .eko-game,
 .eko-hud,
 .mobile-nav,
 .glass {
-  transition:
-    background-color 0.5s var(--ease-out),
-    border-color 0.5s var(--ease-out),
-    color 0.5s var(--ease-out);
+  transition: transform var(--motion-panel) var(--ease-settle), opacity var(--motion-fast) ease;
 }
 
 /* ================= Top hub ================= */

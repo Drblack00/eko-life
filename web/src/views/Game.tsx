@@ -1,3 +1,4 @@
+import { ViewStage } from "../components/ViewStage";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useGameSocket } from "../hooks/useGameSocket";
@@ -393,7 +394,7 @@ function CityTab({
     }
     // Spread pins that would otherwise stack on top of each other.
     return declutterPins(locPins);
-  }, [config, you, spawns]);
+  }, [config, you.currentCity, you.homeCity, you.locationId, you.id, you.name, you.avatar, spawns]);
 
   const hereName = useMemo(() => {
     const l = asList(config?.locations).find((x) => x.id === you.locationId);
@@ -1525,7 +1526,7 @@ export function Game({
         <AdminView token={token} onBack={() => setAdminOpen(false)} />
       ) : (
         <>
-          <main className="eko-main">
+          <ViewStage as="main" className="eko-main" viewKey={tab}>
         {tab === "home" && config && (
           <HomeView
             you={you}
@@ -1572,7 +1573,7 @@ export function Game({
             onOpenTravel={() => setTravelOpen(true)}
           />
         )}
-      </main>
+      </ViewStage>
 
       <Sheet
         open={pinSheet !== null}

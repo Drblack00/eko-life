@@ -11,7 +11,7 @@
   padding: var(--space-3) var(--space-5);
   min-height: 44px;
   min-width: 44px;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+  transition: transform var(--motion-fast) var(--ease-spring), opacity var(--motion-fast) ease;
   text-decoration: none;
   user-select: none;
 }
@@ -27,30 +27,30 @@
 }
 
 .eko-btn--primary {
-  background: var(--palm-500);
-  color: #fff;
-  box-shadow: 0 6px 16px rgb(34 197 94 / 0.35);
+  background: var(--primary);
+  color: var(--on-accent, var(--bg));
+  box-shadow: var(--shadow-sm);
 }
 
 .eko-btn--accent {
   background: var(--accent);
-  color: var(--neutral-900);
+  color: var(--on-accent, var(--bg));
   box-shadow: var(--shadow-md);
 }
 
 /* Dark navy pill (selected-tab language) */
 .eko-btn--dark {
-  background: #0f172a;
-  color: #fff;
+  background: var(--surface-2);
+  color: var(--text);
   box-shadow: var(--shadow-md);
 }
 
 /* Floating white pill */
 .eko-btn--light {
-  background: #fff;
+  background: var(--surface);
   color: var(--text);
   box-shadow: var(--shadow-md);
-  border: 1px solid rgb(0 0 0 / 0.06);
+  border: 1px solid var(--line, var(--glass-border));
 }
 
 .eko-btn--ghost {
@@ -65,17 +65,17 @@
 }
 
 .eko-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(1.02);
 }
 
 .eko-btn:active:not(:disabled) {
-  transform: translateY(1px) scale(0.99);
+  transform: translateY(1px) scale(0.97);
 }
 
 .eko-btn:disabled {
-  background: #d9f6e7;
-  color: #3f6b50;
-  opacity: 1;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  opacity: 0.65;
   box-shadow: none;
   cursor: not-allowed;
   transform: none;

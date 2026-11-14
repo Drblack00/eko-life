@@ -1,0 +1,89 @@
+/* Shared finish. All UI colours inherit the six existing theme palettes.
+   Motion changes only transform/opacity; shadows and blur stay static. */
+.eko-game { -webkit-font-smoothing: antialiased; }
+.eko-game :is(h2, h3) { text-wrap: balance; }
+.eko-game :is(p, label) { overflow-wrap: break-word; }
+.eko-game :is(input, textarea, select) {
+  border-radius: var(--radius-sm);
+  border-color: var(--line, var(--glass-border));
+  background-color: var(--surface-2);
+  color: var(--text);
+  caret-color: var(--primary);
+}
+.eko-game :is(input, textarea)::placeholder { color: var(--text-muted); opacity: 0.8; }
+.eko-card.glass {
+  border-color: var(--line, var(--glass-border));
+  --glass-shadow: var(--shadow-sm);
+}
+:is(.eko-card, .eko-empty, .eko-loading, .eko-phone__app, .eko-iphone__app, .eko-char__body) {
+  animation: eko-content-arrive 340ms var(--ease-spring) both;
+}
+:is(.eko-empty, .eko-loading) { color: var(--text); }
+.eko-empty__emoji {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft, var(--surface-2));
+}
+:is(.eko-empty__title, .eko-loading__message) { letter-spacing: -0.02em; }
+:is(.eko-dialog__close, .eko-sheet__close, .eko-iphone__appbtn, .eko-char__tab, .eko-tabbar__btn) {
+  transition: transform var(--motion-fast) var(--ease-spring), opacity var(--motion-fast) ease;
+}
+@media (hover: hover) {
+  :is(.eko-dialog__close, .eko-sheet__close, .eko-iphone__appbtn, .eko-char__tab):hover:not(:disabled) { transform: translateY(-1px) scale(1.03); }
+}
+:is(.eko-dialog__close, .eko-sheet__close, .eko-iphone__appbtn, .eko-char__tab):active:not(:disabled) { transform: scale(0.96); }
+:is(.eko-sheet__scrim, .eko-dialog__scrim, .eko-phone__scrim) {
+  background: color-mix(in srgb, var(--bg) 66%, transparent);
+  animation: eko-scrim-in 180ms ease both;
+}
+:is(.eko-sheet, .eko-dialog) { animation-duration: var(--motion-panel); animation-timing-function: var(--ease-spring); }
+:is(.eko-sheet__scrim, .eko-dialog__scrim, .eko-phone__scrim)[data-state="closing"] {
+  pointer-events: none;
+  animation: eko-scrim-out 220ms ease both;
+}
+.eko-dialog__scrim[data-state="closing"] .eko-dialog {
+  animation: eko-dialog-exit 220ms var(--ease-settle) both;
+}
+.eko-sheet__scrim[data-state="closing"] .eko-sheet,
+.eko-phone__scrim[data-state="closing"] .eko-phone__panel {
+  animation: eko-panel-exit 220ms var(--ease-settle) both;
+}
+.eko-phone__panel { animation-timing-function: var(--ease-spring); }
+@keyframes eko-content-arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes eko-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes eko-scrim-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes eko-dialog-exit { to { transform: translateY(8px) scale(0.97); opacity: 0; } }
+@keyframes eko-panel-exit { to { transform: translateY(28px) scale(0.99); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  /* Keep state changes accessible; usePresence still cleans up interrupted exits. */
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+.eko-viewstage[data-phase="enter"] { animation: eko-content-arrive 320ms var(--ease-settle) both; }
+.eko-viewstage[data-phase="exit"] { animation: eko-view-exit 160ms var(--ease-settle) both; pointer-events: none; }
+[data-state="open"] > :is(.eko-dialog, .eko-sheet) { animation-timing-function: var(--ease-spring); animation-duration: var(--motion-panel); }
+@keyframes eko-view-exit { to { opacity: 0; transform: translateY(-6px); } }
+
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 240ms; animation-timing-function: ease; }
+::view-transition-group(root) { animation: none; }
+
+.eko-iphone__screen { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+/* HUD retains its layout; its material now shares the panel boundary and depth. */
+.eko-hud :is(.glass, .eko-top-pill) { border-color: var(--line, var(--glass-border)); }
+:is(.eko-top-pill__avatar, .eko-hub__avatar) { text-shadow: 0 2px 3px color-mix(in srgb, var(--bg) 48%, transparent); }
+.mobile-nav .nav-item { transition: transform var(--motion-fast) var(--ease-spring), opacity var(--motion-fast) ease; }
+.mobile-nav .nav-item:active { transform: scale(0.93); }
+
+.eko-game .bar > span, .eko-game .eko-needsbar__fill {
+  width: 100%;
+  transform-origin: left;
+  transition: transform 450ms var(--ease-settle);
+}
+
+/* Keep the phone's last row and home indicator above the persistent mobile dock. */
+@media (max-width: 699px) {
+  .eko-phone__panel.eko-phone__panel--iphone {
+    bottom: calc(76px + var(--sab));
+    max-height: calc(100dvh - 90px - var(--sat) - var(--sab));
+  }
+}

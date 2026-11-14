@@ -101,10 +101,12 @@ export async function createApp() {
   // (fire-and-forget; a dead feed never blocks startup or requests).
   // triggerNewsRefresh is debounced: overlapping refreshes are skipped.
   let newsRefreshing = false;
+  const newsAbort = new AbortController();
+  let newsRefreshPromise = Promise.resolve();
   const triggerNewsRefresh = () => {
-    if (newsRefreshing) return;
+    if (newsRefreshing || newsAbort.signal.aborted) return;
     newsRefreshing = true;
-    refreshNewsFeeds()
+    newsRefreshPromise = refreshNewsFeeds({ signal: newsAbort.signal })
       .catch((e) => console.error('[news] refresh:', e.message))
       .finally(() => { newsRefreshing = false; });
   };
@@ -243,6 +245,8 @@ export async function createApp() {
     clearInterval(clock);
     clearInterval(v2tick);
     clearInterval(newsTimer);
+    newsAbort.abort();
+    await newsRefreshPromise;
     await new Promise((resolve) => server.close(resolve));
   }
 
