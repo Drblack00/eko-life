@@ -1,3 +1,4 @@
+import { ViewStage } from "../components/ViewStage";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useGameSocket } from "../hooks/useGameSocket";
@@ -1525,7 +1526,7 @@ export function Game({
         <AdminView token={token} onBack={() => setAdminOpen(false)} />
       ) : (
         <>
-          <main className="eko-main">
+          <ViewStage as="main" className="eko-main" viewKey={tab}>
         {tab === "home" && config && (
           <HomeView
             you={you}
@@ -1572,7 +1573,7 @@ export function Game({
             onOpenTravel={() => setTravelOpen(true)}
           />
         )}
-      </main>
+      </ViewStage>
 
       <Sheet
         open={pinSheet !== null}

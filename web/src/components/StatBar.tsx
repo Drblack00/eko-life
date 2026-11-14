@@ -38,7 +38,7 @@ export function StatBar({
       >
         <div
           className={`eko-statbar__fill eko-statbar__fill--${tone}`}
-          style={{ width: `${clamped}%` }}
+          style={{ transform: `scaleX(${clamped / 100})` }}
         />
       </div>
     </div>

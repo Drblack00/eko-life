@@ -39,7 +39,9 @@
 .eko-statbar__fill {
   height: 100%;
   border-radius: 99px;
-  transition: width 0.4s ease;
+  width: 100%;
+  transform-origin: left;
+  transition: transform 0.45s var(--ease-settle);
 }
 
 .eko-statbar__fill--good {

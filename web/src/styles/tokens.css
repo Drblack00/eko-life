@@ -43,6 +43,12 @@
   --danger: #dc2626;
   --ring: var(--lagoon-500);
 
+  /* Motion: overshoot only on spatial feedback; exits settle without bounce. */
+  --ease-spring: cubic-bezier(0.2, 1.18, 0.3, 1);
+  --ease-settle: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-fast: 160ms;
+  --motion-panel: 380ms;
+
   /* Shape */
   --radius-sm: 10px;
   --radius-md: 16px;

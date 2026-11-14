@@ -138,10 +138,35 @@ export function setTheme(next: ThemeId): void {
   if (changed) listeners.forEach((l) => l());
 }
 
+/** Theme switches cross-fade snapshots rather than animating paint-heavy colours.
+ * Boot and direct setTheme calls stay synchronous; unsupported/reduced-motion
+ * browsers still apply the theme immediately. */
+let themeTransition: { skipTransition: () => void } | null = null;
+let themeRevision = 0;
+export function setThemeWithMotion(next: ThemeId): void {
+  if (!isThemeId(next)) return;
+  const revision = ++themeRevision;
+  if (typeof document === "undefined" || typeof window === "undefined" ||
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ||
+      typeof document.startViewTransition !== "function" || document.visibilityState === "hidden") {
+    setTheme(next);
+    return;
+  }
+  themeTransition?.skipTransition();
+  const transition = document.startViewTransition(() => {
+    if (revision === themeRevision) setTheme(next);
+  });
+  themeTransition = transition;
+  void transition.ready.catch(() => {});
+  void transition.finished.catch(() => {}).finally(() => {
+    if (themeTransition === transition) themeTransition = null;
+  });
+}
+
 /** React hook: [activeThemeId, setTheme]. */
 export function useTheme(): [ThemeId, (id: ThemeId) => void] {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  return [theme, setTheme];
+  return [theme, setThemeWithMotion];
 }
 
 /** Idempotent boot: apply the stored theme before first paint. */

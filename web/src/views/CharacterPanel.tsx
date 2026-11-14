@@ -1,3 +1,4 @@
+import { ViewStage } from "../components/ViewStage";
 /**
  * Character panel (Phase 2 of the reference audit) — a tabbed dialog opened
  * from the avatar button in the top status pill. Rebuilds the reference's
@@ -1082,7 +1083,7 @@ export function CharacterPanel({
             </button>
           ))}
         </div>
-        <div className="eko-char__body" role="tabpanel">
+        <ViewStage className="eko-char__body" role="tabpanel" viewKey={tab}>
           {tab === "profile" && (
             <ProfileTab
               you={you}
@@ -1115,7 +1116,7 @@ export function CharacterPanel({
               onSignOut={onSignOut}
             />
           )}
-        </div>
+        </ViewStage>
       </div>
     </Dialog>
   );

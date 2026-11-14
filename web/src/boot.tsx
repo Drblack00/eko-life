@@ -7,6 +7,7 @@ import "./styles/glass.css";
 import "./styles/themes.css";
 import "./styles/liquid-glass.css";
 import "./boot.css";
+import "./styles/polish.css";
 import { getTheme, setTheme } from "./theme/theme";
 
 // Apply the saved theme before first paint.

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import "./Phone.css";
+import { ViewStage } from "../../components/ViewStage";
+import { usePresence } from "../../hooks/usePresence";
 import { useGemHunt, GemDialog, gemCountdown } from "../home/GemHunt";
 import { naira } from "../../game/types";
 import { authGet } from "../../lib/api";
@@ -338,6 +340,12 @@ export function Phone({
   money,
   isAdmin,
 }: PhoneProps) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const present = usePresence(open);
+  const lastApp = useRef(activeApp);
+  if (open) lastApp.current = activeApp;
+  const displayApp = open ? activeApp : lastApp.current;
   const closeRef = useRef<HTMLButtonElement>(null);
   const clock = useClock();
   /** Direction E: widgets home vs the full app grid. */
@@ -346,10 +354,11 @@ export function Phone({
 
   useEffect(() => {
     if (!open) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
     // Direction E: every open starts on the widgets home.
     setShowAll(false);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     };
     document.addEventListener("keydown", onKey);
     // Lock body scroll while the phone is open; restore on close.
@@ -359,16 +368,17 @@ export function Phone({
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     };
-  }, [open, onClose]);
+  }, [open]);
 
-  if (!open) return null;
+  if (!present) return null;
 
-  const wide = activeApp === "style";
+  const wide = displayApp === "style";
   const iphone = !wide;
-  const known = activeApp ? PHONE_APPS.find((a) => a.id === activeApp) : undefined;
-  const isAppOpen = activeApp !== null;
-  const appLabel = known?.label ?? activeApp ?? "";
+  const known = displayApp ? PHONE_APPS.find((a) => a.id === displayApp) : undefined;
+  const isAppOpen = displayApp !== null;
+  const appLabel = known?.label ?? displayApp ?? "";
   const appIcon = known?.icon ?? "📱";
 
   const goGrid = () => {
@@ -394,7 +404,7 @@ export function Phone({
       : 0;
 
   return (
-    <div className="eko-phone__scrim" onClick={onClose}>
+    <div className="eko-phone__scrim" data-state={open ? "open" : "closing"} inert={!open} aria-hidden={!open || undefined} onClick={onClose}>
       <section
         className={`eko-phone__panel${wide ? " eko-phone__panel--wide" : ""}${iphone ? " eko-phone__panel--iphone" : ""}`}
         role="dialog"
@@ -412,7 +422,8 @@ export function Phone({
               <StatusIcons />
             </div>
 
-            {isAppOpen && activeApp ? (
+            <ViewStage className="eko-iphone__screen" viewKey={displayApp ?? (showAll ? "all" : "home")}>
+            {isAppOpen && displayApp ? (
               <>
                 <div className="eko-iphone__navbar">
                   <button
@@ -436,8 +447,8 @@ export function Phone({
                     <span aria-hidden="true">✕</span>
                   </button>
                 </div>
-                <div className="eko-iphone__app" key={activeApp}>
-                  {renderApp(activeApp)}
+                <div className="eko-iphone__app">
+                  {renderApp(displayApp)}
                 </div>
               </>
             ) : (
@@ -559,6 +570,7 @@ export function Phone({
               </>
             )}
 
+            </ViewStage>
             <button
               type="button"
               className="eko-iphone__homebar"
@@ -595,10 +607,10 @@ export function Phone({
               </button>
             </header>
 
-            {activeApp ? (
-              <div className="eko-phone__app" key={activeApp}>
-                {renderApp(activeApp)}
-              </div>
+            {displayApp ? (
+              <ViewStage className="eko-phone__app" viewKey={displayApp ?? "home"}>
+                {renderApp(displayApp)}
+              </ViewStage>
             ) : null}
 
             <div className="eko-phone__homebar" aria-hidden="true" />
